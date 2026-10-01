@@ -2,27 +2,25 @@ import { Link } from 'react-router-dom';
 import { ROUTES } from '@/routes/paths';
 
 export const ConversionBanner = () => (
-  <section className="bg-indigo-950">
-    <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 px-4 py-12 sm:px-6 md:flex-row md:py-14">
-      <div className="max-w-xl text-center md:text-left">
-        <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-amber-300">Join 25,000+ learners</p>
-        <h2 className="text-3xl font-extrabold text-white sm:text-4xl">
-          Start learning smarter today — it's free to explore.
-        </h2>
-        <p className="mt-2 text-indigo-200">Instant downloads. Structured lessons. Support for the whole family.</p>
+  <section className="bg-brand-800 text-white">
+    <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-6 px-5 py-14 sm:px-8 md:flex-row md:items-center">
+      <div className="max-w-2xl">
+        <p className="mb-2 text-xs font-bold uppercase tracking-[.18em] text-lime-accent">Admissions</p>
+        <h2 className="text-3xl font-extrabold sm:text-4xl">Ready to begin your child’s journey?</h2>
+        <p className="mt-3 text-white/75">Take the first step or speak with our admissions team.</p>
       </div>
-      <div className="flex flex-wrap items-center justify-center gap-3">
+      <div className="flex flex-wrap gap-3">
         <Link
-          to={ROUTES.resources}
-          className="rounded-full bg-amber-400 px-7 py-3.5 text-sm font-bold text-slate-900 shadow-xl transition-transform hover:-translate-y-0.5 hover:bg-amber-300"
+          to={ROUTES.admissions}
+          className="rounded bg-lime-accent px-6 py-3.5 text-sm font-bold text-brand-900 hover:bg-white"
         >
-          Browse Free Resources
+          Apply Now
         </Link>
         <Link
-          to={ROUTES.students}
-          className="rounded-full border-2 border-white/30 px-7 py-3 text-sm font-bold text-white transition-colors hover:border-white hover:bg-white/10"
+          to={ROUTES.contact}
+          className="rounded border border-white/50 px-6 py-3 text-sm font-bold text-white hover:bg-white/10"
         >
-          Create Free Account
+          Contact Admissions
         </Link>
       </div>
     </div>

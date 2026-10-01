@@ -1,9 +1,14 @@
 export const ROUTES = {
   home: '/',
-  students: '/students',
-  parents: '/parents',
-  teachers: '/teachers',
-  resources: '/resources',
+  about: '/about',
+  academics: '/academics',
+  admissions: '/admissions',
+  studentLife: '/student-life',
+  services: '/services',
+  news: '/news',
+  gallery: '/gallery',
+  contact: '/contact',
+  login: '/login',
   notFound: '*',
 } as const;
 

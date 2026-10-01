@@ -1,93 +1,75 @@
-import { useState } from 'react';
-import { Button } from '@/components/ui/Button';
-import { HandwrittenBadge } from '@/components/ui/Badge';
-import { ROUTES } from '@/routes/paths';
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { heroSlides } from '@/data/heroSlides';
+import { Container } from '@/components/ui/Container';
+import { PageMetadata } from '@/components/ui/PageMetadata';
 
 export const Hero = () => {
-  const [showVideo, setShowVideo] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [paused, setPaused] = useState(() => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const touchStartX = useRef<number | null>(null);
+  const slide = heroSlides[activeIndex];
+
+  useEffect(() => {
+    heroSlides.forEach((item) => {
+      const image = new Image();
+      image.src = item.image;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (paused) return;
+    const timer = window.setInterval(() => setActiveIndex((index) => (index + 1) % heroSlides.length), 7000);
+    return () => window.clearInterval(timer);
+  }, [paused]);
+
+  const showSlide = (index: number) => setActiveIndex((index + heroSlides.length) % heroSlides.length);
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-indigo-50 via-white to-white">
-      <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 pb-16 pt-12 sm:px-6 lg:grid-cols-2 lg:pt-20">
-        <div>
-          <div className="mb-4 flex flex-wrap gap-2">
-            <HandwrittenBadge>trusted by 25k+ families ✏️</HandwrittenBadge>
-          </div>
-          <h1 className="text-4xl font-extrabold leading-[1.05] tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-            Simplify learning.
-            <span className="block text-indigo-600">Empower everyone.</span>
-          </h1>
-          <p className="mt-5 max-w-lg text-lg leading-relaxed text-slate-600">
-            LearnwithUncleTee is your all-in-one portal for structured curriculum resources,
-            downloadable materials and persona-driven guidance for primary & secondary success.
-          </p>
+    <section
+      className="relative isolate flex min-h-[600px] items-center overflow-hidden bg-brand-900 text-white sm:min-h-[680px]"
+      aria-roledescription="carousel"
+      aria-label="School highlights"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onTouchStart={(event) => { touchStartX.current = event.touches[0]?.clientX ?? null; }}
+      onTouchEnd={(event) => {
+        if (touchStartX.current === null) return;
+        const endX = event.changedTouches[0]?.clientX;
+        if (endX !== undefined && Math.abs(endX - touchStartX.current) > 45) showSlide(activeIndex + (endX < touchStartX.current ? 1 : -1));
+        touchStartX.current = null;
+      }}
+      onFocus={() => setPaused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setPaused(false);
+      }}
+    >
+      <PageMetadata title="Nurturing Future Leaders" description="Academic excellence, strong character and a supportive environment for every learner at Learnwithuncletee." />
+      {heroSlides.map((item, index) => (
+        <div
+          key={item.id}
+          className={`absolute inset-0 -z-10 transition-opacity duration-700 ${index === activeIndex ? 'opacity-100' : 'opacity-0'}`}
+          aria-hidden="true"
+          style={{ backgroundImage: `linear-gradient(90deg, rgba(4,46,26,.92) 0%, rgba(4,58,33,.72) 48%, rgba(4,58,33,.20) 100%), url(${item.image})`, backgroundPosition: 'center', backgroundSize: 'cover' }}
+        />
+      ))}
+      <Container className="relative pb-20 pt-16 sm:pb-24">
+        <div key={slide.id} className="max-w-3xl">
+          <p className="text-xs font-bold uppercase tracking-[.2em] text-lime-accent">{slide.eyebrow}</p>
+          <h1 className="mt-5 max-w-2xl text-5xl font-extrabold leading-[1.04] sm:text-6xl lg:text-7xl">{slide.title}</h1>
+          <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/85 sm:text-xl">{slide.text}</p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Button to={ROUTES.resources} variant="primary">Explore Courses →</Button>
-            <Button variant="outline" onClick={() => setShowVideo(true)}>
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-xs text-white">▶</span>
-              Watch How It Works
-            </Button>
-          </div>
-          <div className="mt-8 flex items-center gap-4">
-            <div className="flex -space-x-2">
-              {['AO', 'MB', 'DE', '+'].map((t, i) => (
-                <span key={i} className={`flex h-9 w-9 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white ${i === 3 ? 'bg-slate-900' : 'bg-indigo-400'}`}>
-                  {t}
-                </span>
-              ))}
-            </div>
-            <div className="text-sm">
-              <div className="font-bold text-slate-900">★★★★★ 4.9/5</div>
-              <div className="text-slate-500">from 3,200+ verified reviews</div>
-            </div>
+            <Link to={slide.primaryCta.to} className="inline-flex min-h-12 items-center rounded bg-lime-accent px-6 py-3 text-sm font-bold text-brand-900 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">{slide.primaryCta.label}<span aria-hidden="true" className="ml-2">→</span></Link>
+            {slide.secondaryCta && <Link to={slide.secondaryCta.to} className="inline-flex min-h-12 items-center rounded border border-white/60 px-6 py-3 text-sm font-bold text-white hover:bg-white/10">{slide.secondaryCta.label}</Link>}
           </div>
         </div>
-
-        <div className="relative">
-          <div className="relative overflow-hidden rounded-3xl bg-slate-900 shadow-2xl">
-            <div className="aspect-[4/3] bg-gradient-to-br from-indigo-600 via-violet-600 to-amber-400 p-8 flex flex-col justify-end">
-              <div className="rounded-2xl bg-white/95 p-5 backdrop-blur">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700">● LIVE CLASS</span>
-                  <span className="text-xs text-slate-500">JSS3 • Mathematics</span>
-                </div>
-                <p className="font-bold text-slate-900">Fractions made simple — visual walkthrough</p>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full w-2/3 rounded-full bg-indigo-600" />
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowVideo(true)}
-              className="absolute inset-0 m-auto flex h-16 w-16 items-center justify-center rounded-full bg-white text-xl shadow-xl transition-transform hover:scale-110"
-              aria-label="Play video"
-            >
-              ▶
-            </button>
-          </div>
-          <div className="absolute -bottom-5 -left-4 rotate-[-3deg] rounded-2xl bg-amber-300 px-4 py-3 shadow-lg">
-            <p className="font-[cursive] text-sm font-bold text-slate-900">“Aha! I finally get it!” 💡</p>
-          </div>
-          <div className="absolute -top-4 -right-2 rotate-[3deg] rounded-2xl bg-white px-4 py-2 shadow-lg border">
-            <p className="text-xs font-bold text-slate-900">📥 12k downloads this week</p>
-          </div>
+        <div className="absolute bottom-7 left-5 flex items-center gap-3 sm:left-8" aria-label="Carousel controls">
+          <button type="button" onClick={() => showSlide(activeIndex - 1)} aria-label="Previous slide" className="flex h-10 w-10 items-center justify-center rounded border border-white/40 text-xl hover:bg-white/15">←</button>
+          {heroSlides.map((item, index) => <button key={item.id} type="button" onClick={() => showSlide(index)} aria-label={`Show slide ${index + 1}`} aria-current={index === activeIndex} className={`h-2.5 rounded-full transition-all ${index === activeIndex ? 'w-9 bg-lime-accent' : 'w-2.5 bg-white/60 hover:bg-white'}`} />)}
+          <button type="button" onClick={() => showSlide(activeIndex + 1)} aria-label="Next slide" className="flex h-10 w-10 items-center justify-center rounded border border-white/40 text-xl hover:bg-white/15">→</button>
+          <span className="ml-2 text-xs text-white/70">Sample imagery for layout</span>
         </div>
-      </div>
-
-      {showVideo && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/70 p-4" onClick={() => setShowVideo(false)}>
-          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-bold">Welcome to LearnwithUncleTee 🎬</h3>
-              <button onClick={() => setShowVideo(false)} className="rounded-full bg-slate-100 px-3 py-1 hover:bg-slate-200">✕</button>
-            </div>
-            <div className="flex aspect-video items-center justify-center rounded-xl bg-slate-900 text-white">
-              <p className="text-sm text-slate-300">Video showcase placeholder — embed your YouTube/Vimeo here.</p>
-            </div>
-            <p className="mt-3 text-sm text-slate-600">See how students, parents and teachers use the portal daily.</p>
-          </div>
-        </div>
-      )}
+      </Container>
     </section>
   );
 };

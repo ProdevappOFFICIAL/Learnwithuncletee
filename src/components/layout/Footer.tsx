@@ -1,47 +1,42 @@
 import { Link } from 'react-router-dom';
 import { ROUTES } from '@/routes/paths';
+import { primaryNavLinks, siteInfo } from '@/data/content';
 
 export const Footer = () => (
-  <footer className="bg-slate-950 text-slate-300">
-    <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-4">
+  <footer className="bg-brand-900 text-white">
+    <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:px-8 md:grid-cols-[1.5fr_1fr_1fr_1.2fr]">
       <div>
-        <div className="mb-3 flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500 text-lg font-bold text-white">U</span>
-          <span className="text-lg font-extrabold text-white">LearnwithUncleTee</span>
-        </div>
-        <p className="text-sm leading-relaxed text-slate-400">
-          Simplifying learning, empowering educators, and guiding parents for primary & secondary success.
-        </p>
+        <Link to={ROUTES.home} className="mb-4 flex items-center gap-3">
+          <img src="/logo.jpg" alt="" className="h-12 w-12 rounded-full object-cover" />
+          <span className="text-lg font-extrabold">{siteInfo.name}</span>
+        </Link>
+        <p className="max-w-xs text-sm leading-relaxed text-white/70">Nurturing academic excellence, strong character and a supportive environment for every learner.</p>
       </div>
       <div>
-        <h4 className="mb-3 text-sm font-bold uppercase tracking-wider text-white">Portals</h4>
-        <ul className="space-y-2 text-sm">
-          <li><Link className="hover:text-white" to={ROUTES.students}>Students</Link></li>
-          <li><Link className="hover:text-white" to={ROUTES.parents}>Parents</Link></li>
-          <li><Link className="hover:text-white" to={ROUTES.teachers}>Teachers</Link></li>
-          <li><Link className="hover:text-white" to={ROUTES.resources}>Resource Hub</Link></li>
+        <h2 className="mb-4 text-xs font-bold uppercase tracking-widest text-lime-accent">School</h2>
+        <ul className="space-y-2 text-sm text-white/75">
+          {primaryNavLinks.slice(1, 5).map((link) => <li key={link.to}><Link className="hover:text-white" to={link.to}>{link.label}</Link></li>)}
         </ul>
       </div>
       <div>
-        <h4 className="mb-3 text-sm font-bold uppercase tracking-wider text-white">Resources</h4>
-        <ul className="space-y-2 text-sm">
-          <li>Worksheets</li>
-          <li>Lecture Notes</li>
-          <li>Past Papers</li>
-          <li>Study Guides</li>
+        <h2 className="mb-4 text-xs font-bold uppercase tracking-widest text-lime-accent">Explore</h2>
+        <ul className="space-y-2 text-sm text-white/75">
+          {[...primaryNavLinks.slice(5), { to: ROUTES.login, label: 'Portal Login' }].map((link) => <li key={link.to}><Link className="hover:text-white" to={link.to}>{link.label}</Link></li>)}
         </ul>
       </div>
       <div>
-        <h4 className="mb-3 text-sm font-bold uppercase tracking-wider text-white">Stay updated</h4>
-        <p className="mb-3 text-sm text-slate-400">Weekly study tips & free downloads.</p>
-        <form className="flex overflow-hidden rounded-full bg-white/10 p-1" onSubmit={(e) => e.preventDefault()}>
-          <input placeholder="Email address" className="w-full bg-transparent px-3 text-sm text-white placeholder:text-slate-500 focus:outline-none" />
-          <button className="rounded-full bg-amber-400 px-4 py-2 text-sm font-bold text-slate-900 hover:bg-amber-300">Join</button>
-        </form>
+        <h2 className="mb-4 text-xs font-bold uppercase tracking-widest text-lime-accent">Contact</h2>
+        <ul className="space-y-3 text-sm text-white/75">
+          <li>{siteInfo.address}</li>
+          <li>{siteInfo.phone}</li>
+          <li>{siteInfo.email}</li>
+          <li>{siteInfo.hours}</li>
+        </ul>
+        <Link to={ROUTES.admissions} className="mt-5 inline-flex rounded bg-lime-accent px-4 py-3 text-sm font-bold text-brand-900 hover:bg-white">Apply Now</Link>
       </div>
     </div>
-    <div className="border-t border-white/10 py-5 text-center text-xs text-slate-500">
-      © {new Date().getFullYear()} LearnwithUncleTee. All rights reserved.
+    <div className="border-t border-white/15 px-5 py-5 text-center text-xs text-white/55">
+      © {new Date().getFullYear()} {siteInfo.name}. All rights reserved. School details are pending confirmation.
     </div>
   </footer>
 );

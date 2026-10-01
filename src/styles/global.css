@@ -1,7 +1,27 @@
-@import 'tailwindcss';
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
 
 @theme {
-  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Manrope", ui-sans-serif, system-ui, sans-serif;
+
+  /* Brand — green, per school identity */
+  --color-brand-50: #eaf7ef;
+  --color-brand-100: #d4f0dd;
+  --color-brand-200: #a9e0bd;
+  --color-brand-300: #6fc998;
+  --color-brand-400: #16a05d;
+  --color-brand-500: #0b6b3a;
+  --color-brand-600: #095e32;
+  --color-brand-700: #064a2a;
+  --color-brand-800: #043a21;
+  --color-brand-900: #052e1a;
+
+  --color-lime-accent: #b7e36b;
+  --color-cream: #fffdf7;
+  --color-ink: #15221a;
+  --color-muted: #637067;
+  --color-line: #dde9e1;
 }
 
 html {
@@ -11,6 +31,24 @@ html {
 body {
   font-family: var(--font-sans);
   background: #fff;
-  color: #0f172a;
+  color: var(--color-ink);
   -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

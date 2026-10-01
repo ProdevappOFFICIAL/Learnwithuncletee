@@ -1,41 +1,99 @@
-export interface Persona {
+export interface Testimonial {
   id: string;
-  title: string;
-  tagline: string;
-  description: string;
-  path: string;
-  icon: string;
-  accent: {
-    bg: string;
-    soft: string;
-    text: string;
-    ring: string;
-  };
-  points: string[];
-  cta: string;
+  name: string;
+  role: 'Student' | 'Parent' | 'Educator' | 'Alumnus';
+  quote: string;
+  initials: string;
+  color: string;
 }
 
-export interface Pillar {
+export interface HeroSlide {
+  id: string;
+  eyebrow: string;
+  title: string;
+  text: string;
+  image: string;
+  primaryCta: { label: string; to: string };
+  secondaryCta?: { label: string; to: string };
+}
+
+export interface StatItem {
+  id: string;
+  label: string;
+  value: string;
+}
+
+export interface Programme {
+  id: string;
+  level: 'Early Years' | 'Primary' | 'Secondary';
+  title: string;
+  ageRange: string;
+  description: string;
+  outcomes: string[];
+}
+
+export interface ServiceItem {
+  id: string;
+  title: string;
+  slug: string;
+  summary: string;
+  description: string;
+  features: string[];
+  icon: string;
+  ctaLabel: string;
+}
+
+export interface Facility {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+}
+
+export interface WhyChooseUsItem {
   id: string;
   title: string;
   text: string;
   icon: string;
 }
 
-export interface Testimonial {
+export interface NewsArticle {
   id: string;
-  name: string;
-  role: 'Student' | 'Parent' | 'Educator';
-  quote: string;
-  initials: string;
+  slug: string;
+  category: 'News' | 'Events' | 'Announcements' | 'Academic' | 'Sports' | 'Cultural';
+  title: string;
+  excerpt: string;
+  date: string;
+  image: string;
+}
+
+export interface GalleryImage {
+  id: string;
+  category: 'Campus' | 'Academics' | 'Students' | 'Sports' | 'Cultural' | 'Events' | 'Staff';
+  caption: string;
   color: string;
 }
 
-export interface ResourceItem {
+export interface CoreValue {
   id: string;
   title: string;
-  category: string;
-  level: 'Primary' | 'Secondary' | 'General';
-  format: 'PDF' | 'Video' | 'Worksheet' | 'Notes';
-  downloads: string;
+  icon: string;
+}
+
+export interface StaffMember {
+  id: string;
+  name: string;
+  role: string;
+  message: string;
+}
+
+export interface FaqItem {
+  id: string;
+  question: string;
+  answer: string;
+}
+
+export interface NavLink {
+  to: string;
+  label: string;
 }

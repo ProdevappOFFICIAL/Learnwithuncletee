@@ -1,14 +1,30 @@
 import { Layout } from '@/components/layout/Layout';
 import { Hero } from '@/components/home/Hero';
-import { PersonaGrid } from '@/components/home/PersonaGrid';
-import { PillarGrid } from '@/components/home/PillarGrid';
-import { Testimonials } from '@/components/home/Testimonials';
+import {
+  FacilitiesSection,
+  GalleryPreviewSection,
+  NewsSection,
+  ProgrammesSection,
+  ServicesSection,
+  StatsStrip,
+  StudentLifeSection,
+  TestimonialsSection,
+  WelcomeSection,
+  WhyChooseUsSection,
+} from '@/components/home/HomeSections';
 
 export const HomePage = () => (
   <Layout>
     <Hero />
-    <PersonaGrid />
-    <PillarGrid />
-    <Testimonials />
+    <StatsStrip />
+    <WelcomeSection />
+    <ProgrammesSection />
+    <WhyChooseUsSection />
+    <ServicesSection />
+    <FacilitiesSection />
+    <StudentLifeSection />
+    <NewsSection />
+    <GalleryPreviewSection />
+    <TestimonialsSection />
   </Layout>
 );

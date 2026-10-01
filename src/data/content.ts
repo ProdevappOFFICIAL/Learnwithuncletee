@@ -1,76 +1,80 @@
-import type { Pillar, Testimonial, ResourceItem } from '@/types';
+import type { CoreValue, NavLink, StatItem, Testimonial, WhyChooseUsItem } from '@/types';
+import { ROUTES } from '@/routes/paths';
 
-export const pillars: Pillar[] = [
-  {
-    id: 'excellence',
-    title: 'Excellence',
-    text: 'Structured curriculum resources that make complex topics simple for primary & secondary learners.',
-    icon: '🏆',
-  },
-  {
-    id: 'integrity',
-    title: 'Integrity',
-    text: 'Verified, educator-reviewed materials parents and schools can trust every term.',
-    icon: '🤝',
-  },
-  {
-    id: 'impact',
-    title: 'Impact',
-    text: 'Persona-driven workflows that bridge learning gaps and build confident, independent learners.',
-    icon: '🚀',
-  },
+export const siteInfo = {
+  name: 'Learnwithuncletee',
+  shortName: 'Learnwithuncletee',
+  tagline: 'Nurturing future leaders',
+  // TODO: replace with school-confirmed contact details
+  address: '5 Unity Avenue , Valentino Ondo',
+  phone: 'Official phone number to be confirmed',
+  email: 'info@learnwithuncletee.org',
+  hours: 'Opening hours to be confirmed',
+};
+
+export const primaryNavLinks: NavLink[] = [
+  { to: ROUTES.home, label: 'Home' },
+  { to: ROUTES.about, label: 'About' },
+  { to: ROUTES.academics, label: 'Academics' },
+  { to: ROUTES.admissions, label: 'Admissions' },
+  { to: ROUTES.studentLife, label: 'Student Life' },
+  { to: ROUTES.services, label: 'Services' },
+  { to: ROUTES.news, label: 'News & Events' },
+  { to: ROUTES.gallery, label: 'Gallery' },
+  { to: ROUTES.contact, label: 'Contact' },
 ];
 
-export const missionVision = [
-  {
-    id: 'mission',
-    label: 'Our Mission',
-    title: 'Simplify learning for every child',
-    text: 'We break the curriculum into bite-size lessons, practice sets and toolkits that any student, parent or teacher can use immediately.',
-  },
-  {
-    id: 'vision',
-    label: 'Our Vision',
-    title: 'Empowered educators, supported parents',
-    text: 'A future where no child is left behind because the adults around them have the right resources at the right time.',
-  },
+// TODO: replace with verified figures from school management
+export const keyStats: StatItem[] = [
+  { id: 'students', label: 'Students', value: '1,200+' },
+  { id: 'teachers', label: 'Qualified Teachers', value: '85+' },
+  { id: 'years', label: 'Years of Excellence', value: '18' },
+  { id: 'programmes', label: 'Academic Programmes', value: '3' },
+  { id: 'facilities', label: 'Campus Facilities', value: '12' },
+];
+
+export const coreValues: CoreValue[] = [
+  { id: 'faith', title: 'Faith', icon: '🙏' },
+  { id: 'integrity', title: 'Integrity', icon: '🤝' },
+  { id: 'excellence', title: 'Excellence', icon: '🏆' },
+  { id: 'respect', title: 'Respect', icon: '💚' },
+  { id: 'discipline', title: 'Discipline', icon: '📏' },
+  { id: 'responsibility', title: 'Responsibility', icon: '🎯' },
+  { id: 'innovation', title: 'Innovation', icon: '💡' },
+];
+
+export const whyChooseUs: WhyChooseUsItem[] = [
+  { id: 'teachers', title: 'Experienced Teachers', text: 'Qualified, passionate educators dedicated to every learner.', icon: '👩‍🏫' },
+  { id: 'holistic', title: 'Holistic Education', text: 'Academics balanced with character, faith and confidence building.', icon: '🌱' },
+  { id: 'safe', title: 'Safe Environment', text: 'A secure, supportive and welcoming school community.', icon: '🛡️' },
+  { id: 'facilities', title: 'Modern Facilities', text: 'Well-equipped classrooms, labs and recreational spaces.', icon: '🏫' },
+  { id: 'character', title: 'Character Development', text: 'Programmes that shape discipline, leadership and integrity.', icon: '🧭' },
+  { id: 'support', title: 'Student Support', text: 'Dedicated guidance, mentoring and welfare structures.', icon: '❤️' },
 ];
 
 export const testimonials: Testimonial[] = [
   {
     id: 't1',
-    name: 'Adaeze O.',
-    role: 'Student',
-    quote:
-      'The simplified lessons and past questions made JSCE prep so easy. I finally enjoy studying maths!',
+    name: 'Mrs. Adaeze O.',
+    role: 'Parent',
+    quote: 'Learnwithuncletee has given my daughter a safe, nurturing environment where she thrives academically and personally.',
     initials: 'AO',
-    color: 'bg-amber-400',
+    color: 'bg-brand-400',
   },
   {
     id: 't2',
-    name: 'Mrs. Balogun',
-    role: 'Parent',
-    quote:
-      'The home-support toolkit changed everything. I now track my son’s progress weekly without stress.',
-    initials: 'MB',
-    color: 'bg-emerald-400',
+    name: 'Daniel E.',
+    role: 'Student',
+    quote: 'The teachers care about us beyond the classroom. I love the clubs and the sports programmes here.',
+    initials: 'DE',
+    color: 'bg-lime-accent',
   },
   {
     id: 't3',
-    name: 'Mr. Daniel E.',
+    name: 'Mr. Balogun',
     role: 'Educator',
-    quote:
-      'Lesson plans and teaching aids save me hours every week. My classroom engagement has doubled.',
-    initials: 'DE',
-    color: 'bg-sky-400',
+    quote: 'A school community built on excellence, discipline and genuine care for every child.',
+    initials: 'MB',
+    color: 'bg-brand-200',
   },
-];
-
-export const resourceItems: ResourceItem[] = [
-  { id: 'r1', title: 'Primary 4 Maths – Fractions Worksheet Pack', category: 'Worksheets', level: 'Primary', format: 'Worksheet', downloads: '12.4k' },
-  { id: 'r2', title: 'JSS3 English – Comprehensive Lecture Notes', category: 'Lecture Notes', level: 'Secondary', format: 'Notes', downloads: '8.1k' },
-  { id: 'r3', title: 'WAEC Past Questions – Mathematics (2015-2024)', category: 'Past Papers', level: 'Secondary', format: 'PDF', downloads: '21.7k' },
-  { id: 'r4', title: 'Primary 6 Science – Exam Prep Guide', category: 'Exam Prep', level: 'Primary', format: 'PDF', downloads: '6.9k' },
-  { id: 'r5', title: 'SS2 Physics – Motion Video Series', category: 'Video Lessons', level: 'Secondary', format: 'Video', downloads: '4.2k' },
-  { id: 'r6', title: 'Study Skills – Effective Strategy Guide', category: 'Study Guides', level: 'General', format: 'Notes', downloads: '9.3k' },
 ];
