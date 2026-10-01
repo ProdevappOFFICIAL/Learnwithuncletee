@@ -7,7 +7,7 @@ export const Footer = () => (
     <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:px-8 md:grid-cols-[1.5fr_1fr_1fr_1.2fr]">
       <div>
         <Link to={ROUTES.home} className="mb-4 flex items-center gap-3">
-          <img src="/logo.jpg" alt="" className="h-12 w-12 rounded-full object-cover" />
+          <img src="/logo.png" alt="" className="h-12 w-12 rounded-full object-cover" />
           <span className="text-lg font-extrabold">{siteInfo.name}</span>
         </Link>
         <p className="max-w-xs text-sm leading-relaxed text-white/70">Nurturing academic excellence, strong character and a supportive environment for every learner.</p>
@@ -28,7 +28,11 @@ export const Footer = () => (
         <h2 className="mb-4 text-xs font-bold uppercase tracking-widest text-lime-accent">Contact</h2>
         <ul className="space-y-3 text-sm text-white/75">
           <li>{siteInfo.address}</li>
-          <li>{siteInfo.phone}</li>
+          {siteInfo.phoneContacts.map((contact) => (
+            <li key={contact.label}>
+              <a href={contact.href} className="hover:text-white">{contact.label}: {contact.number}</a>
+            </li>
+          ))}
           <li>{siteInfo.email}</li>
           <li>{siteInfo.hours}</li>
         </ul>
@@ -36,7 +40,7 @@ export const Footer = () => (
       </div>
     </div>
     <div className="border-t border-white/15 px-5 py-5 text-center text-xs text-white/55">
-      © {new Date().getFullYear()} {siteInfo.name}. All rights reserved. School details are pending confirmation.
+      © {new Date().getFullYear()} {siteInfo.name}. All rights reserved. Address, email and opening hours are pending confirmation.
     </div>
   </footer>
 );

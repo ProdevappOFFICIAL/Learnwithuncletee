@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { ROUTES } from '@/routes/paths';
-import { primaryNavLinks } from '@/data/content';
+import { primaryNavLinks, siteInfo } from '@/data/content';
 
 export const Navbar = () => {
   const [open, setOpen] = useState(false);
@@ -10,12 +10,18 @@ export const Navbar = () => {
       <div className="hidden border-b border-line bg-brand-900 text-xs text-white/80 lg:block">
         <div className="mx-auto flex max-w-7xl justify-between px-8 py-2">
           <i className="font-sans">...Lubricating the wheel of education...</i>
-          <span>School contact details to be confirmed</span>
+          <div className="flex gap-5">
+            {siteInfo.phoneContacts.map((contact) => (
+              <a key={contact.label} href={contact.href} className="hover:text-white">
+                {contact.label}: {contact.number}
+              </a>
+            ))}
+          </div>
         </div>
       </div>
       <nav className="mx-auto flex min-h-[76px] max-w-7xl items-center justify-between gap-4 px-5 sm:px-8">
         <Link to={ROUTES.home} className="flex shrink-0 items-center gap-2" aria-label="Learnwithuncletee home">
-          <img src="/logo.jpg" alt="Learnwithuncletee" className="h-12 w-12 rounded-full border border-line object-cover" />
+          <img src="/logo.png" alt="Learnwithuncletee" className="h-12 w-12 rounded-full border border-line object-cover" />
           <span className="max-w-[145px] text-sm font-extrabold leading-tight text-ink sm:max-w-none sm:text-base">
             Learnwithuncletee
             <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-widest text-brand-600">School</span>

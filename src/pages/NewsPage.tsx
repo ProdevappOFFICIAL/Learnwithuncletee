@@ -5,6 +5,7 @@ import { PageHero } from '@/components/ui/PageHero';
 import { SampleNotice } from '@/components/ui/SampleNotice';
 import { newsArticles } from '@/data/news';
 import type { NewsArticle } from '@/types';
+import { ChevronRight } from 'lucide-react';
 
 const filters = ['All', 'News', 'Events', 'Announcements', 'Academic', 'Sports', 'Cultural'] as const;
 type NewsFilter = (typeof filters)[number];
@@ -14,7 +15,7 @@ const NewsCard = ({ article }: { article: NewsArticle }) => (
     <img src={article.image} alt={`${article.title}, sample image`} loading="lazy" className="aspect-[16/10] w-full object-cover" />
     <div className="mt-4 flex items-center justify-between gap-3 text-xs"><span className="font-bold uppercase tracking-widest text-brand-700">{article.category}</span><time dateTime={article.date} className="text-muted">{new Date(article.date).toLocaleDateString('en', { day: 'numeric', month: 'long', year: 'numeric' })}</time></div>
     <h2 className="mt-2 text-xl font-extrabold">{article.title}</h2><p className="mt-2 text-sm leading-relaxed text-muted">{article.excerpt}</p>
-    <span className="mt-4 inline-flex text-sm font-bold text-brand-700">Article coming soon <span className="ml-2">→</span></span>
+    <span className="mt-4 inline-flex items-center text-sm font-bold text-brand-700">Article coming soon <ChevronRight aria-hidden="true" className="ml-2" size={16} /></span>
   </article>
 );
 

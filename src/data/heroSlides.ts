@@ -7,7 +7,7 @@ export const heroSlides: HeroSlide[] = [
     eyebrow: 'Welcome to Learnwithuncletee',
     title: 'Nurturing Future Leaders',
     text: 'Academic excellence, strong character and a supportive environment for every learner.',
-    image: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=2000&q=85',
+    image: '/school.JPG',
     primaryCta: { label: 'Apply Now', to: ROUTES.admissions },
     secondaryCta: { label: 'Explore Our School', to: ROUTES.about },
   },
@@ -16,7 +16,7 @@ export const heroSlides: HeroSlide[] = [
     eyebrow: 'Beyond the classroom',
     title: 'Learning Beyond the Classroom',
     text: 'Students participating in sports, practical learning, clubs and cultural activities.',
-    image: 'https://images.unsplash.com/photo-1529390079861-591de354faf5?auto=format&fit=crop&w=2000&q=85',
+    image: '/students_playing_games.jfif',
     primaryCta: { label: 'Discover Student Life', to: ROUTES.studentLife },
   },
   {
