@@ -49,7 +49,7 @@ export const ProgrammesSection = () => (
     <Container>
       <SectionHeading eyebrow="Learning pathways" title="A strong start at every stage" text="Explore the learning pathways available for children as they grow and prepare for what comes next." />
       <div className="mt-12 grid gap-6">
-        {programmes.map((programme, index) => (
+        {programmes.map((programme) => (
           <article key={programme.id} className="group border border-line bg-white">
             <div className="relative">
               <img src={'/img_1.jpeg'} alt={`${programme.title}, sample image`} loading="lazy" className="aspect-[16/10] w-full object-cover transition-transform duration-300 group-hover:scale-[1.02] rounded-3xl" />
@@ -75,7 +75,7 @@ export const WhyChooseUsSection = () => (
       <SectionHeading eyebrow="Why families choose us" title="A school experience built around the whole child" text="Learning is strongest when students feel supported, challenged and part of a community." />
       <div className="mt-12 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
         {whyChooseUs.map((item) => <article key={item.id} className="flex gap-4 border-t border-line pt-5">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center bg-brand-50 text-2xl" aria-hidden="true">{item.icon}</span>
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center bg-brand-50 text-brand-700" aria-hidden="true"><item.icon size={22} /></span>
           <div><h3 className="font-bold text-ink">{item.title}</h3><p className="mt-2 text-sm leading-relaxed text-muted">{item.text}</p></div>
         </article>)}
       </div>
@@ -93,7 +93,7 @@ export const ServicesSection = () => (
       </div>
       <div className="mt-10 grid gap-px bg-line sm:grid-cols-2 lg:grid-cols-3">
         {services.slice(0, 3).map((service) => <article key={service.id} className="bg-white p-7">
-          <span className="text-3xl" aria-hidden="true">{service.icon}</span>
+          <service.icon className="text-brand-700" size={28} aria-hidden="true" />
           <h3 className="mt-5 text-xl font-extrabold text-ink">{service.title}</h3>
           <p className="mt-2 text-sm leading-relaxed text-muted">{service.summary}</p>
           <Link to={ROUTES.services} className="mt-5 inline-flex items-center text-sm font-bold text-brand-700">Learn more <ChevronRight aria-hidden="true" size={16} /></Link>
@@ -110,7 +110,7 @@ export const FacilitiesSection = () => (
       <SectionHeading eyebrow="Our spaces" title="Room to learn, play and thrive" text="Take a first look at some of the spaces that can support a well-rounded school day." />
       <div className="mt-10 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {facilities.map((facility) => <article key={facility.id} className="border border-line p-5 sm:p-6">
-          <span className="text-2xl" aria-hidden="true">{facility.icon}</span>
+          <facility.icon className="text-brand-700" size={24} aria-hidden="true" />
           <h3 className="mt-4 text-base font-bold text-ink">{facility.title}</h3>
           <p className="mt-2 text-xs leading-relaxed text-muted">{facility.description}</p>
         </article>)}

@@ -1,5 +1,6 @@
 import type { CoreValue, NavLink, StatItem, Testimonial, WhyChooseUsItem } from '@/types';
 import { ROUTES } from '@/routes/paths';
+import { Award, Compass, Heart, Lightbulb, Ruler, ShieldCheck, Sprout, Target, Handshake, School, UserRound } from 'lucide-react';
 
 export const siteInfo = {
   name: 'Learnwithuncletee',
@@ -37,22 +38,22 @@ export const keyStats: StatItem[] = [
 ];
 
 export const coreValues: CoreValue[] = [
-  { id: 'faith', title: 'Faith', icon: '🙏' },
-  { id: 'integrity', title: 'Integrity', icon: '🤝' },
-  { id: 'excellence', title: 'Excellence', icon: '🏆' },
-  { id: 'respect', title: 'Respect', icon: '💚' },
-  { id: 'discipline', title: 'Discipline', icon: '📏' },
-  { id: 'responsibility', title: 'Responsibility', icon: '🎯' },
-  { id: 'innovation', title: 'Innovation', icon: '💡' },
+  { id: 'faith', title: 'Faith', icon: Heart },
+  { id: 'integrity', title: 'Integrity', icon: Handshake },
+  { id: 'excellence', title: 'Excellence', icon: Award },
+  { id: 'respect', title: 'Respect', icon: Heart },
+  { id: 'discipline', title: 'Discipline', icon: Ruler },
+  { id: 'responsibility', title: 'Responsibility', icon: Target },
+  { id: 'innovation', title: 'Innovation', icon: Lightbulb },
 ];
 
 export const whyChooseUs: WhyChooseUsItem[] = [
-  { id: 'teachers', title: 'Experienced Teachers', text: 'Qualified, passionate educators dedicated to every learner.', icon: '👩‍🏫' },
-  { id: 'holistic', title: 'Holistic Education', text: 'Academics balanced with character, faith and confidence building.', icon: '🌱' },
-  { id: 'safe', title: 'Safe Environment', text: 'A secure, supportive and welcoming school community.', icon: '🛡️' },
-  { id: 'facilities', title: 'Modern Facilities', text: 'Well-equipped classrooms, labs and recreational spaces.', icon: '🏫' },
-  { id: 'character', title: 'Character Development', text: 'Programmes that shape discipline, leadership and integrity.', icon: '🧭' },
-  { id: 'support', title: 'Student Support', text: 'Dedicated guidance, mentoring and welfare structures.', icon: '❤️' },
+  { id: 'teachers', title: 'Experienced Teachers', text: 'Qualified, passionate educators dedicated to every learner.', icon: UserRound },
+  { id: 'holistic', title: 'Holistic Education', text: 'Academics balanced with character, faith and confidence building.', icon: Sprout },
+  { id: 'safe', title: 'Safe Environment', text: 'A secure, supportive and welcoming school community.', icon: ShieldCheck },
+  { id: 'facilities', title: 'Modern Facilities', text: 'Well-equipped classrooms, labs and recreational spaces.', icon: School },
+  { id: 'character', title: 'Character Development', text: 'Programmes that shape discipline, leadership and integrity.', icon: Compass },
+  { id: 'support', title: 'Student Support', text: 'Dedicated guidance, mentoring and welfare structures.', icon: Heart },
 ];
 
 export const testimonials: Testimonial[] = [

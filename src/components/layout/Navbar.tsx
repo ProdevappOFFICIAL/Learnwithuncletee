@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { ROUTES } from '@/routes/paths';
 import { primaryNavLinks, siteInfo } from '@/data/content';
+import { Menu, X } from 'lucide-react';
 
 export const Navbar = () => {
   const [open, setOpen] = useState(false);
@@ -58,7 +59,7 @@ export const Navbar = () => {
             aria-label={open ? 'Close navigation menu' : 'Open navigation menu'}
             aria-expanded={open}
           >
-            {open ? '×' : '☰'}
+            {open ? <X aria-hidden="true" size={20} /> : <Menu aria-hidden="true" size={20} />}
           </button>
         </div>
       </nav>

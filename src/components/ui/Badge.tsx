@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Pencil } from 'lucide-react';
 
 export const Badge = ({ children, tone = 'amber' }: { children: ReactNode; tone?: string }) => {
   const tones: Record<string, string> = {
@@ -19,6 +20,6 @@ export const Badge = ({ children, tone = 'amber' }: { children: ReactNode; tone?
 
 export const HandwrittenBadge = ({ children }: { children: ReactNode }) => (
   <span className="inline-block -rotate-2 rounded-lg bg-amber-200 px-3 py-1 font-[cursive] text-sm text-slate-900 shadow-sm border-2 border-dashed border-amber-500/50">
-    ✏️ {children}
+    <Pencil className="mr-1 inline" size={14} aria-hidden="true" /> {children}
   </span>
 );

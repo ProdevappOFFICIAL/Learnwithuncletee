@@ -1,3 +1,5 @@
+import type { LucideIcon } from 'lucide-react';
+
 export interface Testimonial {
   id: string;
   name: string;
@@ -39,7 +41,7 @@ export interface ServiceItem {
   summary: string;
   description: string;
   features: string[];
-  icon: string;
+  icon: LucideIcon;
   ctaLabel: string;
 }
 
@@ -47,14 +49,14 @@ export interface Facility {
   id: string;
   title: string;
   description: string;
-  icon: string;
+  icon: LucideIcon;
 }
 
 export interface WhyChooseUsItem {
   id: string;
   title: string;
   text: string;
-  icon: string;
+  icon: LucideIcon;
 }
 
 export interface NewsArticle {
@@ -77,7 +79,7 @@ export interface GalleryImage {
 export interface CoreValue {
   id: string;
   title: string;
-  icon: string;
+  icon: LucideIcon | string;
 }
 
 export interface StaffMember {
