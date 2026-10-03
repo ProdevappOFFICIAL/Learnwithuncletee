@@ -31,6 +31,14 @@ export const LoginPage = () => {
           </form>
           {notice && <p role="status" className="mt-4 border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">Authentication is not connected yet. No sign-in or recovery request was sent.</p>}
           <button type="button" className="mt-5 text-sm font-semibold text-brand-700 underline underline-offset-4" onClick={() => { setNotice(false); setMode(mode === 'login' ? 'recovery' : 'login'); }}>{mode === 'login' ? 'Forgot password?' : 'Return to login'}</button>
+          <div className="mt-6 border border-line bg-cream p-4">
+            <p className="text-xs font-bold uppercase tracking-widest text-brand-700">Preview portals</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link to={ROUTES.studentDashboard} className="rounded bg-brand-500 px-3 py-2 text-xs font-bold text-white hover:bg-brand-700">Student →</Link>
+              <Link to={ROUTES.teacherDashboard} className="rounded bg-brand-900 px-3 py-2 text-xs font-bold text-white hover:bg-brand-700">Teacher →</Link>
+              <Link to={ROUTES.adminDashboard} className="rounded bg-lime-accent px-3 py-2 text-xs font-bold text-brand-900 hover:bg-white">Admin →</Link>
+            </div>
+          </div>
           <p className="mt-10 border-t border-line pt-5 text-xs leading-relaxed text-muted">Your account role and permissions must be verified by the school. Role selection alone does not grant access.</p>
         </div>
       </section>
