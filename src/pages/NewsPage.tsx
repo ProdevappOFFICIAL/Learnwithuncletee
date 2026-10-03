@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Container } from '@/components/ui/Container';
 import { PageHero } from '@/components/ui/PageHero';
+import { PageMetadata } from '@/components/ui/PageMetadata';
 import { apiGetPublic } from '@/lib/api';
 import type { NoticeData } from '@/data/dashboard';
 import { ChevronRight } from 'lucide-react';
@@ -55,6 +56,12 @@ export const NewsPage = () => {
 
   return (
     <Layout>
+      <PageMetadata
+        title="News & Events"
+        description="School updates, upcoming moments and stories from the Learnwithuncletee learning community."
+        image="/school.JPG"
+        type="website"
+      />
       <PageHero eyebrow="From our community" title="News & Events" text="School updates, upcoming moments and stories from our learning community." image="https://images.unsplash.com/photo-1523580494863-6f3031224c94?auto=format&fit=crop&w=1800&q=85" />
       <section className="py-14 sm:py-18">
         <Container>

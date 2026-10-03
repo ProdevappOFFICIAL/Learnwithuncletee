@@ -24,7 +24,7 @@ export const DashboardIndexPage = () => (
         {portals.map((p) => (
           <Link key={p.to} to={p.to} className="border border-line bg-white p-6 hover:border-brand-500">
             <span className={`flex h-12 w-12 items-center justify-center rounded-full font-display text-sm font-extrabold ${p.bg} ${p.bg === 'bg-lime-accent' ? 'text-brand-900' : 'text-white'}`}>{p.initials}</span>
-            <h2 className="mt-4 font-display text-xl font-extrabold">{p.title}</h2>
+            <h2 className="hidden mt-4 font-display text-xl font-extrabold">{p.title}</h2>
             <p className="mt-1 text-sm text-muted">{p.text}</p>
             <span className="mt-4 inline-block text-sm font-bold text-brand-700">Open portal →</span>
           </Link>

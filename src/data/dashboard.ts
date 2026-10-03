@@ -160,6 +160,8 @@ export interface NoticeData {
   audience: string;
   coverUrl?: string | null;
   isPublished: boolean;
+  likeCount: number;
+  dislikeCount: number;
   createdAt: string;
 }
 

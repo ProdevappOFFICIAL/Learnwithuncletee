@@ -2,18 +2,35 @@ import { Suspense, lazy, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Container } from '@/components/ui/Container';
+import { PageMetadata } from '@/components/ui/PageMetadata';
 import { ROUTES } from '@/routes/paths';
-import { apiGetPublic } from '@/lib/api';
+import { apiGetPublic, apiPost } from '@/lib/api';
 import type { NoticeData } from '@/data/dashboard';
-import { ChevronLeft } from 'lucide-react';
+import { Check, ChevronLeft, Link2, ThumbsDown, ThumbsUp } from 'lucide-react';
 
 // Code-split: editor package (viewer) loads only on this route.
 const NewsContent = lazy(() => import('@/lib/mdxEditor').then((m) => ({ default: m.NewsContent })));
+
+type Vote = 'like' | 'dislike' | null;
+const voteKey = (id: string) => `lwu_react_${id}`;
+
+const plainExcerpt = (markdown: string, max = 160) => {
+  const text = markdown
+    .replace(/[#>*_`[\]()!-]/g, '')
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+};
 
 export const NewsDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const [article, setArticle] = useState<NoticeData | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing' | 'error'>('loading');
+  const [vote, setVote] = useState<Vote>(null);
+  const [counts, setCounts] = useState({ likeCount: 0, dislikeCount: 0 });
+  const [voting, setVoting] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!id) {
@@ -22,10 +39,16 @@ export const NewsDetailPage = () => {
     }
     let cancelled = false;
     setStatus('loading');
+    try {
+      setVote((localStorage.getItem(voteKey(id)) as Vote) ?? null);
+    } catch {
+      /* private mode — voting still works, just not remembered */
+    }
     apiGetPublic<NoticeData>(`/public-notices/${id}`)
       .then((res) => {
         if (!cancelled) {
           setArticle(res.data);
+          setCounts({ likeCount: res.data.likeCount, dislikeCount: res.data.dislikeCount });
           setStatus('ready');
         }
       })
@@ -37,8 +60,66 @@ export const NewsDetailPage = () => {
     };
   }, [id]);
 
+  const castVote = async (next: 'like' | 'dislike') => {
+    if (!id || !article || voting) return;
+    const previous = vote;
+    const toggled: Vote = previous === next ? null : next;
+    setVote(toggled);
+    setCounts((c) => ({
+      likeCount: Math.max(0, c.likeCount + (toggled === 'like' ? 1 : 0) - (previous === 'like' ? 1 : 0)),
+      dislikeCount: Math.max(0, c.dislikeCount + (toggled === 'dislike' ? 1 : 0) - (previous === 'dislike' ? 1 : 0)),
+    }));
+    setVoting(true);
+    try {
+      const res = await apiPost<{ likeCount: number; dislikeCount: number }>(`/public-notices/${id}/react`, {
+        reaction: toggled,
+        previous,
+      });
+      setCounts({ likeCount: res.data.likeCount, dislikeCount: res.data.dislikeCount });
+      try {
+        if (toggled) localStorage.setItem(voteKey(id), toggled);
+        else localStorage.removeItem(voteKey(id));
+      } catch {
+        /* ignore */
+      }
+    } catch {
+      // Revert optimistic update on failure.
+      setVote(previous);
+      setCounts({ likeCount: article.likeCount, dislikeCount: article.dislikeCount });
+    } finally {
+      setVoting(false);
+    }
+  };
+
+  const copyLink = async () => {
+    const url = window.location.href;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      document.body.append(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <Layout>
+      {status === 'ready' && article && (
+        <PageMetadata
+          title={article.title}
+          description={article.description || plainExcerpt(article.body)}
+          image={article.coverUrl ?? '/school.JPG'}
+          type="article"
+          publishedTime={article.createdAt}
+          section={article.category}
+        />
+      )}
+
       {status === 'loading' && (
         <Container>
           <div className="animate-pulse py-14" aria-label="Loading">
@@ -108,13 +189,52 @@ export const NewsDetailPage = () => {
           <section className="py-12">
             <Container>
               <div className="mx-auto max-w-3xl">
-           
+
                 <div className="mt-6">
                   <Suspense fallback={<div className="h-40 animate-pulse bg-brand-50" aria-label="Loading content" />}>
                     <NewsContent markdown={article.body} />
                   </Suspense>
                 </div>
-                <Link to={ROUTES.news} className="mt-10 inline-flex min-h-11 items-center rounded border border-line bg-white px-5 py-2.5 text-sm font-bold text-ink hover:border-brand-500 hover:text-brand-700">
+
+                <div className="mt-10 flex flex-wrap items-center gap-2 border-t border-line pt-6" aria-label="React to this announcement">
+                  <span className="mr-1 text-sm font-bold text-muted">Was this helpful?</span>
+                  <button
+                    type="button"
+                    onClick={() => castVote('like')}
+                    disabled={voting}
+                    aria-pressed={vote === 'like'}
+                    className={`inline-flex min-h-11 items-center gap-2 rounded border px-4 py-2.5 text-sm font-bold transition-colors disabled:opacity-60 ${
+                      vote === 'like'
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-line bg-white text-ink hover:border-brand-500 hover:text-brand-700'
+                    }`}
+                  >
+                    <ThumbsUp aria-hidden="true" size={16} /> {counts.likeCount}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => castVote('dislike')}
+                    disabled={voting}
+                    aria-pressed={vote === 'dislike'}
+                    className={`inline-flex min-h-11 items-center gap-2 rounded border px-4 py-2.5 text-sm font-bold transition-colors disabled:opacity-60 ${
+                      vote === 'dislike'
+                        ? 'border-rose-300 bg-rose-50 text-rose-700'
+                        : 'border-line bg-white text-ink hover:border-rose-300 hover:text-rose-700'
+                    }`}
+                  >
+                    <ThumbsDown aria-hidden="true" size={16} /> {counts.dislikeCount}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={copyLink}
+                    className="inline-flex min-h-11 items-center gap-2 rounded bg-brand-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-700"
+                  >
+                    {copied ? <Check aria-hidden="true" size={16} /> : <Link2 aria-hidden="true" size={16} />}
+                    {copied ? 'Copied!' : 'Copy link'}
+                  </button>
+                </div>
+
+                <Link to={ROUTES.news} className="mt-6 inline-flex min-h-11 items-center rounded border border-line bg-white px-5 py-2.5 text-sm font-bold text-ink hover:border-brand-500 hover:text-brand-700">
                   <ChevronLeft aria-hidden="true" size={16} className="mr-1" /> All announcements
                 </Link>
               </div>

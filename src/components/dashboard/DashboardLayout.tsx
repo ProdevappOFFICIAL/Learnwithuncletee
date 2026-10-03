@@ -57,7 +57,7 @@ export const DashboardLayout = ({ role, nav }: Props) => {
         <img src="/logo.png" alt="Learnwithuncletee" className="h-11 w-11 rounded-full border border-white/20 object-cover" />
         <span className="leading-tight">
           <span className="block font-display text-sm font-extrabold">{siteInfo.name}</span>
-          <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-[.18em] text-lime-accent">{meta.title}</span>
+          <span className="hidden mt-0.5  text-[10px] font-bold uppercase tracking-[.18em] text-lime-accent">{meta.title}</span>
         </span>
       </Link>
 
@@ -65,7 +65,7 @@ export const DashboardLayout = ({ role, nav }: Props) => {
         <p className="px-1 text-[11px] font-bold uppercase tracking-[.18em] text-white/50">{meta.subtitle}</p>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4" aria-label={`${meta.title} navigation`}>
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4" aria-label={` navigation`}>
         {visibleNav.map((item) => {
           const Icon = item.icon;
           return (
@@ -176,7 +176,7 @@ export const DashboardLayout = ({ role, nav }: Props) => {
               <Menu size={18} aria-hidden="true" />
             </button>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold uppercase tracking-[.18em] text-brand-700">{meta.title}</p>
+              <p className="hidden text-[11px] font-bold uppercase tracking-[.18em] text-brand-700">{meta.title}</p>
               <h1 className="truncate font-display text-lg font-extrabold leading-tight sm:text-xl">
                 {active?.label ?? 'Dashboard'}
               </h1>

@@ -88,10 +88,10 @@ export const LoginPage = () => {
         <div className="relative max-w-xl"><Link to={ROUTES.home} className="mb-10 inline-flex items-center gap-3"><img src="/logo.png" alt="" className="h-12 w-12 rounded-full object-cover" /><span className="font-extrabold">{siteInfo.name}</span></Link><p className="text-xs font-bold uppercase tracking-[.18em] text-lime-accent">School portal</p><h1 className="mt-4 text-4xl font-extrabold sm:text-5xl">Your school day, connected.</h1><p className="mt-4 max-w-lg leading-relaxed text-white/80">Access the school portal for student, parent, teacher and staff accounts.</p><p className="mt-5 text-xs text-white/60">Sample background image. Replace with an approved school photograph.</p></div>
       </section>
       <section className="flex items-center justify-center px-5 py-12 sm:px-10">
-        <div className="w-full max-w-md">
-          <Link to={ROUTES.home} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-500"><ChevronLeft aria-hidden="true" size={16} />Back to website</Link>
+         <div className="w-full max-w-md">
+           <Link to={ROUTES.home} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-500"><ChevronLeft aria-hidden="true" size={16} />Back to website</Link>
 
-          <div className="mt-10 grid grid-cols-2 gap-1 rounded bg-cream p-1" role="tablist" aria-label="Account actions">
+          <div className="hidden mt-10 grid grid-cols-2 gap-1 rounded bg-cream p-1" role="tablist" aria-label="Account actions">
             {(['login', 'signup'] as Mode[]).map((m) => (
               <button
                 key={m}
@@ -99,12 +99,15 @@ export const LoginPage = () => {
                 role="tab"
                 aria-selected={mode === m}
                 onClick={() => switchMode(m)}
-                className={`rounded px-3 py-2.5 text-sm font-bold transition-colors ${mode === m ? 'bg-brand-900 text-white' : 'text-muted hover:text-ink'}`}
+                className={`rounded px-3 py-2.5 text-sm font-bold transition-colors ${mode === m ? 'bg-brand-900 text-white' : 'text-muted hover:text-ink border border-line'}`}
               >
                 {m === 'login' ? 'Sign in' : 'Create account'}
               </button>
             ))}
           </div>
+         
+             <div className="w-full max-w-md border mt-4 border-line bg-cream px-4 pb-10 rounded">
+       
 
           <p className="mt-6 text-xs font-bold uppercase tracking-widest text-brand-700">
             {mode === 'login' ? 'Secure access' : mode === 'signup' ? 'New here' : 'Account recovery'}
@@ -155,20 +158,9 @@ export const LoginPage = () => {
             <button type="button" className="mt-5 text-sm font-semibold text-brand-700 underline underline-offset-4" onClick={() => switchMode('login')}>Return to login</button>
           )}
 
-          <div className="mt-6 border border-line bg-cream p-4">
-            <p className="text-xs font-bold uppercase tracking-widest text-brand-700">Demo accounts (after seeding)</p>
-            <ul className="mt-2 space-y-1 text-xs text-muted">
-              <li><span className="font-bold text-ink">Admin:</span> admin@learnwithuncletee.org / Admin123!</li>
-              <li><span className="font-bold text-ink">Teacher:</span> teacher@learnwithuncletee.org / Teacher123!</li>
-              <li><span className="font-bold text-ink">Student:</span> student@learnwithuncletee.org / Student123!</li>
-            </ul>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Link to={ROUTES.studentDashboard} className="rounded bg-brand-500 px-3 py-2 text-xs font-bold text-white hover:bg-brand-700">Student →</Link>
-              <Link to={ROUTES.teacherDashboard} className="rounded bg-brand-900 px-3 py-2 text-xs font-bold text-white hover:bg-brand-700">Teacher →</Link>
-              <Link to={ROUTES.adminDashboard} className="rounded bg-lime-accent px-3 py-2 text-xs font-bold text-brand-900 hover:bg-white">Admin →</Link>
-            </div>
-          </div>
-          <p className="mt-10 border-t border-line pt-5 text-xs leading-relaxed text-muted">Your account role and permissions must be verified by the school. Role selection alone does not grant access.</p>
+     
+          <p className="hidden mt-10 border-t border-line pt-5 text-xs leading-relaxed text-muted">Your account role and permissions must be verified by the school. Role selection alone does not grant access.</p>
+        </div>
         </div>
       </section>
     </main>
