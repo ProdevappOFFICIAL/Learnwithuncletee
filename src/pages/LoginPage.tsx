@@ -1,15 +1,85 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/routes/paths';
 import { siteInfo } from '@/data/content';
 import { PageMetadata } from '@/components/ui/PageMetadata';
 import { ChevronLeft } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { apiPost } from '@/lib/api';
 
 const inputClass = 'mt-2 min-h-12 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100';
 
+const homeForRole = (role: string) =>
+  role === 'STUDENT' || role === 'PARENT'
+    ? ROUTES.studentDashboard
+    : role === 'TEACHER'
+      ? ROUTES.teacherDashboard
+      : ROUTES.adminDashboard;
+
+type Mode = 'login' | 'signup' | 'recovery';
+
 export const LoginPage = () => {
-  const [mode, setMode] = useState<'login' | 'recovery'>('login');
-  const [notice, setNotice] = useState(false);
+  const [mode, setMode] = useState<Mode>('login');
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  const switchMode = (m: Mode) => {
+    setMode(m);
+    setError(null);
+    setSuccess(null);
+  };
+
+  const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    setSuccess(null);
+    if (mode === 'recovery') {
+      setError('Account recovery is handled by the school office — call Central Admin with your ID number.');
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    const identity = String(form.get('identity') ?? '').trim();
+    const password = String(form.get('password') ?? '');
+    setBusy(true);
+    try {
+      const me = await login(identity, password);
+      navigate(homeForRole(me.role));
+    } catch (e: any) {
+      setError(e?.message ?? 'Sign-in failed. Check your email and password.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSignup = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    setSuccess(null);
+    const form = new FormData(event.currentTarget);
+    const payload = {
+      user_name: String(form.get('user_name') ?? '').trim(),
+      user_email: String(form.get('user_email') ?? '').trim(),
+      user_password: String(form.get('user_password') ?? ''),
+      role: String(form.get('role') ?? 'STUDENT'),
+    };
+    if (payload.user_password.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await apiPost('/auth/signup', payload);
+      setSuccess(res.message ?? 'Account created. It is pending school approval — you can sign in once activated.');
+      event.currentTarget.reset();
+    } catch (e: any) {
+      setError(e?.message ?? 'Could not create account.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <main className="grid min-h-screen lg:grid-cols-[1.05fr_.95fr]">
@@ -20,19 +90,78 @@ export const LoginPage = () => {
       <section className="flex items-center justify-center px-5 py-12 sm:px-10">
         <div className="w-full max-w-md">
           <Link to={ROUTES.home} className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-500"><ChevronLeft aria-hidden="true" size={16} />Back to website</Link>
-          <p className="mt-10 text-xs font-bold uppercase tracking-widest text-brand-700">{mode === 'login' ? 'Secure access' : 'Account recovery'}</p>
-          <h2 className="mt-3 text-3xl font-extrabold">{mode === 'login' ? 'Portal Login' : 'Forgot your password?'}</h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted">{mode === 'login' ? 'Sign in with the credentials provided by your school.' : 'Enter your account email or ID and contact the school office to complete recovery.'}</p>
-          <form className="mt-8 space-y-5" onSubmit={(event) => { event.preventDefault(); setNotice(true); }}>
-            {mode === 'login' && <label className="block text-sm font-semibold">Choose portal<select className={inputClass} defaultValue="parent" name="role"><option value="student">Student</option><option value="parent">Parent / Guardian</option><option value="teacher">Teacher / Staff</option><option value="admin">Administrator</option></select></label>}
-            <label className="block text-sm font-semibold">{mode === 'login' ? 'ID number or email' : 'ID number or email'}<input className={inputClass} name="identity" autoComplete="username" required /></label>
-            {mode === 'login' && <label className="block text-sm font-semibold">Password<input className={inputClass} name="password" type="password" autoComplete="current-password" required /></label>}
-            <button type="submit" className="min-h-12 w-full rounded bg-brand-500 px-5 py-3 text-sm font-bold text-white hover:bg-brand-700">{mode === 'login' ? 'Sign in' : 'Request recovery'}</button>
-          </form>
-          {notice && <p role="status" className="mt-4 border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">Authentication is not connected yet. No sign-in or recovery request was sent.</p>}
-          <button type="button" className="mt-5 text-sm font-semibold text-brand-700 underline underline-offset-4" onClick={() => { setNotice(false); setMode(mode === 'login' ? 'recovery' : 'login'); }}>{mode === 'login' ? 'Forgot password?' : 'Return to login'}</button>
+
+          <div className="mt-10 grid grid-cols-2 gap-1 rounded bg-cream p-1" role="tablist" aria-label="Account actions">
+            {(['login', 'signup'] as Mode[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="tab"
+                aria-selected={mode === m}
+                onClick={() => switchMode(m)}
+                className={`rounded px-3 py-2.5 text-sm font-bold transition-colors ${mode === m ? 'bg-brand-900 text-white' : 'text-muted hover:text-ink'}`}
+              >
+                {m === 'login' ? 'Sign in' : 'Create account'}
+              </button>
+            ))}
+          </div>
+
+          <p className="mt-6 text-xs font-bold uppercase tracking-widest text-brand-700">
+            {mode === 'login' ? 'Secure access' : mode === 'signup' ? 'New here' : 'Account recovery'}
+          </p>
+          <h2 className="mt-3 text-3xl font-extrabold">
+            {mode === 'login' ? 'Portal Login' : mode === 'signup' ? 'Create account' : 'Forgot your password?'}
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">
+            {mode === 'login'
+              ? 'Sign in with the credentials provided by your school.'
+              : mode === 'signup'
+                ? 'Students and parents can self-register. Staff accounts are created by the school. New accounts need office approval before sign-in.'
+                : 'Enter your account email or ID and contact the school office to complete recovery.'}
+          </p>
+
+          {mode === 'signup' ? (
+            <form className="mt-8 space-y-5" onSubmit={handleSignup}>
+              <label className="block text-sm font-semibold">Full name<input className={inputClass} name="user_name" autoComplete="name" required placeholder="e.g. Daniel E." /></label>
+              <label className="block text-sm font-semibold">Email address<input className={inputClass} name="user_email" type="email" autoComplete="email" required placeholder="you@example.com" /></label>
+              <label className="block text-sm font-semibold">I am a
+                <select className={inputClass} name="role" defaultValue="STUDENT">
+                  <option value="STUDENT">Student</option>
+                  <option value="PARENT">Parent / Guardian</option>
+                </select>
+              </label>
+              <label className="block text-sm font-semibold">Password (min 8 characters)<input className={inputClass} name="user_password" type="password" autoComplete="new-password" required minLength={8} /></label>
+              <button type="submit" disabled={busy} className="min-h-12 w-full rounded bg-brand-500 px-5 py-3 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
+                {busy ? 'Creating…' : 'Create account'}
+              </button>
+            </form>
+          ) : (
+            <form className="mt-8 space-y-5" onSubmit={handleLogin}>
+              <label className="block text-sm font-semibold">Email address<input className={inputClass} name="identity" type="email" autoComplete="username" required placeholder="you@learnwithuncletee.org" /></label>
+              {mode === 'login' && <label className="block text-sm font-semibold">Password<input className={inputClass} name="password" type="password" autoComplete="current-password" required /></label>}
+              <button type="submit" disabled={busy} className="min-h-12 w-full rounded bg-brand-500 px-5 py-3 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
+                {busy ? 'Signing in…' : mode === 'login' ? 'Sign in' : 'Request recovery'}
+              </button>
+            </form>
+          )}
+
+          {error && <p role="alert" className="mt-4 border-l-2 border-rose-400 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</p>}
+          {success && <p role="status" className="mt-4 border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{success}</p>}
+
+          {mode === 'login' && (
+            <button type="button" className="mt-5 text-sm font-semibold text-brand-700 underline underline-offset-4" onClick={() => switchMode('recovery')}>Forgot password?</button>
+          )}
+          {mode !== 'login' && (
+            <button type="button" className="mt-5 text-sm font-semibold text-brand-700 underline underline-offset-4" onClick={() => switchMode('login')}>Return to login</button>
+          )}
+
           <div className="mt-6 border border-line bg-cream p-4">
-            <p className="text-xs font-bold uppercase tracking-widest text-brand-700">Preview portals</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-brand-700">Demo accounts (after seeding)</p>
+            <ul className="mt-2 space-y-1 text-xs text-muted">
+              <li><span className="font-bold text-ink">Admin:</span> admin@learnwithuncletee.org / Admin123!</li>
+              <li><span className="font-bold text-ink">Teacher:</span> teacher@learnwithuncletee.org / Teacher123!</li>
+              <li><span className="font-bold text-ink">Student:</span> student@learnwithuncletee.org / Student123!</li>
+            </ul>
             <div className="mt-3 flex flex-wrap gap-2">
               <Link to={ROUTES.studentDashboard} className="rounded bg-brand-500 px-3 py-2 text-xs font-bold text-white hover:bg-brand-700">Student →</Link>
               <Link to={ROUTES.teacherDashboard} className="rounded bg-brand-900 px-3 py-2 text-xs font-bold text-white hover:bg-brand-700">Teacher →</Link>

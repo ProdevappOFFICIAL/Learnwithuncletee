@@ -1,28 +1,49 @@
-import { Card, CardHead, PageHeader, Pill, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
+import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
+import { useResource } from '@/context/AuthContext';
 
-export const AdminAssignmentsPage = () => (
-  <div className="space-y-6">
-    <PageHeader eyebrow="Academics" title="Assignments monitor" text="Workload and completion across all classes. Nudge teachers where work is overdue." />
-    <Card>
-      <CardHead title="This week's assignments" sub="All subjects · 42 active" />
-      <TableWrap>
-        <table className="w-full min-w-[680px] text-left text-sm">
-          <thead><tr><Th>Title</Th><Th>Teacher · Class</Th><Th>Completion</Th><Th>Status</Th></tr></thead>
-          <tbody>
-            {[
-              { t: 'Quadratic equations — ex 4a', m: 'Mr. Balogun · JSS 2', c: '74%', s: 'Collecting' },
-              { t: 'Comprehension + summary', m: 'Mrs. Okoye · JSS 2', c: '88%', s: 'Grading' },
-              { t: 'Simple circuits lab report', m: 'Miss Ibrahim · JSS 1', c: '100%', s: 'Graded' },
-            ].map((r) => (
-              <tr key={r.t}>
-                <Td className="font-bold">{r.t}</Td><Td className="text-muted">{r.m}</Td>
-                <Td><span className="font-bold">{r.c}</span><span className="mt-1 block h-1.5 w-32 rounded bg-brand-50"><span className="block h-full rounded bg-brand-500" style={{ width: r.c }} /></span></Td>
-                <Td><Pill tone={r.s === 'Graded' ? 'emerald' : 'amber'}>{r.s}</Pill></Td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </TableWrap>
-    </Card>
-  </div>
-);
+interface AssignmentRow {
+  id: string;
+  title: string;
+  subject: string;
+  className: string;
+  dueAt: string;
+  maxScore: number;
+  teacher: { user_name: string };
+  _count: { submissions: number };
+}
+
+export const AdminAssignmentsPage = () => {
+  const { data, loading, error, reload } = useResource<AssignmentRow[]>('/school-assignments', { limit: 50 });
+
+  return (
+    <div className="space-y-6">
+      <PageHeader eyebrow="Academics" title="Assignments monitor" text="Workload and completion across all classes." />
+      <Card>
+        <CardHead title="All assignments" sub="Every class · every teacher" />
+        {loading ? (
+          <div className="px-5 py-5"><LoadingSkeleton rows={5} /></div>
+        ) : error || !data ? (
+          <div className="px-5 py-5"><ErrorState message={error ?? 'No data'} onRetry={reload} /></div>
+        ) : data.length === 0 ? (
+          <div className="px-5 py-5"><EmptyState message="No assignments yet." /></div>
+        ) : (
+          <TableWrap>
+            <table className="w-full min-w-[680px] text-left text-sm">
+              <thead><tr><Th>Title</Th><Th>Teacher · Class</Th><Th>Due</Th><Th>Submissions</Th></tr></thead>
+              <tbody>
+                {data.map((r) => (
+                  <tr key={r.id}>
+                    <Td><span className="font-bold">{r.title}</span><span className="block text-xs text-muted">{r.subject} · {r.maxScore} marks</span></Td>
+                    <Td className="text-muted">{r.teacher.user_name} · {r.className}</Td>
+                    <Td>{new Date(r.dueAt).toLocaleDateString()}</Td>
+                    <Td className="font-bold">{r._count.submissions}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        )}
+      </Card>
+    </div>
+  );
+};

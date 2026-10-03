@@ -1,24 +1,55 @@
 import { useState } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Bell, Menu, Search, X } from 'lucide-react';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Bell, LogOut, Menu, Search, X } from 'lucide-react';
 import { ROUTES } from '@/routes/paths';
 import { roleMeta, type DashboardNavItem, type DashboardRole } from '@/data/dashboard';
 import { siteInfo } from '@/data/content';
+import { useAuth } from '@/context/AuthContext';
 
 interface Props {
   role: DashboardRole;
   nav: DashboardNavItem[];
 }
 
+const initialsOf = (name: string) =>
+  name
+    .split(' ')
+    .map((p) => p.replace('.', '')[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'LW';
+
 export const DashboardLayout = ({ role, nav }: Props) => {
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, can, logout } = useAuth();
   const meta = roleMeta[role];
-  const active = nav.find((item) =>
+
+  // Admin-configurable visibility: items carrying `permission` are hidden
+  // when the signed-in user lacks it. Signed-out preview shows everything.
+  const visibleNav = nav.filter((item) => !user || !item.permission || can(item.permission));
+
+  const active = visibleNav.find((item) =>
     item.to === location.pathname
       ? true
       : location.pathname.startsWith(item.to) && item.to !== '/dashboard' && item.to.split('/').length > 2,
   );
+
+  const displayName = user?.user_name ?? meta.title;
+  const detail =
+    user?.role === 'STUDENT' && user.studentProfile
+      ? `${user.studentProfile.className} · ${user.studentProfile.studentCode}`
+      : user?.role === 'TEACHER' && user.teacherProfile
+        ? `${user.teacherProfile.department ?? 'Teacher'} · ${user.teacherProfile.staffCode}`
+        : (user?.role ?? 'Guest');
+  const initials = user ? initialsOf(user.user_name) : meta.title.slice(0, 2).toUpperCase();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate(ROUTES.login);
+  };
 
   const sidebar = (
     <div className="flex h-full flex-col bg-brand-900 text-white">
@@ -35,7 +66,7 @@ export const DashboardLayout = ({ role, nav }: Props) => {
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4" aria-label={`${meta.title} navigation`}>
-        {nav.map((item) => {
+        {visibleNav.map((item) => {
           const Icon = item.icon;
           return (
             <NavLink
@@ -73,17 +104,37 @@ export const DashboardLayout = ({ role, nav }: Props) => {
 
       <div className="border-t border-white/10 p-4">
         <div className="flex items-center gap-3 rounded bg-white/10 p-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-lime-accent text-sm font-extrabold text-brand-900">
-            {meta.initials}
-          </span>
+          {user?.img ? (
+            <img src={user.img} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+          ) : (
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-lime-accent text-sm font-extrabold text-brand-900">
+              {initials}
+            </span>
+          )}
           <span className="min-w-0 leading-tight">
-            <span className="block truncate text-sm font-bold">{meta.name}</span>
-            <span className="block truncate text-xs text-white/60">{meta.detail}</span>
+            <span className="block truncate text-sm font-bold">{displayName}</span>
+            <span className="block truncate text-xs text-white/60">{detail}</span>
           </span>
         </div>
+        {user ? (
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded border border-white/20 px-3 py-2.5 text-xs font-bold text-white/80 hover:bg-white/10 hover:text-white"
+          >
+            <LogOut size={14} aria-hidden="true" /> Sign out
+          </button>
+        ) : (
+          <Link
+            to={ROUTES.login}
+            className="mt-3 block rounded bg-lime-accent px-3 py-2.5 text-center text-xs font-bold text-brand-900 hover:bg-white"
+          >
+            Sign in →
+          </Link>
+        )}
         <Link
           to={ROUTES.home}
-          className="mt-3 block rounded border border-white/20 px-3 py-2.5 text-center text-xs font-bold text-white/80 hover:bg-white/10 hover:text-white"
+          className="mt-2 block rounded px-3 py-2 text-center text-xs font-bold text-white/60 hover:text-white"
         >
           ← Back to website
         </Link>
@@ -144,13 +195,22 @@ export const DashboardLayout = ({ role, nav }: Props) => {
                 <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-brand-500" />
               </button>
               <span className="hidden items-center gap-2 rounded bg-brand-900 py-1.5 pl-1.5 pr-3 text-white sm:flex">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-lime-accent text-[11px] font-extrabold text-brand-900">
-                  {meta.initials}
-                </span>
-                <span className="text-xs font-bold">{meta.name}</span>
+                {user?.img ? (
+                  <img src={user.img} alt="" className="h-7 w-7 rounded-full object-cover" />
+                ) : (
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-lime-accent text-[11px] font-extrabold text-brand-900">
+                    {initials}
+                  </span>
+                )}
+                <span className="text-xs font-bold">{displayName}</span>
               </span>
             </div>
           </div>
+          {!user && (
+            <p className="border-t border-line bg-cream px-4 py-2 text-center text-xs text-muted sm:px-6">
+              <Link to={ROUTES.login} className="font-bold text-brand-700 underline underline-offset-2">Sign in</Link> to load live data.
+            </p>
+          )}
         </header>
 
         <main className="flex-1 px-4 py-6 sm:px-6 sm:py-8">

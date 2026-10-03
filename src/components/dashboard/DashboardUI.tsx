@@ -14,7 +14,7 @@ export const PageHeader = ({
 }) => (
   <div className="flex flex-wrap items-end justify-between gap-4">
     <div className="max-w-2xl">
-      <p className="inline-flex items-center border-l-2 border-brand-500 pl-3 text-xs font-bold uppercase tracking-widest text-brand-700">
+      <p className="hidden  items-center border-l-2 border-brand-500 pl-3 text-xs font-bold uppercase tracking-widest text-brand-700">
         {eyebrow}
       </p>
       <h2 className="mt-2 font-display text-2xl font-extrabold text-ink sm:text-3xl">{title}</h2>
@@ -113,4 +113,33 @@ export const Th = ({ children }: { children: ReactNode }) => (
 
 export const Td = ({ children, className = '' }: { children: ReactNode; className?: string }) => (
   <td className={`border-b border-line px-5 py-3.5 align-top text-ink ${className}`}>{children}</td>
+);
+
+export const LoadingSkeleton = ({ rows = 4 }: { rows?: number }) => (
+  <div className="space-y-3" role="status" aria-label="Loading">
+    {Array.from({ length: rows }).map((_, i) => (
+      <div key={i} className="h-12 animate-pulse rounded bg-brand-50" />
+    ))}
+    <span className="sr-only">Loading…</span>
+  </div>
+);
+
+export const ErrorState = ({ message, onRetry }: { message: string; onRetry?: () => void }) => (
+  <div className="border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-800" role="alert">
+    <p className="font-bold">Couldn't load this section</p>
+    <p className="mt-1">{message}. Is the API running ({'VITE_API_URL'}) and are you signed in?</p>
+    {onRetry && (
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-3 rounded bg-brand-900 px-4 py-2 text-xs font-bold text-white hover:bg-brand-700"
+      >
+        Retry
+      </button>
+    )}
+  </div>
+);
+
+export const EmptyState = ({ message }: { message: string }) => (
+  <p className="border border-dashed border-line bg-cream px-5 py-6 text-center text-sm text-muted">{message}</p>
 );

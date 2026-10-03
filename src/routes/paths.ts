@@ -6,6 +6,7 @@ export const ROUTES = {
   studentLife: '/student-life',
   services: '/services',
   news: '/news',
+  newsDetail: '/news/:id',
   gallery: '/gallery',
   contact: '/contact',
   login: '/login',
@@ -28,6 +29,7 @@ export const ROUTES = {
   adminAssignments: '/dashboard/admin/assignments',
   adminVirtualClass: '/dashboard/admin/virtual-class',
   adminNews: '/dashboard/admin/news',
+  adminNewsPreview: '/dashboard/admin/news/preview',
   adminSettings: '/dashboard/admin/settings',
   notFound: '*',
 } as const;

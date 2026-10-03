@@ -11,10 +11,13 @@
     "lint:fix": "oxlint --fix"
   },
   "dependencies": {
+    "@mdxeditor/editor": "4.3.2",
+    "@uploadthing/react": "7.3.3",
     "lucide-react": "1.49.0",
     "react": "19.1.1",
     "react-dom": "19.1.1",
-    "react-router-dom": "7.18.4"
+    "react-router-dom": "7.18.4",
+    "uploadthing": "7.7.4"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.1.12",

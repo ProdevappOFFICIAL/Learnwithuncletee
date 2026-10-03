@@ -7,6 +7,7 @@ import { AdmissionsPage } from '@/pages/AdmissionsPage';
 import { StudentLifePage } from '@/pages/StudentLifePage';
 import { ServicesPage } from '@/pages/ServicesPage';
 import { NewsPage } from '@/pages/NewsPage';
+import { NewsDetailPage } from '@/pages/NewsDetailPage';
 import { GalleryPage } from '@/pages/GalleryPage';
 import { ContactPage } from '@/pages/ContactPage';
 import { LoginPage } from '@/pages/LoginPage';
@@ -32,6 +33,7 @@ import { AdminResultsPage } from '@/pages/dashboard/admin/AdminResultsPage';
 import { AdminAssignmentsPage } from '@/pages/dashboard/admin/AdminAssignmentsPage';
 import { AdminVirtualClassPage } from '@/pages/dashboard/admin/AdminVirtualClassPage';
 import { AdminNewsPage } from '@/pages/dashboard/admin/AdminNewsPage';
+import { AdminNewsPreviewPage } from '@/pages/dashboard/admin/AdminNewsPreviewPage';
 import { AdminSettingsPage } from '@/pages/dashboard/admin/AdminSettingsPage';
 
 export const router = createBrowserRouter([
@@ -42,6 +44,7 @@ export const router = createBrowserRouter([
   { path: ROUTES.studentLife, element: <StudentLifePage /> },
   { path: ROUTES.services, element: <ServicesPage /> },
   { path: ROUTES.news, element: <NewsPage /> },
+  { path: ROUTES.newsDetail, element: <NewsDetailPage /> },
   { path: ROUTES.gallery, element: <GalleryPage /> },
   { path: ROUTES.contact, element: <ContactPage /> },
   { path: ROUTES.login, element: <LoginPage /> },
@@ -80,6 +83,7 @@ export const router = createBrowserRouter([
       { path: 'assignments', element: <AdminAssignmentsPage /> },
       { path: 'virtual-class', element: <AdminVirtualClassPage /> },
       { path: 'news', element: <AdminNewsPage /> },
+  { path: 'news/preview', element: <AdminNewsPreviewPage /> },
       { path: 'settings', element: <AdminSettingsPage /> },
     ],
   },
