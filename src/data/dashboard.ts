@@ -18,7 +18,6 @@ import {
   Rocket,
   Settings,
   UserCog,
-  UserPlus,
   Users,
   Video,
   Wallet,

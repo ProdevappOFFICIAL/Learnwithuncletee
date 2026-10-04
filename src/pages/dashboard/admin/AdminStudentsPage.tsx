@@ -15,7 +15,7 @@ interface PendingUser {
   createdAt: string;
 }
 
-const inputClass = 'mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500';
+//const inputClass = 'mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500';
 
 const PendingApprovals = () => {
   const { can } = useAuth();
