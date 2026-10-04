@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, ClipboardList, CreditCard, GraduationCap, Info, UserCheck, Video, X } from 'lucide-react';
+import { ClipboardList, CreditCard, GraduationCap, Info, UserCheck, Video, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { apiGet } from '@/lib/api';
 

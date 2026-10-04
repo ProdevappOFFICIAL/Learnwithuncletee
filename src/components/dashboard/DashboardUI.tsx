@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { X } from 'lucide-react';
 
 export const PageHeader = ({
   eyebrow,
@@ -17,7 +18,7 @@ export const PageHeader = ({
       <p className="hidden  items-center border-l-2 border-brand-500 pl-3 text-xs font-bold uppercase tracking-widest text-brand-700">
         {eyebrow}
       </p>
-      <h2 className="mt-2 font-display text-2xl font-extrabold text-ink sm:text-3xl">{title}</h2>
+      <h2 className="hidden mt-2 font-display text-2xl font-extrabold text-ink sm:text-3xl">{title}</h2>
       {text && <p className="mt-2 text-sm leading-relaxed text-muted sm:text-base">{text}</p>}
     </div>
     {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
@@ -143,3 +144,45 @@ export const ErrorState = ({ message, onRetry }: { message: string; onRetry?: ()
 export const EmptyState = ({ message }: { message: string }) => (
   <p className="border border-dashed border-line bg-cream px-5 py-6 text-center text-sm text-muted">{message}</p>
 );
+
+export const Modal = ({
+  open,
+  onClose,
+  title,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: ReactNode;
+}) => {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={title}>
+      <button type="button" aria-label="Close dialog" onClick={onClose} className="absolute inset-0 bg-brand-900/60" />
+      <div className="relative w-full max-w-md border border-line bg-white shadow-xl">
+        <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
+          <h3 className="font-display text-base font-extrabold text-ink">{title}</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close dialog"
+            className="flex h-9 w-9 items-center justify-center rounded border border-line text-brand-800 hover:bg-brand-50"
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="px-5 py-5">{children}</div>
+      </div>
+    </div>
+  );
+};

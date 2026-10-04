@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pill, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
+import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, Modal, PageHeader, Pill, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
 import { useAuth, useResource } from '@/context/AuthContext';
-import { apiPost, formatNaira } from '@/lib/api';
+import { apiDelete, apiPatch, apiPost, formatNaira } from '@/lib/api';
 import { UploadButton } from '@/lib/uploadthing';
-import { CLASS_OPTIONS } from '@/data/dashboard';
-import type { StudentRow } from '@/data/dashboard';
+import type { ClassItem, CombinationItem, StudentRow } from '@/data/dashboard';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 
 interface PendingUser {
   id: string;
@@ -14,6 +14,8 @@ interface PendingUser {
   active: boolean;
   createdAt: string;
 }
+
+const inputClass = 'mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500';
 
 const PendingApprovals = () => {
   const { can } = useAuth();
@@ -66,91 +68,145 @@ const PendingApprovals = () => {
   );
 };
 
+interface StudentForm {
+  user_name: string;
+  user_email: string;
+  password: string;
+  classId: string;
+  combinationId: string;
+  active: boolean;
+  photoUrl: string;
+}
+
+const emptyForm = (defaultClassId: string): StudentForm => ({
+  user_name: '',
+  user_email: '',
+  password: '',
+  classId: defaultClassId,
+  combinationId: '',
+  active: true,
+  photoUrl: '',
+});
+
 export const AdminStudentsPage = () => {
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
-  const { data, loading, error, reload } = useResource<StudentRow[]>('/students', { search: query, limit: 50 });
-  const [form, setForm] = useState({ user_name: '', user_email: '', password: '', className: 'JSS 2 Diamond', guardianName: '', guardianPhone: '', photoUrl: '' });
+  const [classFilter, setClassFilter] = useState('');
+  const { data, loading, error, reload } = useResource<StudentRow[]>('/students', { search: query, classId: classFilter || undefined, limit: 50 });
+  const classes = useResource<ClassItem[]>('/classes');
+  const combinations = useResource<CombinationItem[]>('/combinations', { limit: 100 });
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<StudentRow | null>(null);
+  const [form, setForm] = useState<StudentForm>(emptyForm(''));
   const [created, setCreated] = useState<{ email: string; password: string; studentCode: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
 
-  const create = async (e: React.FormEvent) => {
+  const openCreate = () => {
+    setEditing(null);
+    setForm(emptyForm(classes.data?.[0]?.id ?? ''));
+    setCreated(null);
+    setNotice(null);
+    setModalOpen(true);
+  };
+
+  const openEdit = (row: StudentRow) => {
+    setEditing(row);
+    setForm({
+      user_name: row.user_name,
+      user_email: row.user_email,
+      password: '',
+      classId: row.classId ?? '',
+      combinationId: row.student?.combinationId ?? '',
+      active: row.active,
+      photoUrl: '',
+    });
+    setCreated(null);
+    setNotice(null);
+    setModalOpen(true);
+  };
+
+  const save = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.classId) {
+      setNotice('Select a class for this pupil.');
+      return;
+    }
     setBusy(true);
     setNotice(null);
     setCreated(null);
     try {
-      const res = await apiPost<{ login: { email: string; password: string }; profile: { studentCode: string } }>('/students', {
-        ...form,
-        password: form.password || undefined,
-        photoUrl: form.photoUrl || undefined,
-      });
-      setCreated({ email: res.data.login.email, password: res.data.login.password, studentCode: res.data.profile.studentCode });
-      setForm({ user_name: '', user_email: '', password: '', className: 'JSS 2 Diamond', guardianName: '', guardianPhone: '', photoUrl: '' });
+      if (editing) {
+        await apiPatch(`/students/${editing.id}`, {
+          user_name: form.user_name.trim(),
+          classId: form.classId,
+          combinationId: form.combinationId || null,
+          active: form.active,
+        });
+        setNotice(`"${form.user_name.trim()}" updated.`);
+      } else {
+        const res = await apiPost<{ login: { email: string; password: string }; profile: { studentCode: string } }>('/students', {
+          user_name: form.user_name.trim(),
+          user_email: form.user_email.trim(),
+          password: form.password || undefined,
+          classId: form.classId,
+          combinationId: form.combinationId || undefined,
+          photoUrl: form.photoUrl || undefined,
+        });
+        setCreated({ email: res.data.login.email, password: res.data.login.password, studentCode: res.data.profile.studentCode });
+        setNotice(null);
+      }
+      setModalOpen(false);
+      setEditing(null);
       reload();
     } catch (err: any) {
-      setNotice(err?.message ?? 'Could not create student');
+      setNotice(err?.message ?? 'Save failed');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const remove = async (row: StudentRow) => {
+    if (!confirm(`Delete pupil "${row.user_name}"? Their account and records are removed. This cannot be undone.`)) return;
+    setRowBusy(row.id);
+    try {
+      await apiDelete(`/users/${row.id}`);
+      reload();
+    } catch (err: any) {
+      setNotice(err?.message ?? 'Delete failed');
+    } finally {
+      setRowBusy(null);
+    }
+  };
+
+  const toggleActive = async (row: StudentRow) => {
+    setRowBusy(row.id);
+    try {
+      await apiPatch(`/students/${row.id}`, { active: !row.active });
+      reload();
+    } catch (err: any) {
+      setNotice(err?.message ?? 'Could not change status');
+    } finally {
+      setRowBusy(null);
     }
   };
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Students"
+        eyebrow="Members"
         title="Students"
-        text="Enrolment, class allocation, guardians and fee status across all programmes."
+        text="Enrolment, class allocation, combinations and account access."
+        actions={
+          <button type="button" onClick={openCreate} className="inline-flex min-h-11 items-center rounded bg-brand-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
+            <Plus aria-hidden="true" size={16} className="mr-2" /> Enroll Student
+          </button>
+        }
       />
       <PendingApprovals />
-
-      <Card className="p-5">
-        <p className="text-xs font-bold uppercase tracking-widest text-brand-700">Add student</p>
-        <h3 className="mt-2 font-display text-lg font-extrabold">New pupil + login details</h3>
-        <p className="mt-1 text-sm text-muted">Leave the password blank to auto-generate one. Share the login box with the pupil/guardian — it is shown only once.</p>
-        <form onSubmit={create} className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <label className="block text-sm font-semibold">Full name<input required value={form.user_name} onChange={(e) => setForm({ ...form, user_name: e.target.value })} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm" /></label>
-          <label className="block text-sm font-semibold">Email (login)<input required type="email" value={form.user_email} onChange={(e) => setForm({ ...form, user_email: e.target.value })} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm" /></label>
-          <label className="block text-sm font-semibold">Password (optional)<input type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Auto-generate" className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm" /></label>
-          <label className="block text-sm font-semibold">Grade (class)
-            <select value={form.className} onChange={(e) => setForm({ ...form, className: e.target.value })} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm">
-              {CLASS_OPTIONS.map((c) => <option key={c}>{c}</option>)}
-            </select>
-          </label>
-          <label className="block text-sm font-semibold">Guardian name<input value={form.guardianName} onChange={(e) => setForm({ ...form, guardianName: e.target.value })} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm" /></label>
-          <label className="block text-sm font-semibold">Guardian phone<input value={form.guardianPhone} onChange={(e) => setForm({ ...form, guardianPhone: e.target.value })} placeholder="+234…" className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm" /></label>
-          <div className="flex items-center gap-3">
-            {form.photoUrl ? (
-              <img src={form.photoUrl} alt="Avatar preview" className="h-11 w-11 rounded-full border border-line object-cover" />
-            ) : (
-              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-sm font-extrabold text-brand-700">?</span>
-            )}
-            <div>
-              <p className="text-sm font-semibold">Avatar {form.photoUrl && <span className="text-emerald-700">✓ set</span>}</p>
-              <div className="mt-1">
-                <UploadButton endpoint="avatarUploader" label="Upload avatar" onClientUploadComplete={(res) => setForm({ ...form, photoUrl: res?.[0]?.ufsUrl ?? '' })} onUploadError={(err) => setNotice(err.message)} />
-              </div>
-            </div>
-          </div>
-          <div className="sm:col-span-2 lg:col-span-3">
-            <button type="submit" disabled={busy} className="min-h-11 w-full rounded bg-brand-500 px-5 py-3 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
-              {busy ? 'Creating…' : '+ Add student'}
-            </button>
-          </div>
-        </form>
-        {notice && <p role="alert" className="mt-4 border-l-2 border-rose-400 bg-rose-50 px-4 py-3 text-sm text-rose-800">{notice}</p>}
-        {created && (
-          <div role="status" className="mt-4 border border-lime-accent bg-brand-50 p-4 text-sm">
-            <p className="font-extrabold text-brand-800">Account created — share these login details now (shown once):</p>
-            <ul className="mt-2 space-y-1 font-mono text-[13px]">
-              <li>Email: <b>{created.email}</b></li>
-              <li>Password: <b>{created.password}</b></li>
-              <li>Student ID: <b>{created.studentCode}</b></li>
-            </ul>
-          </div>
-        )}
-      </Card>
+      {notice && !modalOpen && <p role="status" className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
 
       <Card>
         <CardHead title="Student directory" sub="Search, filter and manage records" />
@@ -161,27 +217,50 @@ export const AdminStudentsPage = () => {
             setQuery(search);
           }}
         >
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name or email…" className="min-h-11 w-full max-w-xs rounded border border-line px-3 text-sm outline-none focus:border-brand-500" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, email or admission no…" className="min-h-11 w-full max-w-xs rounded border border-line px-3 text-sm outline-none focus:border-brand-500" />
+          <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)} aria-label="Filter by class" className="min-h-11 rounded border border-line bg-white px-3 text-sm font-semibold">
+            <option value="">All classes</option>
+            {(classes.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
           <button type="submit" className="min-h-11 rounded bg-brand-900 px-4 text-sm font-bold text-white hover:bg-brand-700">Search</button>
+          {(search || classFilter) && (
+            <button type="button" onClick={() => { setSearch(''); setQuery(''); setClassFilter(''); }} className="min-h-11 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">
+              Reset
+            </button>
+          )}
         </form>
         {loading ? (
           <div className="px-5 py-5"><LoadingSkeleton rows={5} /></div>
         ) : error || !data ? (
           <div className="px-5 py-5"><ErrorState message={error ?? 'No data'} onRetry={reload} /></div>
         ) : data.length === 0 ? (
-          <div className="px-5 py-5"><EmptyState message="No students found." /></div>
+          <div className="px-5 py-5"><EmptyState message="No students found. Enroll the first one." /></div>
         ) : (
           <TableWrap>
-            <table className="w-full min-w-[760px] text-left text-sm">
-              <thead><tr><Th>Pupil</Th><Th>Class</Th><Th>Guardian</Th><Th>Balance</Th><Th>Average</Th></tr></thead>
+            <table className="w-full min-w-[880px] text-left text-sm">
+              <thead><tr><Th>Pupil</Th><Th>Class</Th><Th>Combination</Th><Th>Balance</Th><Th>Average</Th><Th>Status</Th><Th><span className="sr-only">Actions</span></Th></tr></thead>
               <tbody>
                 {data.map((r) => (
                   <tr key={r.id}>
-                    <Td><span className="font-bold">{r.user_name}</span><span className="block text-xs text-muted">{r.studentProfile?.studentCode ?? r.user_email}</span></Td>
-                    <Td>{r.studentProfile?.className ?? '—'}</Td>
-                    <Td className="text-muted">{r.studentProfile?.guardianName ?? '—'}{r.studentProfile?.guardianPhone ? ` · ${r.studentProfile.guardianPhone}` : ''}</Td>
+                    <Td><span className="font-bold">{r.user_name}</span><span className="block text-xs text-muted">{r.student?.studentCode ?? r.user_email}</span></Td>
+                    <Td>{r.student?.className ?? '—'}</Td>
+                    <Td className="text-muted">{r.student?.combination?.name ?? '—'}</Td>
                     <Td>{(r.balanceKobo ?? 0) > 0 ? <Pill tone="amber">{formatNaira(r.balanceKobo)}</Pill> : <Pill tone="emerald">Clear</Pill>}</Td>
                     <Td className="font-bold text-brand-700">{r.average !== null && r.average !== undefined ? `${r.average.toFixed(1)}%` : '—'}</Td>
+                    <Td><Pill tone={r.active ? 'emerald' : 'rose'}>{r.active ? 'Active' : 'Inactive'}</Pill></Td>
+                    <Td>
+                      <span className="flex gap-1.5">
+                        <button type="button" onClick={() => openEdit(r)} aria-label={`Edit ${r.user_name}`} title="Edit" className="rounded border border-line px-2.5 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">
+                          <Pencil aria-hidden="true" size={14} />
+                        </button>
+                        <button type="button" disabled={rowBusy === r.id} onClick={() => toggleActive(r)} aria-label={r.active ? `Deactivate ${r.user_name}` : `Activate ${r.user_name}`} title={r.active ? 'Deactivate' : 'Activate'} className="rounded border border-line px-2.5 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-60">
+                          {r.active ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button type="button" disabled={rowBusy === r.id} onClick={() => remove(r)} aria-label={`Delete ${r.user_name}`} title="Delete" className="rounded border border-line px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:border-rose-300 disabled:opacity-60">
+                          <Trash2 aria-hidden="true" size={14} />
+                        </button>
+                      </span>
+                    </Td>
                   </tr>
                 ))}
               </tbody>
@@ -189,6 +268,94 @@ export const AdminStudentsPage = () => {
           </TableWrap>
         )}
       </Card>
+
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Student' : 'Enroll Student'}>
+        <form onSubmit={save} className="space-y-4">
+          <label className="block text-sm font-semibold">Full name
+            <input required value={form.user_name} onChange={(e) => setForm({ ...form, user_name: e.target.value })} placeholder="e.g. Daniel E." className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500" />
+          </label>
+          <label className="block text-sm font-semibold">Email / admission no
+            <input
+              required={!editing}
+              disabled={!!editing}
+              value={form.user_email}
+              onChange={(e) => setForm({ ...form, user_email: e.target.value })}
+              placeholder="pupil@example.com"
+              title={editing ? 'Email is fixed after creation' : undefined}
+              className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500 disabled:bg-cream disabled:text-muted"
+            />
+          </label>
+          {!editing && (
+            <label className="block text-sm font-semibold">Password (optional — auto-generated if blank)
+              <input type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Auto-generate" className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500" />
+            </label>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm font-semibold">Grade (class)
+              <select required value={form.classId} onChange={(e) => setForm({ ...form, classId: e.target.value })} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm">
+                <option value="" disabled>Select a class</option>
+                {(classes.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </label>
+            <label className="block text-sm font-semibold">Combination (optional)
+              <select value={form.combinationId} onChange={(e) => setForm({ ...form, combinationId: e.target.value })} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm">
+                <option value="">None</option>
+                {(combinations.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded border border-line bg-cream px-4 py-3">
+            <div>
+              <p className="text-sm font-bold">Active enrollment</p>
+              <p className="text-xs text-muted">Inactive pupils cannot sign in.</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.active}
+              aria-label="Active enrollment"
+              onClick={() => setForm({ ...form, active: !form.active })}
+              className={`inline-flex h-6 w-11 shrink-0 items-center rounded-full px-1 transition-colors ${form.active ? 'bg-brand-500' : 'bg-line'}`}
+            >
+              <span className={`h-4 w-4 rounded-full bg-white transition-transform ${form.active ? 'translate-x-5' : ''}`} />
+            </button>
+          </div>
+          {!editing && (
+            <div className="flex items-center gap-3">
+              {form.photoUrl ? (
+                <img src={form.photoUrl} alt="Avatar preview" className="h-11 w-11 rounded-full border border-line object-cover" />
+              ) : (
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-sm font-extrabold text-brand-700">?</span>
+              )}
+              <div>
+                <p className="text-sm font-semibold">Avatar {form.photoUrl && <span className="text-emerald-700">✓ set</span>}</p>
+                <div className="mt-1">
+                  <UploadButton endpoint="avatarUploader" label="Upload avatar" onClientUploadComplete={(res) => setForm({ ...form, photoUrl: res?.[0]?.ufsUrl ?? '' })} onUploadError={(err) => setNotice(err.message)} />
+                </div>
+              </div>
+            </div>
+          )}
+          {notice && <p role={editing ? 'status' : 'alert'} className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
+          <div className="flex gap-3">
+            <button type="button" onClick={() => setModalOpen(false)} className="min-h-11 flex-1 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">
+              Cancel
+            </button>
+            <button type="submit" disabled={busy} className="min-h-11 flex-1 rounded bg-brand-500 px-4 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
+              {busy ? 'Saving…' : editing ? 'Save Changes' : 'Enroll Student'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+      {created && (
+        <Card className="border-lime-accent p-4 text-sm" >
+          <p className="font-extrabold text-brand-800">Last created login (copy before leaving):</p>
+          <ul className="mt-2 space-y-1 font-mono text-[13px]">
+            <li>Email: <b>{created.email}</b></li>
+            <li>Password: <b>{created.password}</b></li>
+            <li>Student ID: <b>{created.studentCode}</b></li>
+          </ul>
+        </Card>
+      )}
     </div>
   );
 };

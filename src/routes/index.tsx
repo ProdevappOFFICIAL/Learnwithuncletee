@@ -11,6 +11,7 @@ import { NewsDetailPage } from '@/pages/NewsDetailPage';
 import { GalleryPage } from '@/pages/GalleryPage';
 import { ContactPage } from '@/pages/ContactPage';
 import { LoginPage } from '@/pages/LoginPage';
+import { ExaminationPage } from '@/pages/ExaminationPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { adminNav, studentNav, teacherNav } from '@/data/dashboard';
@@ -34,6 +35,20 @@ import { AdminAssignmentsPage } from '@/pages/dashboard/admin/AdminAssignmentsPa
 import { AdminVirtualClassPage } from '@/pages/dashboard/admin/AdminVirtualClassPage';
 import { AdminNewsPage } from '@/pages/dashboard/admin/AdminNewsPage';
 import { AdminNewsPreviewPage } from '@/pages/dashboard/admin/AdminNewsPreviewPage';
+import { AdminMembersPage } from '@/pages/dashboard/admin/AdminMembersPage';
+import { AdminWebsitePage } from '@/pages/dashboard/admin/AdminWebsitePage';
+import { AdminWebsitePagesPage } from '@/pages/dashboard/admin/AdminWebsitePagesPage';
+import { ExamClassesPage } from '@/pages/dashboard/admin/ExamClassesPage';
+import { AllExamsPage } from '@/pages/dashboard/admin/AllExamsPage';
+import { AllSubjectsPage } from '@/pages/dashboard/admin/AllSubjectsPage';
+import { AllQuestionsPage } from '@/pages/dashboard/admin/AllQuestionsPage';
+import { AdminCombinationPage } from '@/pages/dashboard/admin/AdminCombinationPage';
+import { DeploymentsPage } from '@/pages/dashboard/admin/DeploymentsPage';
+import { ClassExamsPage } from '@/pages/dashboard/admin/ClassExamsPage';
+import { ExamSubjectsPage } from '@/pages/dashboard/admin/ExamSubjectsPage';
+import { SubjectQuestionsPage } from '@/pages/dashboard/admin/SubjectQuestionsPage';
+import { ExamTestResultsPage } from '@/pages/dashboard/admin/ExamTestResultsPage';
+import { WebsiteSectionPage } from '@/pages/dashboard/admin/AdminSectionPage';
 import { AdminSettingsPage } from '@/pages/dashboard/admin/AdminSettingsPage';
 
 export const router = createBrowserRouter([
@@ -48,6 +63,7 @@ export const router = createBrowserRouter([
   { path: ROUTES.gallery, element: <GalleryPage /> },
   { path: ROUTES.contact, element: <ContactPage /> },
   { path: ROUTES.login, element: <LoginPage /> },
+  { path: ROUTES.examination, element: <ExaminationPage /> },
   { path: ROUTES.dashboard, element: <DashboardIndexPage /> },
   {
     path: ROUTES.studentDashboard,
@@ -75,6 +91,7 @@ export const router = createBrowserRouter([
     element: <DashboardLayout role="admin" nav={adminNav} />,
     children: [
       { index: true, element: <AdminDashboardPage /> },
+      { path: 'members', element: <AdminMembersPage /> },
       { path: 'students', element: <AdminStudentsPage /> },
       { path: 'teachers', element: <AdminTeachersPage /> },
       { path: 'admissions', element: <AdminAdmissionsPage /> },
@@ -84,6 +101,19 @@ export const router = createBrowserRouter([
       { path: 'virtual-class', element: <AdminVirtualClassPage /> },
       { path: 'news', element: <AdminNewsPage /> },
   { path: 'news/preview', element: <AdminNewsPreviewPage /> },
+  { path: 'exams', element: <ExamClassesPage /> },
+  { path: 'exams/all', element: <AllExamsPage /> },
+  { path: 'exams/subjects', element: <AllSubjectsPage /> },
+  { path: 'exams/questions', element: <AllQuestionsPage /> },
+  { path: 'exams/combinations', element: <AdminCombinationPage /> },
+  { path: 'exams/deployments', element: <DeploymentsPage /> },
+  { path: 'exams/results', element: <ExamTestResultsPage /> },
+  { path: 'exams/:classId', element: <ClassExamsPage /> },
+  { path: 'exams/:classId/:examId', element: <ExamSubjectsPage /> },
+  { path: 'exams/:classId/:examId/:subjectId', element: <SubjectQuestionsPage /> },
+  { path: 'website', element: <AdminWebsitePage /> },
+  { path: 'website/pages', element: <AdminWebsitePagesPage /> },
+  { path: 'website/:section', element: <WebsiteSectionPage /> },
       { path: 'settings', element: <AdminSettingsPage /> },
     ],
   },

@@ -28,6 +28,7 @@ export const TeacherResultsPage = () => {
   const [entry, setEntry] = useState({ studentId: '', ca: '', exam: '' });
   const [docTitle, setDocTitle] = useState('');
   const [docUrl, setDocUrl] = useState('');
+  const [docStudentId, setDocStudentId] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -60,27 +61,29 @@ export const TeacherResultsPage = () => {
   const uploadDoc = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!docUrl) {
-      setNotice('Upload the result PDF first.');
+      setNotice('Upload the exam result PDF first.');
       return;
     }
-    if (!docTitle.trim()) {
-      setNotice('Give the document a title (e.g. JSS 2 Mathematics scores).');
+    if (!docStudentId) {
+      setNotice('Select the pupil this report sheet belongs to.');
       return;
     }
+    const pupil = (pupils.data ?? []).find((p) => p.id === docStudentId);
     setBusy(true);
     setNotice(null);
     try {
       await apiPost('/result-documents', {
-        title: docTitle.trim(),
+        title: docTitle.trim() || `${pupil?.user_name ?? 'Pupil'} — ${term} report sheet`,
         className,
         session,
         term,
-        subject,
+        studentId: docStudentId,
         fileUrl: docUrl,
       });
-      setNotice(`Result PDF published for ${className} · ${term}, ${session}. Pupils can download it now.`);
+      setNotice(`Report sheet published for ${pupil?.user_name ?? 'the pupil'} (${className} · ${term}, ${session}).`);
       setDocTitle('');
       setDocUrl('');
+      setDocStudentId('');
       docs.reload();
     } catch (err: any) {
       setNotice(err?.message ?? 'Upload failed');
@@ -104,7 +107,7 @@ export const TeacherResultsPage = () => {
       <PageHeader
         eyebrow="Results"
         title="Results & grading"
-        text="Pick the grade, session and term, then enter CA and exam scores — or upload a result PDF for the whole class. Totals and grades are computed automatically."
+        text="Pick the grade, session and term, then enter CA and exam scores — or upload a pupil's full exam report sheet below."
       />
 
       {notice && <p role="status" className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
@@ -137,7 +140,7 @@ export const TeacherResultsPage = () => {
         <form onSubmit={save} className="mt-4 grid gap-3 border-t border-line pt-4 sm:grid-cols-[1.4fr_.6fr_.6fr_auto]">
           <select required value={entry.studentId} onChange={(e) => setEntry({ ...entry, studentId: e.target.value })} className="min-h-11 rounded border border-line bg-white px-3 text-sm">
             <option value="">— Pupil —</option>
-            {(pupils.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.user_name}{p.studentProfile?.studentCode ? ` · ${p.studentProfile.studentCode}` : ''}</option>)}
+            {(pupils.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.user_name}{p.student?.studentCode ? ` · ${p.student.studentCode}` : ''}</option>)}
           </select>
           <input required type="number" min={0} max={30} placeholder="CA / 30" value={entry.ca} onChange={(e) => setEntry({ ...entry, ca: e.target.value })} className="min-h-11 rounded border border-line px-3 text-sm" />
           <input required type="number" min={0} max={70} placeholder="Exam / 70" value={entry.exam} onChange={(e) => setEntry({ ...entry, exam: e.target.value })} className="min-h-11 rounded border border-line px-3 text-sm" />
@@ -185,20 +188,26 @@ export const TeacherResultsPage = () => {
           </Card>
 
           <Card>
-            <CardHead title="Result PDFs" sub={`${className} · ${term}, ${session}`} />
-            <form onSubmit={uploadDoc} className="grid gap-3 border-b border-line px-5 py-4 sm:grid-cols-[1.4fr_auto_auto]">
-              <label className="block text-sm font-semibold">Document title
-                <input value={docTitle} onChange={(e) => setDocTitle(e.target.value)} placeholder="e.g. JSS 2 Mathematics scores" className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm" />
+            <CardHead title="Exam report sheets" sub={`${className} · ${term}, ${session}`} />
+            <form onSubmit={uploadDoc} className="grid gap-3 border-b border-line px-5 py-4 sm:grid-cols-[1fr_1.4fr_auto_auto]">
+              <label className="block text-sm font-semibold">Pupil
+                <select value={docStudentId} onChange={(e) => setDocStudentId(e.target.value)} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm">
+                  <option value="">— Select pupil —</option>
+                  {(pupils.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.user_name}</option>)}
+                </select>
+              </label>
+              <label className="block text-sm font-semibold">Document title (optional)
+                <input value={docTitle} onChange={(e) => setDocTitle(e.target.value)} placeholder="Defaults to “Name — Term report sheet”" className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm" />
               </label>
               <div>
-                <p className="text-sm font-semibold">Result PDF {docUrl && <span className="text-emerald-700">✓ uploaded</span>}</p>
+                <p className="text-sm font-semibold">Report PDF {docUrl && <span className="text-emerald-700">✓ uploaded</span>}</p>
                 <div className="mt-2">
                   <UploadButton endpoint="assignmentUploader" label="Upload PDF" onClientUploadComplete={(res) => setDocUrl(res?.[0]?.ufsUrl ?? '')} onUploadError={(err) => setNotice(err.message)} />
                 </div>
               </div>
               <div className="flex items-end">
                 <button type="submit" disabled={busy} className="min-h-11 rounded bg-brand-900 px-5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
-                  {busy ? '…' : 'Publish PDF'}
+                  {busy ? '…' : 'Upload exam results'}
                 </button>
               </div>
             </form>
@@ -218,7 +227,7 @@ export const TeacherResultsPage = () => {
                       </span>
                       <div>
                         <p className="text-sm font-bold">{d.title}</p>
-                        <p className="text-xs text-muted">{d.subject ?? 'All subjects'} · by {d.uploader?.user_name ?? 'staff'} · {new Date(d.createdAt).toLocaleDateString()}</p>
+                        <p className="text-xs text-muted">{d.student?.user_name ? `${d.student.user_name} · ` : ''}by {d.uploader?.user_name ?? 'staff'} · {new Date(d.createdAt).toLocaleDateString()}</p>
                       </div>
                     </div>
                     <div className="flex gap-2">

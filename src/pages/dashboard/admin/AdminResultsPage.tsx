@@ -3,7 +3,7 @@ import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pi
 import { useResource } from '@/context/AuthContext';
 import { apiDelete, apiPost } from '@/lib/api';
 import { UploadButton } from '@/lib/uploadthing';
-import { CLASS_OPTIONS, TERM_OPTIONS, sessionOptions, type GradeData, type ResultDocData } from '@/data/dashboard';
+import { CLASS_OPTIONS, TERM_OPTIONS, sessionOptions, type GradeData, type ResultDocData, type StudentRow } from '@/data/dashboard';
 import { Download, FileText, Trash2 } from 'lucide-react';
 
 interface ClassRow extends GradeData {
@@ -20,9 +20,11 @@ export const AdminResultsPage = () => {
   const [session, setSession] = useState('2025/2026');
   const [term, setTerm] = useState('First Term');
   const results = useResource<ClassRow[]>('/school-results/class', { subject, className, session, term });
+  const pupils = useResource<StudentRow[]>('/students', { className, limit: 100 });
   const docs = useResource<ResultDocData[]>('/result-documents', { className, session, term });
   const [docTitle, setDocTitle] = useState('');
   const [docUrl, setDocUrl] = useState('');
+  const [docStudentId, setDocStudentId] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const selectClass = 'min-h-11 rounded border border-line bg-white px-3 text-sm font-bold';
@@ -33,27 +35,29 @@ export const AdminResultsPage = () => {
   const uploadDoc = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!docUrl) {
-      setNotice('Upload the result PDF first.');
+      setNotice('Upload the exam result PDF first.');
       return;
     }
-    if (!docTitle.trim()) {
-      setNotice('Give the document a title (e.g. JSS 2 Broadsheet).');
+    if (!docStudentId) {
+      setNotice('Select the pupil this report sheet belongs to.');
       return;
     }
+    const pupil = (pupils.data ?? []).find((p) => p.id === docStudentId);
     setBusy(true);
     setNotice(null);
     try {
       await apiPost('/result-documents', {
-        title: docTitle.trim(),
+        title: docTitle.trim() || `${pupil?.user_name ?? 'Pupil'} — ${term} report sheet`,
         className,
         session,
         term,
-        subject,
+        studentId: docStudentId,
         fileUrl: docUrl,
       });
-      setNotice(`Result PDF published for ${className} · ${term}, ${session}. Pupils can download it now.`);
+      setNotice(`Report sheet published for ${pupil?.user_name ?? 'the pupil'} (${className} · ${term}, ${session}).`);
       setDocTitle('');
       setDocUrl('');
+      setDocStudentId('');
       docs.reload();
     } catch (err: any) {
       setNotice(err?.message ?? 'Upload failed');
@@ -88,7 +92,7 @@ export const AdminResultsPage = () => {
       <PageHeader
         eyebrow="Academics"
         title="Results oversight"
-        text="Publish result PDFs per grade, session and term — pupils in that class can download them. Teacher-entered scores appear in the broadsheet below."
+        text="Upload each pupil's full exam report sheet — pick the class, session, term and pupil, then publish the PDF. Teacher-entered subject scores appear in the broadsheet below."
         actions={
           <>
             <button type="button" onClick={() => publish(true)} className="inline-flex min-h-11 items-center rounded bg-brand-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">Publish selection</button>
@@ -99,7 +103,8 @@ export const AdminResultsPage = () => {
       {notice && <p role="status" className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
 
       <Card className="p-5">
-        <p className="text-xs font-bold uppercase tracking-widest text-brand-700">Add result · PDF upload</p>
+        <p className="text-xs font-bold uppercase tracking-widest text-brand-700">Add result · exam report sheet</p>
+        <p className="mt-1 text-sm text-muted">Pick the exact pupil — the uploaded PDF is that pupil's full report sheet for this class, session and term. No subject needed.</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="block text-sm font-semibold">Grade (class)
             <select value={className} onChange={(e) => setClassName(e.target.value)} className={`${selectClass} mt-2 w-full`}>
@@ -116,25 +121,26 @@ export const AdminResultsPage = () => {
               {TERM_OPTIONS.map((t) => <option key={t}>{t}</option>)}
             </select>
           </label>
-          <label className="block text-sm font-semibold">Subject
-            <select value={subject} onChange={(e) => setSubject(e.target.value)} className={`${selectClass} mt-2 w-full`}>
-              {SUBJECTS.map((s) => <option key={s}>{s}</option>)}
+          <label className="block text-sm font-semibold">Pupil
+            <select value={docStudentId} onChange={(e) => setDocStudentId(e.target.value)} className={`${selectClass} mt-2 w-full`}>
+              <option value="">— Select pupil —</option>
+              {(pupils.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.user_name}</option>)}
             </select>
           </label>
         </div>
         <form onSubmit={uploadDoc} className="mt-4 grid gap-3 border-t border-line pt-4 sm:grid-cols-[1.4fr_auto_auto]">
-          <label className="block text-sm font-semibold">Document title
-            <input value={docTitle} onChange={(e) => setDocTitle(e.target.value)} placeholder="e.g. JSS 2 Diamond broadsheet" className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm" />
+          <label className="block text-sm font-semibold">Document title (optional)
+            <input value={docTitle} onChange={(e) => setDocTitle(e.target.value)} placeholder="Defaults to “Name — Term report sheet”" className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm" />
           </label>
           <div>
-            <p className="text-sm font-semibold">Result PDF {docUrl && <span className="text-emerald-700">✓ uploaded</span>}</p>
+            <p className="text-sm font-semibold">Report PDF {docUrl && <span className="text-emerald-700">✓ uploaded</span>}</p>
             <div className="mt-2">
               <UploadButton endpoint="assignmentUploader" label="Upload PDF" onClientUploadComplete={(res) => setDocUrl(res?.[0]?.ufsUrl ?? '')} onUploadError={(err) => setNotice(err.message)} />
             </div>
           </div>
           <div className="flex items-end">
             <button type="submit" disabled={busy} className="min-h-11 rounded bg-brand-900 px-5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
-              {busy ? '…' : 'Publish PDF'}
+              {busy ? '…' : 'Upload exam results'}
             </button>
           </div>
         </form>
@@ -158,7 +164,7 @@ export const AdminResultsPage = () => {
                   </span>
                   <div>
                     <p className="text-sm font-bold">{d.title}</p>
-                    <p className="text-xs text-muted">{d.subject ?? 'All subjects'} · by {d.uploader?.user_name ?? 'admin'} · {new Date(d.createdAt).toLocaleDateString()}</p>
+                    <p className="text-xs text-muted">{d.student?.user_name ? `${d.student.user_name} · ` : ''}{d.subject ?? 'Full report sheet'} · by {d.uploader?.user_name ?? 'admin'} · {new Date(d.createdAt).toLocaleDateString()}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -186,8 +192,14 @@ export const AdminResultsPage = () => {
             <StatTile label="Entries" value={String(data.length)} hint={session} />
             <StatTile label="Subjects" value={String(new Set(data.map((r) => r.subject)).size)} hint="In this selection" />
           </div>
-          <Card>
-            <CardHead title={`${className} broadsheet`} sub={`${term}, ${session} · ${subject}`} />
+      <Card>
+        <CardHead title={`${className} broadsheet`} sub={`${term}, ${session} · ${subject}`} />
+        <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-3">
+          <label className="text-xs font-bold text-muted" htmlFor="broadsheet-subject">Subject scores:</label>
+          <select id="broadsheet-subject" value={subject} onChange={(e) => setSubject(e.target.value)} className="min-h-10 rounded border border-line bg-white px-3 text-sm font-bold">
+            {SUBJECTS.map((s) => <option key={s}>{s}</option>)}
+          </select>
+        </div>
             {data.length === 0 ? (
               <div className="px-5 py-5"><EmptyState message="No entries for this selection yet. Add results above." /></div>
             ) : (

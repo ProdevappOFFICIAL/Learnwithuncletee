@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, LogOut, Menu, Search, X } from 'lucide-react';
+import { Bell, ChevronDown, ChevronLeft, LogOut, Menu, Search, X } from 'lucide-react';
 import { ROUTES } from '@/routes/paths';
 import { roleMeta, type DashboardNavItem, type DashboardRole } from '@/data/dashboard';
 import { siteInfo } from '@/data/content';
@@ -32,20 +32,182 @@ export const DashboardLayout = ({ role, nav }: Props) => {
 
   // Admin-configurable visibility: items carrying `permission` are hidden
   // when the signed-in user lacks it. Signed-out preview shows everything.
-  const visibleNav = nav.filter((item) => !user || !item.permission || can(item.permission));
+  // Groups survive only while at least one child remains visible.
+  const filterVisible = (items: DashboardNavItem[]): DashboardNavItem[] =>
+    items.flatMap((item) => {
+      if (item.children) {
+        const kids = filterVisible(item.children);
+        if (!kids.length) return [];
+        return [{ ...item, children: kids }];
+      }
+      if (!user || !item.permission || can(item.permission)) return [item];
+      return [];
+    });
+  const visibleNav = filterVisible(nav);
 
-  const active = visibleNav.find((item) =>
-    item.to === location.pathname
-      ? true
-      : location.pathname.startsWith(item.to) && item.to !== '/dashboard' && item.to.split('/').length > 2,
-  );
+  const isLeafActive = (to?: string) =>
+    !!to &&
+    (location.pathname === to ||
+      (to.split('/').length > 2 && to !== '/dashboard' && location.pathname.startsWith(to)));
+
+  const containsActive = (item: DashboardNavItem): boolean =>
+    isLeafActive(item.to) || !!item.children?.some(containsActive);
+
+  /** Deepest matching leaf label for the topbar title. */
+  const findActiveLabel = (items: DashboardNavItem[]): string | null => {
+    let best: string | null = null;
+    let bestLen = -1;
+    const walk = (list: DashboardNavItem[]) => {
+      for (const item of list) {
+        if (item.to && isLeafActive(item.to) && item.to.length > bestLen) {
+          best = item.label;
+          bestLen = item.to.length;
+        }
+        if (item.children) walk(item.children);
+      }
+    };
+    walk(items);
+    return best;
+  };
+  const activeLabel = findActiveLabel(visibleNav);
+
+  // Expanded groups, keyed by label path (labels repeat, e.g. two "Results").
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  // Auto-expand every ancestor of the active route on navigation.
+  // Children are checked before a group's own `to` so drill-down pages
+  // expand the full chain; a group also expands on its own overview page.
+  useEffect(() => {
+    const chain: string[] = [];
+    const walk = (list: DashboardNavItem[], prefix: string): boolean => {
+      for (const item of list) {
+        const key = `${prefix}/${item.label}`;
+        if (item.children && walk(item.children, key)) {
+          chain.push(key);
+          return true;
+        }
+        if (isLeafActive(item.to)) {
+          chain.push(key);
+          return true;
+        }
+      }
+      return false;
+    };
+    walk(visibleNav, '');
+    if (chain.length) setExpanded((prev) => ({ ...prev, ...Object.fromEntries(chain.map((k) => [k, true])) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+
+  const toggleGroup = (key: string) => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const renderNode = (item: DashboardNavItem, pathKey: string, depth: number): React.ReactNode => {
+    const key = `${pathKey}/${item.label}`;
+    const Icon = item.icon;
+    if (item.children?.length) {
+      const open = expanded[key] ?? containsActive(item);
+      // Split-button group: the label navigates to the group's own overview
+      // page (when `to` is set; NavLink highlights it when exact), the
+      // chevron only expands/collapses.
+      return (
+        <div key={key}>
+          <div
+            className="flex items-center gap-1 rounded transition-colors hover:bg-white/10"
+            style={{ paddingLeft: 12 + depth * 14 }}
+          >
+            {item.to ? (
+              <NavLink
+                to={item.to}
+                end={false}
+                onClick={() => {
+                  setOpen(false);
+                  setExpanded((prev) => ({ ...prev, [key]: true }));
+                }}
+                aria-label={item.label}
+                className={({ isActive }) =>
+                  `flex min-w-0 flex-1 items-center gap-3 rounded-full px-3 py-3 text-sm font-semibold transition-colors ${
+                    isActive ? 'bg-lime-accent text-brand-900' : 'text-white/80 hover:bg-white/10 hover:text-white'
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <Icon size={18} aria-hidden="true" className={`shrink-0 ${isActive ? 'text-brand-900' : 'text-lime-accent'}`} />
+                    <span className="truncate">{item.label}</span>
+                    
+                  </>
+                )}
+                
+              </NavLink>
+            ) : (
+              <span className="flex min-w-0 flex-1 items-center gap-3 py-3 pr-1 text-sm font-semibold text-white/80">
+                <Icon size={18} aria-hidden="true" className="shrink-0 text-lime-accent" />
+                <span className="truncate">{item.label}</span>
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => toggleGroup(key)}
+              aria-expanded={open}
+              aria-label={`${open ? 'Collapse' : 'Expand'} ${item.label}`}
+              className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded text-white/60 hover:bg-white/10 hover:text-white"
+            >
+              <ChevronDown
+                size={15}
+                aria-hidden="true"
+                className={`transition-transform ${open ? '' : '-rotate-90'}`}
+              />
+            </button>
+          </div>
+          {open && (
+            <div className="space-y-1">
+              {item.children.map((child) => renderNode(child, key, depth + 1))}
+            </div>
+          )}
+        </div>
+      );
+    }
+    if (!item.to) return null;
+    const to = item.to;
+    return (
+      <NavLink
+        key={key}
+        to={to}
+        end={to.split('/').length <= 3}
+        onClick={() => setOpen(false)}
+        style={{ paddingLeft: 12 + depth * 14 }}
+        className={({ isActive }) =>
+          `group flex items-center justify-between gap-2 rounded-full px-3 py-3 text-sm font-semibold transition-colors ${
+            isActive ? 'bg-lime-accent text-brand-900' : 'text-white/80 hover:bg-white/10 hover:text-white'
+          }`
+        }
+      >
+        {({ isActive }) => (
+          <>
+            <span className="flex items-center gap-3">
+              <Icon size={18} aria-hidden="true" className={isActive ? 'text-brand-900' : 'text-lime-accent'} />
+              {item.label}
+            </span>
+            {item.badge && (
+              <span
+                className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                  isActive ? 'bg-brand-900 text-lime-accent' : 'bg-white/15 text-white'
+                }`}
+              >
+                {item.badge}
+              </span>
+            )}
+          </>
+        )}
+      </NavLink>
+    );
+  };
 
   const displayName = user?.user_name ?? meta.title;
   const detail =
-    user?.role === 'STUDENT' && user.studentProfile
-      ? `${user.studentProfile.className} · ${user.studentProfile.studentCode}`
-      : user?.role === 'TEACHER' && user.teacherProfile
-        ? `${user.teacherProfile.department ?? 'Teacher'} · ${user.teacherProfile.staffCode}`
+    user?.role === 'STUDENT' && user.student
+      ? `${user.student.className} · ${user.student.studentCode}`
+      : user?.role === 'TEACHER' && user.teacher
+        ? `${user.teacher.department ?? 'Teacher'} · ${user.teacher.staffCode}`
         : (user?.role ?? 'Guest');
   const initials = user ? initialsOf(user.user_name) : meta.title.slice(0, 2).toUpperCase();
   const avatar = avatarOf(user);
@@ -101,40 +263,7 @@ export const DashboardLayout = ({ role, nav }: Props) => {
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4" aria-label={` navigation`}>
-        {visibleNav.map((item) => {
-          const Icon = item.icon;
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to.split('/').length <= 3}
-              onClick={() => setOpen(false)}
-              className={({ isActive }) =>
-                `group flex items-center justify-between gap-2 rounded px-3 py-3 text-sm font-semibold transition-colors ${
-                  isActive ? 'bg-lime-accent text-brand-900' : 'text-white/80 hover:bg-white/10 hover:text-white'
-                }`
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <span className="flex items-center gap-3">
-                    <Icon size={18} aria-hidden="true" className={isActive ? 'text-brand-900' : 'text-lime-accent'} />
-                    {item.label}
-                  </span>
-                  {item.badge && (
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                        isActive ? 'bg-brand-900 text-lime-accent' : 'bg-white/15 text-white'
-                      }`}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
-                </>
-              )}
-            </NavLink>
-          );
-        })}
+        {visibleNav.map((item) => renderNode(item, '', 0))}
       </nav>
 
       <div className="border-t border-white/10 p-4">
@@ -169,9 +298,9 @@ export const DashboardLayout = ({ role, nav }: Props) => {
         )}
         <Link
           to={ROUTES.home}
-          className="mt-2 block rounded px-3 py-2 text-center text-xs font-bold text-white/60 hover:text-white"
+          className="flex mt-2 gap-2 items-center justify-center rounded px-3 py-2 text-center text-xs font-bold text-white/60 hover:text-white"
         >
-          ← Back to website
+          <ChevronLeft size={14} aria-hidden="true" /> Back to website
         </Link>
       </div>
     </div>
@@ -213,7 +342,7 @@ export const DashboardLayout = ({ role, nav }: Props) => {
             <div className="min-w-0">
               <p className="hidden text-[11px] font-bold uppercase tracking-[.18em] text-brand-700">{meta.title}</p>
               <h1 className="truncate font-display text-lg font-extrabold leading-tight sm:text-xl">
-                {active?.label ?? 'Dashboard'}
+                {activeLabel ?? 'Dashboard'}
               </h1>
             </div>
             <div className="ml-auto flex items-center gap-2">
@@ -258,8 +387,8 @@ export const DashboardLayout = ({ role, nav }: Props) => {
           )}
         </header>
 
-        <main className="flex-1 px-4 py-6 sm:px-6 sm:py-8">
-          <div className="mx-auto w-full max-w-6xl">
+        <main className="flex-1 px-4  sm:px-6 sm:py-8">
+          <div className="mx-auto w-full ">
             <Outlet />
           </div>
         </main>

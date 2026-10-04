@@ -132,7 +132,7 @@ export const AdminSettingsPage = () => {
             </table>
           </div>
         )}
-        <p className="border-t border-line bg-brand-50/60 px-5 py-3 text-xs text-muted">SUPER_ADMIN and ADMIN always have full access and cannot be restricted. Denied sidebar items disappear on next navigation; denied API calls return 403.</p>
+        <p className="border-t border-line bg-brand-50/60 px-5 py-3 text-xs text-muted">OWNER and ADMIN always have full access and cannot be restricted. Denied sidebar items disappear on next navigation; denied API calls return 403.</p>
       </Card>
     </div>
   );

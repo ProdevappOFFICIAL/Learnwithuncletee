@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+:root {
+  /* We use the light blue-grey from your image as the default background */
+  --background: #E9EDF7;
+  --foreground: #1B2559;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  
+  /* Map Tailwind's font-sans to your Inter variable from layout.tsx */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Note: The design you're replicating is a light-mode specific UI. 
+   If you want to keep the dark mode transition, leave this here; 
+   otherwise, you can remove it to keep the "100% accuracy" 
+   regardless of system settings. 
+*/
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b1437; /* A deep navy to match the brand style */
+    --foreground: #ffffff;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  /* Use font-sans to ensure Inter is applied */
+  font-family: var(--font-inter), sans-serif;
+}

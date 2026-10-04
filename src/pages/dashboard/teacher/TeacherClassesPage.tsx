@@ -63,8 +63,8 @@ export const TeacherClassesPage = () => {
                 {data.map((s) => (
                   <tr key={s.id}>
                     <Td className="font-bold">{s.user_name}</Td>
-                    <Td className="text-muted">{s.studentProfile?.studentCode ?? '—'}</Td>
-                    <Td className="text-muted">{s.studentProfile?.guardianName ?? '—'} · {s.studentProfile?.guardianPhone ?? ''}</Td>
+                    <Td className="text-muted">{s.student?.studentCode ?? '—'}</Td>
+                    <Td className="text-muted">{s.student?.guardianName ?? '—'} · {s.student?.guardianPhone ?? ''}</Td>
                     <Td>{s.balanceKobo !== undefined && s.balanceKobo > 0 ? <Pill tone="amber">Owing</Pill> : <Pill tone="emerald">Clear</Pill>}</Td>
                     <Td className="font-bold text-brand-700">{s.average !== null && s.average !== undefined ? `${s.average.toFixed(1)}%` : '—'}</Td>
                   </tr>

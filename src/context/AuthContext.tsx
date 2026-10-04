@@ -2,8 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { api, apiPost, tokenStore } from '@/lib/api';
 
 /** Preferred avatar: role profile photo first, then account image. */
-export const avatarOf = (user: Pick<SessionUser, 'img' | 'studentProfile' | 'teacherProfile'> | null | undefined) =>
-  user?.studentProfile?.photoUrl || user?.teacherProfile?.photoUrl || user?.img || null;
+export const avatarOf = (user: Pick<SessionUser, 'img' | 'student' | 'teacher'> | null | undefined) =>
+  user?.student?.photoUrl || user?.teacher?.photoUrl || user?.img || null;
 
 export interface SessionUser {
   id: string;
@@ -11,8 +11,9 @@ export interface SessionUser {
   user_email: string;
   role: string;
   img?: string | null;
-  studentProfile?: { studentCode: string; className: string; photoUrl?: string | null } | null;
-  teacherProfile?: { staffCode: string; department?: string; photoUrl?: string | null } | null;
+  workspaceId?: string;
+  student?: { studentCode: string; className: string; photoUrl?: string | null } | null;
+  teacher?: { staffCode: string; department?: string; photoUrl?: string | null } | null;
   permissions: string[];
 }
 
@@ -97,7 +98,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const can = useCallback(
     (permission: string) => {
       if (!user) return false;
-      if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') return true;
+      if (user.role === 'ADMIN' || user.role === 'OWNER') return true;
       return user.permissions.includes(permission);
     },
     [user],

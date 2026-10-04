@@ -9,7 +9,7 @@ import { Download, FileText } from 'lucide-react';
 export const StudentResultsPage = () => {
   const { user } = useAuth();
   const sessions = sessionOptions();
-  const [className, setClassName] = useState(user?.studentProfile?.className ?? 'JSS 2 Diamond');
+  const [className, setClassName] = useState(user?.student?.className ?? 'JSS 2 Diamond');
   const [session, setSession] = useState('2025/2026');
   const [term, setTerm] = useState('First Term');
   const [mode, setMode] = useState<'exact' | 'all'>('exact');
@@ -44,7 +44,7 @@ export const StudentResultsPage = () => {
     try {
       printReportCard({
         pupilName: user?.user_name ?? 'Pupil',
-        studentCode: user?.studentProfile?.studentCode,
+        studentCode: user?.student?.studentCode,
         className: mode === 'exact' ? className : (shown[0]?.className ?? ''),
         session: mode === 'exact' ? session : (shown[0]?.session ?? ''),
         term: mode === 'exact' ? term : 'All terms',
@@ -144,7 +144,7 @@ export const StudentResultsPage = () => {
       )}
 
       <Card>
-        <CardHead title="Result documents" sub="PDFs published by the school for your class" />
+        <CardHead title="Result documents" sub="Class sheets plus report sheets addressed to you" />
         {docsRes.loading ? (
           <div className="px-5 py-5"><LoadingSkeleton rows={2} /></div>
         ) : docsRes.error || !docsRes.data ? (

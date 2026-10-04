@@ -1,13 +1,24 @@
 import {
   BookOpenCheck,
   ClipboardList,
+  Cog,
   CreditCard,
   FileBarChart2,
+  FileQuestion,
+  FileText,
+  Globe,
   GraduationCap,
+  Home,
+  Image as ImageIcon,
+  Info,
+  Layers,
   LayoutDashboard,
+  LayoutTemplate,
   Newspaper,
+  Rocket,
   Settings,
   UserCog,
+  UserPlus,
   Users,
   Video,
   Wallet,
@@ -17,12 +28,15 @@ import { ROUTES } from '@/routes/paths';
 export type DashboardRole = 'student' | 'teacher' | 'admin';
 
 export interface DashboardNavItem {
-  to: string;
+  /** Route path. Omitted for pure toggle groups that only expand/collapse. */
+  to?: string;
   label: string;
   icon: typeof LayoutDashboard;
   badge?: string;
   /** Permission key required to see this item. Undefined = visible to the role. */
   permission?: string;
+  /** Nested children — rendered as a collapsible subgroup. */
+  children?: DashboardNavItem[];
 }
 
 export const studentNav: DashboardNavItem[] = [
@@ -42,15 +56,65 @@ export const teacherNav: DashboardNavItem[] = [
 
 export const adminNav: DashboardNavItem[] = [
   { to: ROUTES.adminDashboard, label: 'Dashboard', icon: LayoutDashboard },
-  { to: ROUTES.adminStudents, label: 'Students', icon: Users, permission: 'students.read' },
-  { to: ROUTES.adminTeachers, label: 'Teachers & Staff', icon: UserCog, permission: 'teachers.read' },
+  {
+    label: 'Members',
+    icon: Users,
+    to: ROUTES.adminMembers,
+    children: [
+      { to: ROUTES.adminStudents, label: 'Students', icon: Users, permission: 'students.read' },
+      { to: ROUTES.adminTeachers, label: 'Teachers', icon: UserCog, permission: 'teachers.read' },
+      // The add-student form + approvals queue live on the Students page.
+  //    { to: ROUTES.adminStudents, label: 'Add Member', icon: UserPlus, permission: 'students.write' },
+    ],
+  },
   { to: ROUTES.adminAdmissions, label: 'Admissions', icon: ClipboardList, badge: '24', permission: 'admissions.read' },
   { to: ROUTES.adminFees, label: 'Fees & Payments', icon: CreditCard, permission: 'fees.read' },
-  { to: ROUTES.adminResults, label: 'Results', icon: FileBarChart2, permission: 'results.read' },
   { to: ROUTES.adminAssignments, label: 'Assignments', icon: BookOpenCheck, permission: 'assignments.read' },
   { to: ROUTES.adminVirtualClass, label: 'Virtual Classes', icon: Video, permission: 'virtual.read' },
   { to: ROUTES.adminNews, label: 'News & Events', icon: Newspaper, permission: 'news.read' },
-  { to: ROUTES.adminSettings, label: 'Settings', icon: Settings, permission: 'settings.read' },
+  { to: ROUTES.adminResults, label: 'Results', icon: FileBarChart2, permission: 'results.read' },
+  {
+    label: 'Exam & Test',
+    icon: GraduationCap,
+    to: ROUTES.adminExams,
+    children: [
+      { to: ROUTES.adminExams, label: 'Classes', icon: Users, permission: 'results.read' },
+      { to: ROUTES.adminAllExams, label: 'Exams', icon: FileText, permission: 'results.read' },
+      { to: ROUTES.adminAllSubjects, label: 'Subjects', icon: BookOpenCheck, permission: 'results.read' },
+      { to: ROUTES.adminAllQuestions, label: 'Questions', icon: FileQuestion, permission: 'results.read' },
+      { to: ROUTES.adminCombinations, label: 'Combinations', icon: Layers, permission: 'results.read' },
+      { to: ROUTES.adminDeployments, label: 'Deployments', icon: Rocket, permission: 'results.read' },
+      { to: ROUTES.adminExamResults, label: 'Results', icon: FileBarChart2, permission: 'results.read' },
+    ],
+  },
+  {
+    label: 'Settings',
+    icon: Settings,
+    to: ROUTES.adminSettings,
+    children: [
+      { to: ROUTES.adminSettings, label: 'General', icon: Cog, permission: 'settings.read' },
+      {
+        label: 'Website Management',
+        icon: Globe,
+        to: ROUTES.adminWebsite,
+        children: [
+          { to: '/dashboard/admin/website/banner', label: 'Banner Image', icon: ImageIcon, permission: 'settings.read' },
+          { to: '/dashboard/admin/website/information', label: 'Information', icon: Info, permission: 'settings.read' },
+          {
+            label: 'Pages',
+            icon: LayoutTemplate,
+            to: ROUTES.adminWebsitePages,
+            children: [
+              { to: '/dashboard/admin/website/home', label: 'Home Page', icon: Home, permission: 'settings.read' },
+              { to: '/dashboard/admin/website/about', label: 'About Page', icon: FileText, permission: 'settings.read' },
+              { to: '/dashboard/admin/website/gallery', label: 'Gallery Page', icon: ImageIcon, permission: 'settings.read' },
+              { to: '/dashboard/admin/website/other', label: 'Other Pages', icon: FileText, permission: 'settings.read' },
+            ],
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 export const roleMeta: Record<DashboardRole, { title: string; subtitle: string }> = {
@@ -100,6 +164,8 @@ export interface ResultDocData {
   session: string;
   term: string;
   subject?: string | null;
+  studentId?: string | null;
+  student?: { user_name: string } | null;
   fileUrl: string;
   createdAt: string;
   uploader?: { user_name: string };
@@ -183,7 +249,8 @@ export interface StudentRow {
   user_email: string;
   active: boolean;
   img?: string | null;
-  studentProfile?: { studentCode: string; className: string; guardianName?: string; guardianPhone?: string } | null;
+  classId?: string | null;
+  student?: { studentCode: string; className: string; guardianName?: string; guardianPhone?: string; combinationId?: string | null; combination?: { id: string; name: string } | null } | null;
   balanceKobo?: number;
   average?: number | null;
 }
@@ -194,5 +261,52 @@ export interface StaffRow {
   user_email: string;
   role: string;
   active: boolean;
-  teacherProfile?: { staffCode: string; department?: string; subjects: string[] } | null;
+  teacher?: { staffCode: string; department?: string; subjects: string[] } | null;
+}
+
+export interface ClassItem {
+  id: string;
+  name: string;
+}
+
+export interface CombinationItem {
+  id: string;
+  name: string;
+  subjects: Array<{ subject: { id: string; name: string; code?: string | null } }>;
+  _count?: { students: number };
+}
+
+export interface ExamItem {
+  id: string;
+  exam_name: string;
+  minutes: number;
+  visible?: boolean;
+  classId: string;
+}
+
+export interface SubjectItem {
+  id: string;
+  name: string;
+  code?: string | null;
+}
+
+export interface CourseAssignmentItem {
+  id: string;
+  teacherId: string;
+  examId?: string | null;
+  subjectId?: string | null;
+  classId?: string | null;
+  teacher?: { user_name: string };
+  exam?: { exam_name: string } | null;
+  subject?: { name: string } | null;
+  class?: { name: string } | null;
+}
+
+export interface ExamDeploymentItem {
+  id: string;
+  code: string;
+  mode: 'ONLINE' | 'OFFLINE';
+  status: 'DRAFT' | 'LIVE' | 'ENDED';
+  createdAt: string;
+  exam?: { id: string; exam_name: string; minutes: number } | null;
 }
