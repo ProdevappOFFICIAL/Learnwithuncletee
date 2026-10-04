@@ -18,6 +18,7 @@ export const ROUTES = {
   studentAssignments: '/dashboard/student/assignments',
   studentVirtualClass: '/dashboard/student/virtual-class',
   teacherDashboard: '/dashboard/teacher',
+  teacherAttendance: '/dashboard/teacher/attendance',
   teacherAssignments: '/dashboard/teacher/assignments',
   teacherResults: '/dashboard/teacher/results',
   teacherClasses: '/dashboard/teacher/classes',
@@ -26,6 +27,7 @@ export const ROUTES = {
   adminStudents: '/dashboard/admin/students',
   adminTeachers: '/dashboard/admin/teachers',
   adminAdmissions: '/dashboard/admin/admissions',
+  adminAttendance: '/dashboard/admin/attendance',
   adminFees: '/dashboard/admin/fees',
   adminResults: '/dashboard/admin/results',
   adminAssignments: '/dashboard/admin/assignments',
@@ -42,6 +44,7 @@ export const ROUTES = {
   adminWebsite: '/dashboard/admin/website',
   adminWebsitePages: '/dashboard/admin/website/pages',
   adminSettings: '/dashboard/admin/settings',
+  adminAuditLog: '/dashboard/admin/audit-log',
   notFound: '*',
 } as const;
 

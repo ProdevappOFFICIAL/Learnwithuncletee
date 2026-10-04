@@ -3,8 +3,9 @@ import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pi
 import { useAuth, useResource } from '@/context/AuthContext';
 import { apiGet } from '@/lib/api';
 import { printReportCard } from '@/lib/reportCard';
-import { CLASS_OPTIONS, TERM_OPTIONS, sessionOptions, type GradeData, type ResultDocData } from '@/data/dashboard';
-import { Download, FileText } from 'lucide-react';
+import { TERM_OPTIONS, sessionOptions, type GradeData, type ResultDocData } from '@/data/dashboard';
+import type { ClassItem } from '@/data/dashboard';
+import {  ExternalLink, FileText } from 'lucide-react';
 
 export const StudentResultsPage = () => {
   const { user } = useAuth();
@@ -21,12 +22,19 @@ export const StudentResultsPage = () => {
   const allRes = useResource<GradeData[]>('/school-results/mine');
   // Published PDFs for the pupil's own class (server force-scopes by class).
   const docsRes = useResource<ResultDocData[]>('/result-documents', mode === 'exact' ? { session, term } : {});
+  // Grade options come from the class API, not a hardcoded list.
+  const classesRes = useResource<ClassItem[]>('/classes');
+  const ownClass = user?.student?.className ?? '';
+  const classOptions = Array.from(
+    new Set([...(classesRes.data ?? []).map((c) => c.name), ...(ownClass ? [ownClass] : [])]),
+  );
+  const effectiveClass = classOptions.includes(className) ? className : (classOptions[0] ?? className);
 
   const fetchExact = async () => {
     setFetching(true);
     setFetchError(null);
     try {
-      const res = await apiGet<GradeData[]>('/school-results/mine', { className, session, term });
+      const res = await apiGet<GradeData[]>('/school-results/mine', { className: effectiveClass, session, term });
       setGrades(res.data);
       setMode('exact');
     } catch (e: any) {
@@ -45,7 +53,7 @@ export const StudentResultsPage = () => {
       printReportCard({
         pupilName: user?.user_name ?? 'Pupil',
         studentCode: user?.student?.studentCode,
-        className: mode === 'exact' ? className : (shown[0]?.className ?? ''),
+        className: mode === 'exact' ? effectiveClass : (shown[0]?.className ?? ''),
         session: mode === 'exact' ? session : (shown[0]?.session ?? ''),
         term: mode === 'exact' ? term : 'All terms',
         grades: shown,
@@ -62,22 +70,28 @@ export const StudentResultsPage = () => {
       <PageHeader
         eyebrow="Results"
         title="Academic results"
-        text="Pick your grade, session and term to fetch that exact result — or view everything at once. Only approved results appear here."
+        text="View all your results. Only approved results appear here."
         actions={
           shown?.length ? (
             <button type="button" onClick={downloadPdf} className="inline-flex min-h-11 items-center rounded bg-brand-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
-              Download PDF
+              View Results
             </button>
           ) : undefined
         }
       />
 
-      <Card className="p-5">
+      <Card className="p-5 hidden">
         <p className="text-xs font-bold uppercase tracking-widest text-brand-700">Find result</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
           <label className="block text-sm font-semibold">Grade (class)
-            <select value={className} onChange={(e) => setClassName(e.target.value)} className={`${selectClass} mt-2 w-full`}>
-              {CLASS_OPTIONS.map((c) => <option key={c}>{c}</option>)}
+            <select value={effectiveClass} onChange={(e) => setClassName(e.target.value)} className={`${selectClass} mt-2 w-full`}>
+              {classesRes.loading ? (
+                <option>Loading classes…</option>
+              ) : classOptions.length === 0 ? (
+                <option value="">No classes found</option>
+              ) : (
+                classOptions.map((c) => <option key={c} value={c}>{c}</option>)
+              )}
             </select>
           </label>
           <label className="block text-sm font-semibold">Session (year)
@@ -111,13 +125,13 @@ export const StudentResultsPage = () => {
       {shown && (
         <>
           <div className="grid gap-4 sm:grid-cols-3 hidden">
-            <StatTile label="Average" value={`${avg.toFixed(1)}%`} hint={mode === 'exact' ? `${className} · ${term}` : 'Across all results'} />
+            <StatTile label="Average" value={`${avg.toFixed(1)}%`} hint={mode === 'exact' ? `${effectiveClass} · ${term}` : 'Across all results'} />
             <StatTile label="Subjects" value={String(shown.length)} hint={mode === 'exact' ? session : 'All sessions'} />
             <StatTile label="Top grade" value={shown.length ? [...shown].sort((a, b) => b.total - a.total)[0].grade : '—'} hint="Best subject" />
           </div>
 
-          <Card>
-            <CardHead title={mode === 'exact' ? `${className} — ${term}, ${session}` : 'All results'} sub={`${shown.length} subject entr(ies)`} />
+          <Card className='hidden'>
+            <CardHead title={mode === 'exact' ? `${effectiveClass} — ${term}, ${session}` : 'All results'} sub={`${shown.length} subject entr(ies)`} />
             {shown.length === 0 ? (
               <div className="px-5 py-5"><EmptyState message="No published result found for this selection. Check the grade, session and term and try again." /></div>
             ) : (
@@ -165,7 +179,7 @@ export const StudentResultsPage = () => {
                   </div>
                 </div>
                 <a href={d.fileUrl} target="_blank" rel="noreferrer" download className="inline-flex items-center rounded bg-brand-500 px-4 py-2 text-xs font-bold text-white hover:bg-brand-700">
-                  <Download aria-hidden="true" size={14} className="mr-1" /> Download PDF
+                  <ExternalLink aria-hidden="true" size={14} className="mr-1" /> View Results
                 </a>
               </li>
             ))}

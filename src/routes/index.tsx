@@ -22,13 +22,16 @@ import { StudentResultsPage } from '@/pages/dashboard/student/StudentResultsPage
 import { StudentAssignmentsPage } from '@/pages/dashboard/student/StudentAssignmentsPage';
 import { StudentVirtualClassPage } from '@/pages/dashboard/student/StudentVirtualClassPage';
 import { TeacherDashboardPage } from '@/pages/dashboard/teacher/TeacherDashboardPage';
+import { TeacherAttendancePage } from '@/pages/dashboard/teacher/TeacherAttendancePage';
 import { TeacherAssignmentsPage } from '@/pages/dashboard/teacher/TeacherAssignmentsPage';
 import { TeacherResultsPage } from '@/pages/dashboard/teacher/TeacherResultsPage';
 import { TeacherClassesPage } from '@/pages/dashboard/teacher/TeacherClassesPage';
+import { TeacherCourseQuestionsPage } from '@/pages/dashboard/teacher/TeacherCourseQuestionsPage';
 import { AdminDashboardPage } from '@/pages/dashboard/admin/AdminDashboardPage';
 import { AdminStudentsPage } from '@/pages/dashboard/admin/AdminStudentsPage';
 import { AdminTeachersPage } from '@/pages/dashboard/admin/AdminTeachersPage';
 import { AdminAdmissionsPage } from '@/pages/dashboard/admin/AdminAdmissionsPage';
+import { AdminAttendancePage } from '@/pages/dashboard/admin/AdminAttendancePage';
 import { AdminFeesPage } from '@/pages/dashboard/admin/AdminFeesPage';
 import { AdminResultsPage } from '@/pages/dashboard/admin/AdminResultsPage';
 import { AdminAssignmentsPage } from '@/pages/dashboard/admin/AdminAssignmentsPage';
@@ -50,6 +53,7 @@ import { SubjectQuestionsPage } from '@/pages/dashboard/admin/SubjectQuestionsPa
 import { ExamTestResultsPage } from '@/pages/dashboard/admin/ExamTestResultsPage';
 import { WebsiteSectionPage } from '@/pages/dashboard/admin/AdminSectionPage';
 import { AdminSettingsPage } from '@/pages/dashboard/admin/AdminSettingsPage';
+import { AdminAuditLogPage } from '@/pages/dashboard/admin/AdminAuditLogPage';
 
 export const router = createBrowserRouter([
   { path: ROUTES.home, element: <HomePage /> },
@@ -81,9 +85,12 @@ export const router = createBrowserRouter([
     element: <DashboardLayout role="teacher" nav={teacherNav} />,
     children: [
       { index: true, element: <TeacherDashboardPage /> },
+      { path: 'attendance', element: <TeacherAttendancePage /> },
+      { path: 'attendance', element: <TeacherAttendancePage /> },
       { path: 'assignments', element: <TeacherAssignmentsPage /> },
       { path: 'results', element: <TeacherResultsPage /> },
       { path: 'classes', element: <TeacherClassesPage /> },
+      { path: 'courses/questions', element: <TeacherCourseQuestionsPage /> },
     ],
   },
   {
@@ -95,6 +102,8 @@ export const router = createBrowserRouter([
       { path: 'students', element: <AdminStudentsPage /> },
       { path: 'teachers', element: <AdminTeachersPage /> },
       { path: 'admissions', element: <AdminAdmissionsPage /> },
+      { path: 'attendance', element: <AdminAttendancePage /> },
+      { path: 'attendance', element: <AdminAttendancePage /> },
       { path: 'fees', element: <AdminFeesPage /> },
       { path: 'results', element: <AdminResultsPage /> },
       { path: 'assignments', element: <AdminAssignmentsPage /> },
@@ -115,6 +124,7 @@ export const router = createBrowserRouter([
   { path: 'website/pages', element: <AdminWebsitePagesPage /> },
   { path: 'website/:section', element: <WebsiteSectionPage /> },
       { path: 'settings', element: <AdminSettingsPage /> },
+      { path: 'audit-log', element: <AdminAuditLogPage /> },
     ],
   },
   // Back-compat alias: /admin/student -> /dashboard/student

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pill, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
-import { useResource } from '@/context/AuthContext';
+import { useAuth, useResource } from '@/context/AuthContext';
 import { apiGet, apiPatch, apiPost } from '@/lib/api';
 import { UploadButton } from '@/lib/uploadthing';
 
@@ -23,9 +23,34 @@ interface SubmissionRow {
   student: { user_name: string; user_email: string };
 }
 
+interface ApiClass {
+  id: string;
+  name: string;
+}
+
+interface ApiSubject {
+  id: string;
+  name: string;
+}
+
+interface CourseAssignment {
+  id: string;
+  subjectId?: string | null;
+  classId?: string | null;
+  subject?: { name: string } | null;
+  class?: { name: string } | null;
+}
+
 export const TeacherAssignmentsPage = () => {
+  const { user } = useAuth();
   const list = useResource<AssignmentRow[]>('/school-assignments', { mine: '1' });
-  const [form, setForm] = useState({ title: '', subject: 'Mathematics', className: 'JSS 2 Diamond', dueAt: '', instructions: '' });
+  const classesRes = useResource<ApiClass[]>('/classes');
+  const subjectsRes = useResource<ApiSubject[]>('/subjects', { limit: 200 });
+  const coursesRes = useResource<CourseAssignment[]>(
+    user ? '/course-assignments' : null,
+    { teacherId: user?.id, limit: 100 },
+  );
+  const [form, setForm] = useState({ title: '', subject: '', className: '', dueAt: '', instructions: '', maxScore: '20' });
   const [attachmentUrl, setAttachmentUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -33,14 +58,37 @@ export const TeacherAssignmentsPage = () => {
   const [subs, setSubs] = useState<SubmissionRow[] | null>(null);
   const [grading, setGrading] = useState<Record<string, string>>({});
 
+  // Dropdowns come from the API, scoped to this teacher's assigned courses.
+  const courses = coursesRes.data ?? [];
+  const assignedClassNames = Array.from(
+    new Set(courses.map((c) => c.class?.name).filter((n): n is string => Boolean(n))),
+  );
+  const assignedSubjectNames = Array.from(
+    new Set(courses.map((c) => c.subject?.name).filter((n): n is string => Boolean(n))),
+  );
+  const classOptions = (classesRes.data ?? [])
+    .map((c) => c.name)
+    .filter((n) => assignedClassNames.length === 0 || assignedClassNames.includes(n));
+  const subjectOptions = (subjectsRes.data ?? [])
+    .map((s) => s.name)
+    .filter((n) => assignedSubjectNames.length === 0 || assignedSubjectNames.includes(n));
+  const className = classOptions.includes(form.className) ? form.className : (classOptions[0] ?? '');
+  const subject = subjectOptions.includes(form.subject) ? form.subject : (subjectOptions[0] ?? '');
+
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setNotice(null);
     try {
-      await apiPost('/school-assignments', { ...form, attachmentUrl: attachmentUrl || undefined });
+      await apiPost('/school-assignments', {
+        ...form,
+        subject,
+        className,
+        maxScore: Math.max(1, Number(form.maxScore) || 20),
+        attachmentUrl: attachmentUrl || undefined,
+      });
       setNotice('Assignment published to class.');
-      setForm({ title: '', subject: 'Mathematics', className: 'JSS 2 Diamond', dueAt: '', instructions: '' });
+      setForm({ title: '', subject: '', className: '', dueAt: '', instructions: '', maxScore: '20' });
       setAttachmentUrl('');
       list.reload();
     } catch (err: any) {
@@ -94,13 +142,23 @@ export const TeacherAssignmentsPage = () => {
             <label className="block text-sm font-semibold">Title<input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Quadratic equations — exercise 5b" className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500" /></label>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block text-sm font-semibold">Class
-                <select value={form.className} onChange={(e) => setForm({ ...form, className: e.target.value })} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm"><option>JSS 2 Diamond</option><option>JSS 1 Gold</option><option>JSS 3 Emerald</option></select>
+                <select value={className} onChange={(e) => setForm({ ...form, className: e.target.value })} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm">
+                  {classOptions.length === 0 ? <option value="">No assigned classes</option> : classOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
               </label>
               <label className="block text-sm font-semibold">Due date<input type="datetime-local" required value={form.dueAt} onChange={(e) => setForm({ ...form, dueAt: e.target.value })} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm" /></label>
             </div>
             <label className="block text-sm font-semibold">Subject
-              <select value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm"><option>Mathematics</option><option>English Language</option><option>Basic Science</option><option>ICT</option><option>Social Studies</option></select>
+              <select value={subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm">
+                {subjectOptions.length === 0 ? <option value="">No assigned subjects</option> : subjectOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
             </label>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block text-sm font-semibold">Max score
+                <input value={form.maxScore} onChange={(e) => setForm({ ...form, maxScore: e.target.value })} type="number" min={1} required placeholder="e.g. 20" className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm" />
+              </label>
+              <p className="self-end pb-1 text-xs text-muted">Pupils are graded out of this score.</p>
+            </div>
             <label className="block text-sm font-semibold">Instructions<textarea rows={3} value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} placeholder="What should pupils do and submit?" className="mt-2 w-full rounded border border-line bg-white px-3 py-3 text-sm outline-none focus:border-brand-500" /></label>
             <div>
               <p className="text-sm font-semibold">Attachment {attachmentUrl && <span className="text-emerald-700">✓ uploaded</span>}</p>
@@ -129,7 +187,7 @@ export const TeacherAssignmentsPage = () => {
                 <tbody>
                   {list.data.map((a) => (
                     <tr key={a.id}>
-                      <Td><span className="font-bold">{a.title}</span><span className="block text-xs text-muted">{a.className} · {a.subject}</span></Td>
+                      <Td><span className="font-bold">{a.title}</span><span className="block text-xs text-muted">{a.className} · {a.subject} · /{a.maxScore}</span></Td>
                       <Td>{new Date(a.dueAt).toLocaleDateString()}</Td>
                       <Td className="font-semibold">{a._count.submissions}</Td>
                       <Td><button type="button" onClick={() => openSubmissions(a.id)} className="rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">Submissions</button></Td>
@@ -160,7 +218,7 @@ export const TeacherAssignmentsPage = () => {
                       <Td>{s.fileUrl ? <a href={s.fileUrl} target="_blank" rel="noreferrer" className="font-bold text-brand-700 underline">Open file</a> : <span className="text-muted">{s.note ?? '—'}</span>}</Td>
                       <Td><Pill tone={s.status === 'GRADED' ? 'emerald' : 'amber'}>{s.status}</Pill></Td>
                       <Td>
-                        <input value={grading[s.id] ?? s.score ?? ''} onChange={(e) => setGrading({ ...grading, [s.id]: e.target.value })} type="number" min={0} className="w-20 rounded border border-line px-2 py-1.5 text-sm" />
+                        <input value={grading[s.id] ?? s.score ?? ''} onChange={(e) => setGrading({ ...grading, [s.id]: e.target.value })} type="number" min={0} max={list.data?.find((a) => a.id === openId)?.maxScore ?? undefined} title={`Score out of ${list.data?.find((a) => a.id === openId)?.maxScore ?? '—'}`} className="w-20 rounded border border-line px-2 py-1.5 text-sm" />
                       </Td>
                       <Td><button type="button" onClick={() => grade(s.id)} className="rounded bg-brand-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-brand-700">Save</button></Td>
                     </tr>

@@ -1,9 +1,9 @@
-import type { LucideIcon } from 'lucide-react';
+import type { LucideIcon } from "lucide-react";
 
 export interface Testimonial {
   id: string;
   name: string;
-  role: 'Student' | 'Parent' | 'Educator' | 'Alumnus';
+  role: "Student" | "Parent" | "Educator" | "Alumnus";
   quote: string;
   initials: string;
   color: string;
@@ -27,7 +27,7 @@ export interface StatItem {
 
 export interface Programme {
   id: string;
-  level: 'Early Years' | 'Primary' | 'Secondary';
+  level: "Early Years" | "Primary" | "Secondary";
   title: string;
   ageRange: string;
   description: string;
@@ -62,7 +62,13 @@ export interface WhyChooseUsItem {
 export interface NewsArticle {
   id: string;
   slug: string;
-  category: 'News' | 'Events' | 'Announcements' | 'Academic' | 'Sports' | 'Cultural';
+  category:
+    | "News"
+    | "Events"
+    | "Announcements"
+    | "Academic"
+    | "Sports"
+    | "Cultural";
   title: string;
   excerpt: string;
   date: string;
@@ -71,7 +77,14 @@ export interface NewsArticle {
 
 export interface GalleryImage {
   id: string;
-  category: 'Campus' | 'Academics' | 'Students' | 'Sports' | 'Cultural' | 'Events' | 'Staff';
+  category:
+    | "Campus"
+    | "Academics"
+    | "Students"
+    | "Sports"
+    | "Cultural"
+    | "Events"
+    | "Staff";
   caption: string;
   color: string;
 }
@@ -87,6 +100,7 @@ export interface StaffMember {
   name: string;
   role: string;
   message: string;
+  img: string;
 }
 
 export interface FaqItem {

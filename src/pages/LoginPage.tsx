@@ -141,7 +141,7 @@ export const LoginPage = () => {
             </form>
           ) : (
             <form className="mt-8 space-y-5" onSubmit={handleLogin}>
-              <label className="block text-sm font-semibold">Email address<input className={inputClass} name="identity" type="email" autoComplete="username" required placeholder="you@learnwithuncletee.org" /></label>
+              <label className="block text-sm font-semibold">Email address / Admission No<input className={inputClass} name="identity" type="text" autoComplete="username" required placeholder="you@learnwithuncletee.org" /></label>
               {mode === 'login' && <label className="block text-sm font-semibold">Password<input className={inputClass} name="password" type="password" autoComplete="current-password" required /></label>}
               {mode === 'login' && (
                 <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-ink">

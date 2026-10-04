@@ -1,6 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Layout } from '@/components/layout/Layout';
 import { Container } from '@/components/ui/Container';
 import { PageMetadata } from '@/components/ui/PageMetadata';
 import { useAuth } from '@/context/AuthContext';
@@ -158,19 +157,28 @@ export const ExaminationPage = () => {
   const inputClass = 'mt-2 min-h-12 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500';
 
   return (
-    <Layout>
+    <>
       <PageMetadata
         title={exam ? exam.exam_name : 'Examination'}
         description={exam ? `Sit ${exam.exam_name} online — answer and submit before time runs out.` : 'Online examination.'}
       />
-      <section className="bg-cream py-14">
-        <Container>
-          <div className="mx-auto max-w-3xl">
-            <nav aria-label="Breadcrumb" className="mb-6 text-sm text-muted">
-              <Link to={ROUTES.home} className="font-bold text-brand-700 hover:text-brand-500">Home</Link>
-              <span className="px-2">/</span>
-              <span className="text-ink" aria-current="page">Examination {code}</span>
-            </nav>
+      <div className="flex min-h-screen flex-col bg-cream font-sans text-ink">
+        <header className="border-b border-line bg-brand-900 text-white">
+          <div className="mx-auto flex min-h-[60px] w-full max-w-3xl items-center gap-3 px-4 sm:px-6">
+            <img src="/logo.png" alt="Learnwithuncletee" className="h-9 w-9 rounded-full border border-white/20 object-cover" />
+            <span className="font-display text-sm font-extrabold leading-tight">
+              Learnwithuncletee
+              <span className="block text-[10px] font-semibold uppercase tracking-widest text-lime-accent">Online examination</span>
+            </span>
+            <span className="ml-auto rounded bg-white/10 px-3 py-1.5 font-mono text-xs font-bold tracking-widest">
+              {code.toUpperCase()}
+            </span>
+          </div>
+        </header>
+        <main className="flex-1">
+          <section className="py-10 sm:py-14">
+            <Container>
+              <div className="mx-auto max-w-3xl">
 
             {phase === 'loading' && (
               <div className="space-y-3" aria-label="Loading">
@@ -288,7 +296,9 @@ export const ExaminationPage = () => {
             )}
           </div>
         </Container>
-      </section>
-    </Layout>
+          </section>
+        </main>
+      </div>
+    </>
   );
 };

@@ -2,29 +2,24 @@ import {
   BookOpenCheck,
   ClipboardList,
   Cog,
-  CreditCard,
   FileBarChart2,
   FileQuestion,
   FileText,
-  Globe,
   GraduationCap,
-  Home,
-  Image as ImageIcon,
-  Info,
   Layers,
   LayoutDashboard,
-  LayoutTemplate,
+  MapPin,
   Newspaper,
   Rocket,
+  ScrollText,
   Settings,
   UserCog,
   Users,
   Video,
-  Wallet,
-} from 'lucide-react';
-import { ROUTES } from '@/routes/paths';
+} from "lucide-react";
+import { ROUTES } from "@/routes/paths";
 
-export type DashboardRole = 'student' | 'teacher' | 'admin';
+export type DashboardRole = "student" | "teacher" | "admin";
 
 export interface DashboardNavItem {
   /** Route path. Omitted for pure toggle groups that only expand/collapse. */
@@ -39,87 +34,268 @@ export interface DashboardNavItem {
 }
 
 export const studentNav: DashboardNavItem[] = [
-  { to: ROUTES.studentDashboard, label: 'Dashboard', icon: LayoutDashboard },
-  { to: ROUTES.studentFees, label: 'Fees', icon: Wallet, badge: 'Due', permission: 'fees.read' },
-  { to: ROUTES.studentResults, label: 'Results', icon: FileBarChart2, permission: 'results.read' },
-  { to: ROUTES.studentAssignments, label: 'Assignments', icon: ClipboardList, badge: '3', permission: 'assignments.read' },
-  { to: ROUTES.studentVirtualClass, label: 'Virtual Class', icon: Video, permission: 'virtual.read' },
+  { to: ROUTES.studentDashboard, label: "Dashboard", icon: LayoutDashboard },
+  /* {
+    to: ROUTES.studentFees,
+    label: "Fees",
+    icon: Wallet,
+    badge: "Due",
+    permission: "fees.read",
+  },*/
+  {
+    to: ROUTES.studentResults,
+    label: "Results",
+    icon: FileBarChart2,
+    permission: "results.read",
+  },
+  {
+    to: ROUTES.studentAssignments,
+    label: "Assignments",
+    icon: ClipboardList,
+    badge: "",
+    permission: "assignments.read",
+  },
+  {
+    to: ROUTES.studentVirtualClass,
+    label: "Virtual Class",
+    icon: Video,
+    permission: "virtual.read",
+  },
 ];
 
 export const teacherNav: DashboardNavItem[] = [
-  { to: ROUTES.teacherDashboard, label: 'Dashboard', icon: LayoutDashboard },
-  { to: ROUTES.teacherAssignments, label: 'Assignments', icon: BookOpenCheck, badge: '12', permission: 'assignments.read' },
-  { to: ROUTES.teacherResults, label: 'Results', icon: GraduationCap, permission: 'results.read' },
-  { to: ROUTES.teacherClasses, label: 'My Classes', icon: Users, permission: 'students.read' },
+  { to: ROUTES.teacherDashboard, label: "Dashboard", icon: LayoutDashboard },
+
+  {
+    to: ROUTES.teacherAttendance,
+    label: "Attendance",
+    icon: MapPin,
+    permission: "attendance.write",
+  },
+
+  {
+    to: ROUTES.teacherClasses,
+    label: "Assigned Courses",
+    icon: Users,
+    permission: "students.read",
+    children: [
+      {
+        to: ROUTES.teacherAssignments,
+        label: "Assignments",
+        icon: BookOpenCheck,
+        badge: "",
+        permission: "assignments.read",
+      },
+    ],
+  },
+  /* {
+        to: ROUTES.teacherResults,
+        label: "Results",
+        icon: GraduationCap,
+
+        permission: "results.read",
+      },*/
 ];
 
 export const adminNav: DashboardNavItem[] = [
-  { to: ROUTES.adminDashboard, label: 'Dashboard', icon: LayoutDashboard },
+  { to: ROUTES.adminDashboard, label: "Dashboard", icon: LayoutDashboard },
   {
-    label: 'Members',
+    label: "Members",
     icon: Users,
     to: ROUTES.adminMembers,
     children: [
-      { to: ROUTES.adminStudents, label: 'Students', icon: Users, permission: 'students.read' },
-      { to: ROUTES.adminTeachers, label: 'Teachers', icon: UserCog, permission: 'teachers.read' },
+      {
+        to: ROUTES.adminStudents,
+        label: "Students",
+        icon: Users,
+        permission: "students.read",
+      },
+      {
+        to: ROUTES.adminTeachers,
+        label: "Teachers",
+        icon: UserCog,
+        permission: "teachers.read",
+      },
       // The add-student form + approvals queue live on the Students page.
-  //    { to: ROUTES.adminStudents, label: 'Add Member', icon: UserPlus, permission: 'students.write' },
+      //    { to: ROUTES.adminStudents, label: 'Add Member', icon: UserPlus, permission: 'students.write' },
     ],
   },
-  { to: ROUTES.adminAdmissions, label: 'Admissions', icon: ClipboardList, badge: '24', permission: 'admissions.read' },
-  { to: ROUTES.adminFees, label: 'Fees & Payments', icon: CreditCard, permission: 'fees.read' },
-  { to: ROUTES.adminAssignments, label: 'Assignments', icon: BookOpenCheck, permission: 'assignments.read' },
-  { to: ROUTES.adminVirtualClass, label: 'Virtual Classes', icon: Video, permission: 'virtual.read' },
-  { to: ROUTES.adminNews, label: 'News & Events', icon: Newspaper, permission: 'news.read' },
-  { to: ROUTES.adminResults, label: 'Results', icon: FileBarChart2, permission: 'results.read' },
   {
-    label: 'Exam & Test',
+    to: ROUTES.adminAdmissions,
+    label: "Admissions",
+    icon: ClipboardList,
+    badge: "24",
+    permission: "admissions.read",
+  },
+  {
+    to: ROUTES.adminAttendance,
+    label: "Attendance",
+    icon: MapPin,
+    permission: "attendance.read",
+  },
+  /* {
+    to: ROUTES.adminFees,
+    label: "Fees & Payments",
+    icon: CreditCard,
+    permission: "fees.read",
+  },
+  */
+
+  {
+    to: ROUTES.adminAssignments,
+    label: "Assignments",
+    icon: BookOpenCheck,
+    permission: "assignments.read",
+  },
+  {
+    to: ROUTES.adminVirtualClass,
+    label: "Virtual Classes",
+    icon: Video,
+    permission: "virtual.read",
+  },
+  {
+    to: ROUTES.adminNews,
+    label: "News & Events",
+    icon: Newspaper,
+    permission: "news.read",
+  },
+  {
+    to: ROUTES.adminResults,
+    label: "Results",
+    icon: FileBarChart2,
+    permission: "results.read",
+  },
+  {
+    label: "Exam & Test",
     icon: GraduationCap,
     to: ROUTES.adminExams,
     children: [
-      { to: ROUTES.adminExams, label: 'Classes', icon: Users, permission: 'results.read' },
-      { to: ROUTES.adminAllExams, label: 'Exams', icon: FileText, permission: 'results.read' },
-      { to: ROUTES.adminAllSubjects, label: 'Subjects', icon: BookOpenCheck, permission: 'results.read' },
-      { to: ROUTES.adminAllQuestions, label: 'Questions', icon: FileQuestion, permission: 'results.read' },
-      { to: ROUTES.adminCombinations, label: 'Combinations', icon: Layers, permission: 'results.read' },
-      { to: ROUTES.adminDeployments, label: 'Deployments', icon: Rocket, permission: 'results.read' },
-      { to: ROUTES.adminExamResults, label: 'Results', icon: FileBarChart2, permission: 'results.read' },
-    ],
-  },
-  {
-    label: 'Settings',
-    icon: Settings,
-    to: ROUTES.adminSettings,
-    children: [
-      { to: ROUTES.adminSettings, label: 'General', icon: Cog, permission: 'settings.read' },
       {
-        label: 'Website Management',
-        icon: Globe,
-        to: ROUTES.adminWebsite,
+        to: ROUTES.adminExams,
+        label: "Classes",
+        icon: Users,
+        permission: "results.read",
         children: [
-          { to: '/dashboard/admin/website/banner', label: 'Banner Image', icon: ImageIcon, permission: 'settings.read' },
-          { to: '/dashboard/admin/website/information', label: 'Information', icon: Info, permission: 'settings.read' },
           {
-            label: 'Pages',
-            icon: LayoutTemplate,
-            to: ROUTES.adminWebsitePages,
-            children: [
-              { to: '/dashboard/admin/website/home', label: 'Home Page', icon: Home, permission: 'settings.read' },
-              { to: '/dashboard/admin/website/about', label: 'About Page', icon: FileText, permission: 'settings.read' },
-              { to: '/dashboard/admin/website/gallery', label: 'Gallery Page', icon: ImageIcon, permission: 'settings.read' },
-              { to: '/dashboard/admin/website/other', label: 'Other Pages', icon: FileText, permission: 'settings.read' },
-            ],
+            to: ROUTES.adminAllExams,
+            label: "All Exams",
+            icon: FileText,
+            permission: "results.read",
+          },
+          {
+            to: ROUTES.adminAllSubjects,
+            label: "All Subjects",
+            icon: BookOpenCheck,
+            permission: "results.read",
+          },
+          {
+            to: ROUTES.adminAllQuestions,
+            label: "All Questions",
+            icon: FileQuestion,
+            permission: "results.read",
+          },
+          {
+            to: ROUTES.adminCombinations,
+            label: "All Combinations",
+            icon: Layers,
+            permission: "results.read",
+          },
+          {
+            to: ROUTES.adminDeployments,
+            label: "All Deployments",
+            icon: Rocket,
+            permission: "results.read",
+          },
+          {
+            to: ROUTES.adminExamResults,
+            label: "All Results",
+            icon: FileBarChart2,
+            permission: "results.read",
           },
         ],
       },
     ],
   },
+  {
+    label: "Settings",
+    icon: Settings,
+    to: ROUTES.adminSettings,
+    children: [
+      {
+        to: ROUTES.adminSettings,
+        label: "General",
+        icon: Cog,
+        permission: "settings.read",
+      },
+      {
+        to: ROUTES.adminAuditLog,
+        label: "Audit Log",
+        icon: ScrollText,
+        permission: "settings.read",
+      },
+      /*  {
+        label: "Website Management",
+        icon: Globe,
+        to: ROUTES.adminWebsite,
+        children: [
+          {
+            to: "/dashboard/admin/website/banner",
+            label: "Banner Image",
+            icon: ImageIcon,
+            permission: "settings.read",
+          },
+          {
+            to: "/dashboard/admin/website/information",
+            label: "Information",
+            icon: Info,
+            permission: "settings.read",
+          },
+          {
+            label: "Pages",
+            icon: LayoutTemplate,
+            to: ROUTES.adminWebsitePages,
+            children: [
+              {
+                to: "/dashboard/admin/website/home",
+                label: "Home Page",
+                icon: Home,
+                permission: "settings.read",
+              },
+              {
+                to: "/dashboard/admin/website/about",
+                label: "About Page",
+                icon: FileText,
+                permission: "settings.read",
+              },
+              {
+                to: "/dashboard/admin/website/gallery",
+                label: "Gallery Page",
+                icon: ImageIcon,
+                permission: "settings.read",
+              },
+              {
+                to: "/dashboard/admin/website/other",
+                label: "Other Pages",
+                icon: FileText,
+                permission: "settings.read",
+              },
+            ],
+          },
+        ],
+      },
+
+      */
+    ],
+  },
 ];
 
-export const roleMeta: Record<DashboardRole, { title: string; subtitle: string }> = {
-  student: { title: 'Student Portal', subtitle: 'Learn · Grow · Excel' },
-  teacher: { title: 'Teacher Portal', subtitle: 'Teach · Mentor · Inspire' },
-  admin: { title: 'Admin Portal', subtitle: 'Manage the whole school' },
+export const roleMeta: Record<
+  DashboardRole,
+  { title: string; subtitle: string }
+> = {
+  student: { title: "Student Portal", subtitle: "Learn · Grow · Excel" },
+  teacher: { title: "Teacher Portal", subtitle: "Teach · Mentor · Inspire" },
+  admin: { title: "Admin Portal", subtitle: "Manage the whole school" },
 };
 
 /* ── API response shapes (mirror the backend; no mock data lives here) ── */
@@ -137,9 +313,16 @@ export interface InvoiceData {
   term: string;
   amountKobo: number;
   paidKobo: number;
-  status: 'UNPAID' | 'PART_PAID' | 'PAID' | 'OVERDUE';
+  status: "UNPAID" | "PART_PAID" | "PAID" | "OVERDUE";
   dueDate?: string;
-  payments?: Array<{ id: string; amountKobo: number; method: string; reference: string; status: string; createdAt: string }>;
+  payments?: Array<{
+    id: string;
+    amountKobo: number;
+    method: string;
+    reference: string;
+    status: string;
+    createdAt: string;
+  }>;
 }
 
 export interface GradeData {
@@ -172,25 +355,25 @@ export interface ResultDocData {
 
 /** Grade (class) options for result filters and entry forms. */
 export const CLASS_OPTIONS = [
-  'Creche',
-  'KG 1',
-  'KG 2',
-  'Primary 1',
-  'Primary 2',
-  'Primary 3',
-  'Primary 4',
-  'Primary 5',
-  'Primary 6',
-  'JSS 1 Gold',
-  'JSS 2 Diamond',
-  'JSS 3 Emerald',
-  'SS 1',
-  'SS 2',
-  'SS 3',
+  "Creche",
+  "KG 1",
+  "KG 2",
+  "Primary 1",
+  "Primary 2",
+  "Primary 3",
+  "Primary 4",
+  "Primary 5",
+  "Primary 6",
+  "JSS 1 Gold",
+  "JSS 2 Diamond",
+  "JSS 3 Emerald",
+  "SS 1",
+  "SS 2",
+  "SS 3",
 ];
 
 /** Term options — First / Second / Third. */
-export const TERM_OPTIONS = ['First Term', 'Second Term', 'Third Term'];
+export const TERM_OPTIONS = ["First Term", "Second Term", "Third Term"];
 
 /** Session (academic year) options centred on the current year, e.g. 2025/2026. */
 export const sessionOptions = () => {
@@ -210,7 +393,13 @@ export interface HomeworkData {
   attachmentUrl?: string | null;
   maxScore: number;
   teacher?: { user_name: string };
-  submission?: { id: string; status: string; score?: number | null; feedback?: string | null; fileUrl?: string | null } | null;
+  submission?: {
+    id: string;
+    status: string;
+    score?: number | null;
+    feedback?: string | null;
+    fileUrl?: string | null;
+  } | null;
 }
 
 export interface LessonData {
@@ -249,7 +438,14 @@ export interface StudentRow {
   active: boolean;
   img?: string | null;
   classId?: string | null;
-  student?: { studentCode: string; className: string; guardianName?: string; guardianPhone?: string; combinationId?: string | null; combination?: { id: string; name: string } | null } | null;
+  student?: {
+    studentCode: string;
+    className: string;
+    guardianName?: string;
+    guardianPhone?: string;
+    combinationId?: string | null;
+    combination?: { id: string; name: string } | null;
+  } | null;
   balanceKobo?: number;
   average?: number | null;
 }
@@ -260,7 +456,11 @@ export interface StaffRow {
   user_email: string;
   role: string;
   active: boolean;
-  teacher?: { staffCode: string; department?: string; subjects: string[] } | null;
+  teacher?: {
+    staffCode: string;
+    department?: string;
+    subjects: string[];
+  } | null;
 }
 
 export interface ClassItem {
@@ -271,7 +471,9 @@ export interface ClassItem {
 export interface CombinationItem {
   id: string;
   name: string;
-  subjects: Array<{ subject: { id: string; name: string; code?: string | null } }>;
+  subjects: Array<{
+    subject: { id: string; name: string; code?: string | null };
+  }>;
   _count?: { students: number };
 }
 
@@ -304,8 +506,8 @@ export interface CourseAssignmentItem {
 export interface ExamDeploymentItem {
   id: string;
   code: string;
-  mode: 'ONLINE' | 'OFFLINE';
-  status: 'DRAFT' | 'LIVE' | 'ENDED';
+  mode: "ONLINE" | "OFFLINE";
+  status: "DRAFT" | "LIVE" | "ENDED";
   createdAt: string;
   exam?: { id: string; exam_name: string; minutes: number } | null;
 }

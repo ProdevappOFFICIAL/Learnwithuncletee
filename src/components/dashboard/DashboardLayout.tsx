@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, ChevronDown, ChevronLeft, LogOut, Menu, Search, X } from 'lucide-react';
+import { Bell, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LogOut, Menu, Search, X } from 'lucide-react';
 import { ROUTES } from '@/routes/paths';
 import { roleMeta, type DashboardNavItem, type DashboardRole } from '@/data/dashboard';
 import { siteInfo } from '@/data/content';
@@ -14,6 +14,15 @@ interface Props {
   nav: DashboardNavItem[];
 }
 
+/**
+ * Optional extras a nav item can carry (add them to DashboardNavItem when
+ * convenient; read through this type so the layout compiles either way):
+ *  - dividerBefore: draws a thin separator above the item (section break)
+ *  - disabled: renders the item dimmed and non-interactive
+ */
+type NavExtras = { dividerBefore?: boolean; disabled?: boolean };
+const extras = (item: DashboardNavItem) => item as DashboardNavItem & NavExtras;
+
 const initialsOf = (name: string) =>
   name
     .split(' ')
@@ -23,8 +32,19 @@ const initialsOf = (name: string) =>
     .join('')
     .toUpperCase() || 'LW';
 
+const cx = (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(' ');
+
+// Sidebar row styling: flat rounded rows, muted by default, soft grey fill
+// for hover and active. No coloured pills.
+const rowBase =
+  'group relative flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40';
+const rowIdle = 'text-white/60 hover:bg-white/[0.07] hover:text-white';
+const rowActive = 'bg-white/[0.12] text-white';
+const rowContains = 'text-white hover:bg-white/[0.07]';
+
 export const DashboardLayout = ({ role, nav }: Props) => {
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, can, logout } = useAuth();
@@ -100,103 +120,155 @@ export const DashboardLayout = ({ role, nav }: Props) => {
 
   const toggleGroup = (key: string) => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
 
-  const renderNode = (item: DashboardNavItem, pathKey: string, depth: number): React.ReactNode => {
+  // ---- Sidebar "Find" ------------------------------------------------------
+  const [query, setQuery] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
+  const q = query.trim().toLowerCase();
+  const searching = q.length > 0;
+
+  /** Keep items whose label matches, plus groups that have a matching descendant. */
+  const matchTree = (items: DashboardNavItem[]): DashboardNavItem[] =>
+    items.flatMap((item) => {
+      if (item.label.toLowerCase().includes(q)) return [item];
+      if (item.children) {
+        const kids = matchTree(item.children);
+        return kids.length ? [{ ...item, children: kids }] : [];
+      }
+      return [];
+    });
+  const shownNav = searching ? matchTree(visibleNav) : visibleNav;
+
+  // Press "F" anywhere (outside inputs) to jump to the sidebar search.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'f' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      if (!searchRef.current || searchRef.current.offsetParent === null) return;
+      e.preventDefault();
+      searchRef.current.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // ---- Nav rendering -------------------------------------------------------
+  // `collapsed` is desktop-only: the mobile drawer always renders expanded.
+  const renderList = (items: DashboardNavItem[], pathKey: string, collapsed: boolean): React.ReactNode =>
+    items.map((item, i) => (
+      <Fragment key={`${pathKey}/${item.label}`}>
+        {i > 0 && !searching && !collapsed && extras(item).dividerBefore && (
+          <div role="separator" className="mx-1 my-2 border-t border-white/10" />
+        )}
+        {renderNode(item, pathKey, collapsed)}
+      </Fragment>
+    ));
+
+  const renderNode = (item: DashboardNavItem, pathKey: string, collapsed: boolean): React.ReactNode => {
     const key = `${pathKey}/${item.label}`;
     const Icon = item.icon;
+
+    // Group: the whole row reads as one item with a chevron on the right.
+    // With `to`, the label navigates to the overview page and the chevron
+    // toggles; without `to`, the entire row toggles.
     if (item.children?.length) {
-      const open = expanded[key] ?? containsActive(item);
-      // Split-button group: the label navigates to the group's own overview
-      // page (when `to` is set; NavLink highlights it when exact), the
-      // chevron only expands/collapses.
+      const isOpen = searching || (expanded[key] ?? containsActive(item));
+      const chevron = (
+        <ChevronRight
+          size={16}
+          aria-hidden="true"
+          className={cx('shrink-0 text-white/50 transition-transform duration-150', isOpen && 'rotate-90')}
+        />
+      );
+
       return (
-        <div key={key}>
-          <div
-            className="flex items-center gap-1 rounded transition-colors hover:bg-white/10"
-            style={{ paddingLeft: 12 + depth * 14 }}
-          >
-            {item.to ? (
+        <div>
+          {item.to ? (
+            <div className="relative">
               <NavLink
                 to={item.to}
-                end={false}
+                end
+                title={collapsed ? item.label : undefined}
                 onClick={() => {
                   setOpen(false);
                   setExpanded((prev) => ({ ...prev, [key]: true }));
                 }}
-                aria-label={item.label}
                 className={({ isActive }) =>
-                  `flex min-w-0 flex-1 items-center gap-3 rounded-full px-3 py-3 text-sm font-semibold transition-colors ${
-                    isActive ? 'bg-lime-accent text-brand-900' : 'text-white/80 hover:bg-white/10 hover:text-white'
-                  }`
+                  cx(rowBase,  collapsed && 'justify-center px-0', isActive ? rowActive : containsActive(item) ? rowContains : rowIdle)
                 }
               >
-                {({ isActive }) => (
-                  <>
-                    <Icon size={18} aria-hidden="true" className={`shrink-0 ${isActive ? 'text-brand-900' : 'text-lime-accent'}`} />
-                    <span className="truncate">{item.label}</span>
-                    
-                  </>
-                )}
-                
+                <Icon size={20} strokeWidth={0.75} aria-hidden="true" className="shrink-0" />
+                {!collapsed && <span className="truncate">{item.label}</span>}
               </NavLink>
-            ) : (
-              <span className="flex min-w-0 flex-1 items-center gap-3 py-3 pr-1 text-sm font-semibold text-white/80">
-                <Icon size={18} aria-hidden="true" className="shrink-0 text-lime-accent" />
-                <span className="truncate">{item.label}</span>
-              </span>
-            )}
+              {!collapsed && (
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(key)}
+                  aria-expanded={isOpen}
+                  aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${item.label}`}
+                  className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded hover:bg-white/10"
+                >
+                  {chevron}
+                </button>
+              )}
+            </div>
+          ) : (
             <button
               type="button"
               onClick={() => toggleGroup(key)}
-              aria-expanded={open}
-              aria-label={`${open ? 'Collapse' : 'Expand'} ${item.label}`}
-              className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded text-white/60 hover:bg-white/10 hover:text-white"
+              aria-expanded={isOpen}
+              title={collapsed ? item.label : undefined}
+              className={cx(rowBase, collapsed ? 'justify-center px-0' : 'justify-between text-left', containsActive(item) ? rowContains : rowIdle)}
             >
-              <ChevronDown
-                size={15}
-                aria-hidden="true"
-                className={`transition-transform ${open ? '' : '-rotate-90'}`}
-              />
+              <span className="flex min-w-0 items-center gap-3">
+                <Icon size={18} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
+                {!collapsed && <span className="truncate">{item.label}</span>}
+              </span>
+              {!collapsed && chevron}
             </button>
-          </div>
-          {open && (
-            <div className="space-y-1">
-              {item.children.map((child) => renderNode(child, key, depth + 1))}
+          )}
+
+          {isOpen && !collapsed && (
+            <div className="ml-[21px] mt-0.5 space-y-0.5 border-l border-white/10 pl-2">
+              {renderList(item.children, key, collapsed)}
             </div>
           )}
         </div>
       );
     }
+
     if (!item.to) return null;
     const to = item.to;
+
+    if (extras(item).disabled) {
+      return (
+        <span
+          aria-disabled="true"
+          title={collapsed ? item.label : undefined}
+          className={cx(rowBase, collapsed ? 'justify-center px-0' : '', 'cursor-not-allowed text-white/30')}
+        >
+          <Icon size={18} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
+          {!collapsed && <span className="truncate">{item.label}</span>}
+        </span>
+      );
+    }
+
     return (
       <NavLink
-        key={key}
         to={to}
         end={to.split('/').length <= 3}
+        title={collapsed ? item.label : undefined}
         onClick={() => setOpen(false)}
-        style={{ paddingLeft: 12 + depth * 14 }}
-        className={({ isActive }) =>
-          `group flex items-center justify-between gap-2 rounded-full px-3 py-3 text-sm font-semibold transition-colors ${
-            isActive ? 'bg-lime-accent text-brand-900' : 'text-white/80 hover:bg-white/10 hover:text-white'
-          }`
-        }
+        className={({ isActive }) => cx(rowBase, 'justify-between', collapsed && 'justify-center px-0', isActive ? rowActive : rowIdle)}
       >
-        {({ isActive }) => (
-          <>
-            <span className="flex items-center gap-3">
-              <Icon size={18} aria-hidden="true" className={isActive ? 'text-brand-900' : 'text-lime-accent'} />
-              {item.label}
-            </span>
-            {item.badge && (
-              <span
-                className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                  isActive ? 'bg-brand-900 text-lime-accent' : 'bg-white/15 text-white'
-                }`}
-              >
-                {item.badge}
-              </span>
-            )}
-          </>
+        <span className="flex min-w-0 items-center gap-3">
+          <Icon size={18} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
+          {!collapsed && <span className="truncate">{item.label}</span>}
+        </span>
+        {!collapsed && item.badge && (
+          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-white/80">
+            {item.badge}
+          </span>
         )}
       </NavLink>
     );
@@ -248,59 +320,114 @@ export const DashboardLayout = ({ role, nav }: Props) => {
     navigate(ROUTES.login);
   };
 
-  const sidebar = (
+  const sidebar = (isCollapsed: boolean) => (
     <div className="flex h-full flex-col bg-brand-900 text-white">
-      <Link to={ROUTES.home} className="flex items-center gap-3 border-b border-white/10 px-5 py-5">
-        <img src="/logo.png" alt="Learnwithuncletee" className="h-11 w-11 rounded-full border border-white/20 object-cover" />
-        <span className="leading-tight">
-          <span className="block font-display text-sm font-extrabold">{siteInfo.name}</span>
-          <span className="hidden mt-0.5  text-[10px] font-bold uppercase tracking-[.18em] text-lime-accent">{meta.title}</span>
-        </span>
+      <Link
+        to={ROUTES.home}
+        className={cx('flex items-center gap-3 px-5 pb-3 pt-5', isCollapsed && 'justify-center px-0')}
+        title={isCollapsed ? siteInfo.name : undefined}
+      >
+        <img src="/logo.png" alt="Learnwithuncletee" className="h-8 w-8 shrink-0 rounded-full border border-white/20 object-cover" />
+        {!isCollapsed && <span className="font-display text-sm font-extrabold leading-tight">{siteInfo.name}</span>}
       </Link>
 
-      <div className="px-5 pb-2 pt-5">
-        <p className="hidden px-1 text-[11px] font-bold uppercase tracking-[.18em] text-white/50">{meta.subtitle}</p>
-      </div>
+      {/* Find */}
+      {!isCollapsed && (
+        <div className="px-3 pb-3">
+          <label className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/[0.04] px-3 py-2 text-white/60 transition-colors focus-within:border-white/40 focus-within:text-white">
+            <Search size={17} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
+            <input
+              ref={searchRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setQuery('');
+                  e.currentTarget.blur();
+                }
+              }}
+              placeholder="Find"
+              aria-label="Find in navigation"
+              className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/50"
+            />
+            {searching ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery('');
+                  searchRef.current?.focus();
+                }}
+                aria-label="Clear search"
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-white/60 hover:bg-white/10 hover:text-white"
+              >
+                <X size={14} aria-hidden="true" />
+              </button>
+            ) : (
+              <kbd className="hidden h-5 w-5 shrink-0 items-center justify-center rounded border border-white/20 bg-white/10 font-sans text-[11px] font-semibold text-white/80 lg:flex">
+                F
+              </kbd>
+            )}
+          </label>
+        </div>
+      )}
 
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4" aria-label={` navigation`}>
-        {visibleNav.map((item) => renderNode(item, '', 0))}
+      <nav className="scroll-slim flex-1 space-y-0.5 overflow-y-auto px-3 pb-4" aria-label={`${meta.title} navigation`}>
+        {shownNav.length ? (
+          renderList(shownNav, '', isCollapsed)
+        ) : (
+          <p className="px-3 py-6 text-center text-sm text-white/50">No matches for “{query.trim()}”</p>
+        )}
       </nav>
 
-      <div className="border-t border-white/10 p-4">
-        <button type="button" onClick={() => setAccountOpen(true)} aria-label="Open account settings" className="flex w-full items-center gap-3 rounded bg-white/10 p-3 text-left hover:bg-white/15">
+      <div className="space-y-0.5 border-t border-white/10 p-3">
+        <button
+          type="button"
+          onClick={() => setAccountOpen(true)}
+          aria-label="Open account settings"
+          title={isCollapsed ? displayName : undefined}
+          className={cx(
+            'flex w-full items-center gap-3 rounded-md p-2 text-left transition-colors hover:bg-white/[0.07]',
+            isCollapsed && 'justify-center px-0',
+          )}
+        >
           {avatar ? (
-            <img src={avatar} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+            <img src={avatar} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
           ) : (
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-lime-accent text-sm font-extrabold text-brand-900">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-lime-accent text-sm font-extrabold text-brand-900">
               {initials}
             </span>
           )}
-          <span className="min-w-0 leading-tight">
-            <span className="block truncate text-sm font-bold">{displayName}</span>
-            <span className="block truncate text-xs text-white/60">{detail}</span>
-          </span>
+          {!isCollapsed && (
+            <span className="min-w-0 leading-tight">
+              <span className="block truncate text-sm font-semibold">{displayName}</span>
+              <span className="block truncate text-xs text-white/50">{detail}</span>
+            </span>
+          )}
         </button>
+
         {user ? (
           <button
             type="button"
             onClick={handleLogout}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded border border-white/20 px-3 py-2.5 text-xs font-bold text-white/80 hover:bg-white/10 hover:text-white"
+            title={isCollapsed ? 'Sign out' : undefined}
+            className={cx(rowBase, rowIdle, isCollapsed && 'justify-center px-0')}
           >
-            <LogOut size={14} aria-hidden="true" /> Sign out
+            <LogOut size={18} strokeWidth={1.75} aria-hidden="true" className="shrink-0" /> {!isCollapsed && 'Sign out'}
           </button>
         ) : (
           <Link
             to={ROUTES.login}
-            className="mt-3 block rounded bg-lime-accent px-3 py-2.5 text-center text-xs font-bold text-brand-900 hover:bg-white"
+            title={isCollapsed ? 'Sign in' : undefined}
+            className={cx(
+              'mb-1 block rounded-md bg-lime-accent px-3 py-2.5 text-center text-sm font-semibold text-brand-900 hover:bg-white',
+              isCollapsed && 'px-0',
+            )}
           >
-            Sign in →
+            {isCollapsed ? '→' : 'Sign in'}
           </Link>
         )}
-        <Link
-          to={ROUTES.home}
-          className="flex mt-2 gap-2 items-center justify-center rounded px-3 py-2 text-center text-xs font-bold text-white/60 hover:text-white"
-        >
-          <ChevronLeft size={14} aria-hidden="true" /> Back to website
+        <Link to={ROUTES.home} title={isCollapsed ? 'Back to website' : undefined} className={cx(rowBase, rowIdle, isCollapsed && 'justify-center px-0')}>
+          <ChevronLeft size={18} strokeWidth={1.75} aria-hidden="true" className="shrink-0" /> {!isCollapsed && 'Back to website'}
         </Link>
       </div>
     </div>
@@ -309,13 +436,33 @@ export const DashboardLayout = ({ role, nav }: Props) => {
   return (
     <div className="flex min-h-screen bg-cream font-sans text-ink">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-72 shrink-0 lg:block">{sidebar}</aside>
+      <aside
+        className={`sticky top-0 hidden h-screen shrink-0 transition-[width] duration-200 lg:block ${
+          collapsed ? 'w-20' : 'w-72'
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() => setCollapsed((v) => !v)}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-expanded={!collapsed}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="z-50 bg-white absolute -right-3 top-7 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-line  text-brand-800 shadow-lg hover:bg-brand-50"
+        >
+          {collapsed ? (
+            <ChevronsRight size={15} aria-hidden="true" />
+          ) : (
+            <ChevronsLeft size={15} aria-hidden="true" />
+          )}
+        </button>
+        {sidebar(collapsed)}
+      </aside>
 
       {/* Mobile drawer */}
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Dashboard menu">
           <button type="button" aria-label="Close menu" onClick={() => setOpen(false)} className="absolute inset-0 bg-brand-900/60" />
-          <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw]">{sidebar}</aside>
+          <aside className="absolute inset-y-0 left-0 w-72 max-w-[85vw]">{sidebar(false)}</aside>
           <button
             type="button"
             onClick={() => setOpen(false)}

@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pill, StatTile, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
+import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, StatTile } from '@/components/dashboard/DashboardUI';
 import { useResource } from '@/context/AuthContext';
 import { apiDelete, apiPost } from '@/lib/api';
 import { UploadButton } from '@/lib/uploadthing';
-import { CLASS_OPTIONS, TERM_OPTIONS, sessionOptions, type GradeData, type ResultDocData, type StudentRow } from '@/data/dashboard';
+import { TERM_OPTIONS, sessionOptions, type GradeData, type ResultDocData, type StudentRow } from '@/data/dashboard';
+import type { ClassItem } from '@/data/dashboard';
 import { Download, FileText, Trash2 } from 'lucide-react';
 
 interface ClassRow extends GradeData {
@@ -11,23 +12,29 @@ interface ClassRow extends GradeData {
   studentCode: string;
 }
 
-const SUBJECTS = ['Mathematics', 'English Language', 'Basic Science', 'Social Studies', 'ICT', 'Civic Education'];
+//const SUBJECTS = ['Mathematics', 'English Language', 'Basic Science', 'Social Studies', 'ICT', 'Civic Education'];
 
 export const AdminResultsPage = () => {
   const sessions = sessionOptions();
-  const [subject, setSubject] = useState('Mathematics');
+  const [subject, _setSubject] = useState('Mathematics');
   const [className, setClassName] = useState('JSS 2 Diamond');
   const [session, setSession] = useState('2025/2026');
   const [term, setTerm] = useState('First Term');
-  const results = useResource<ClassRow[]>('/school-results/class', { subject, className, session, term });
-  const pupils = useResource<StudentRow[]>('/students', { className, limit: 100 });
-  const docs = useResource<ResultDocData[]>('/result-documents', { className, session, term });
-  const [docTitle, setDocTitle] = useState('');
-  const [docUrl, setDocUrl] = useState('');
   const [docStudentId, setDocStudentId] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const selectClass = 'min-h-11 rounded border border-line bg-white px-3 text-sm font-bold';
+
+  const classesRes = useResource<ClassItem[]>('/classes');
+  const classOptions = Array.from(
+    new Set([...(classesRes.data ?? []).map((c) => c.name), 'JSS 2 Diamond']),
+  );
+  const effectiveClass = classOptions.includes(className) ? className : (classOptions[0] ?? className);
+  const results = useResource<ClassRow[]>('/school-results/class', { subject, className: effectiveClass, session, term });
+  const pupils = useResource<StudentRow[]>('/students', { className: effectiveClass, limit: 100 });
+  const docs = useResource<ResultDocData[]>('/result-documents', { className: effectiveClass, session, term });
+  const [docTitle, setDocTitle] = useState('');
+  const [docUrl, setDocUrl] = useState('');
 
   const data = results.data ?? [];
   const avg = data.length ? data.reduce((s, r) => s + r.total, 0) / data.length : 0;
@@ -48,13 +55,13 @@ export const AdminResultsPage = () => {
     try {
       await apiPost('/result-documents', {
         title: docTitle.trim() || `${pupil?.user_name ?? 'Pupil'} — ${term} report sheet`,
-        className,
+        className: effectiveClass,
         session,
         term,
         studentId: docStudentId,
         fileUrl: docUrl,
       });
-      setNotice(`Report sheet published for ${pupil?.user_name ?? 'the pupil'} (${className} · ${term}, ${session}).`);
+      setNotice(`Report sheet published for ${pupil?.user_name ?? 'the pupil'} (${effectiveClass} · ${term}, ${session}).`);
       setDocTitle('');
       setDocUrl('');
       setDocStudentId('');
@@ -79,8 +86,8 @@ export const AdminResultsPage = () => {
   const publish = async (published: boolean) => {
     setNotice(null);
     try {
-      await apiPost('/school-results/publish', { className, session, term, published });
-      setNotice(published ? `Published ${className} · ${term}, ${session}. Pupils can now see it.` : `Hidden ${className} · ${term}, ${session}.`);
+      await apiPost('/school-results/publish', { className: effectiveClass, session, term, published });
+      setNotice(published ? `Published ${effectiveClass} · ${term}, ${session}. Pupils can now see it.` : `Hidden ${effectiveClass} · ${term}, ${session}.`);
       results.reload();
     } catch (err: any) {
       setNotice(err?.message ?? 'Failed');
@@ -107,8 +114,14 @@ export const AdminResultsPage = () => {
         <p className="mt-1 text-sm text-muted">Pick the exact pupil — the uploaded PDF is that pupil's full report sheet for this class, session and term. No subject needed.</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="block text-sm font-semibold">Grade (class)
-            <select value={className} onChange={(e) => setClassName(e.target.value)} className={`${selectClass} mt-2 w-full`}>
-              {CLASS_OPTIONS.map((c) => <option key={c}>{c}</option>)}
+            <select value={effectiveClass} onChange={(e) => setClassName(e.target.value)} className={`${selectClass} mt-2 w-full`}>
+              {classesRes.loading ? (
+                <option>Loading classes…</option>
+              ) : classOptions.length === 0 ? (
+                <option value="">No classes found</option>
+              ) : (
+                classOptions.map((c) => <option key={c} value={c}>{c}</option>)
+              )}
             </select>
           </label>
           <label className="block text-sm font-semibold">Session
@@ -147,7 +160,7 @@ export const AdminResultsPage = () => {
       </Card>
 
       <Card>
-        <CardHead title="Result documents" sub={`${className} · ${term}, ${session}`} />
+        <CardHead title="Result documents" sub={`${effectiveClass} · ${term}, ${session}`} />
         {docs.loading ? (
           <div className="px-5 py-5"><LoadingSkeleton rows={3} /></div>
         ) : docs.error || !docs.data ? (
@@ -187,40 +200,12 @@ export const AdminResultsPage = () => {
         <ErrorState message={results.error ?? 'No data'} onRetry={results.reload} />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <StatTile label="Average" value={`${avg.toFixed(1)}%`} hint={`${className} · ${term}`} />
+          <div className="hidden grid gap-4 sm:grid-cols-3">
+            <StatTile label="Average" value={`${avg.toFixed(1)}%`} hint={`${effectiveClass} · ${term}`} />
             <StatTile label="Entries" value={String(data.length)} hint={session} />
             <StatTile label="Subjects" value={String(new Set(data.map((r) => r.subject)).size)} hint="In this selection" />
           </div>
-      <Card>
-        <CardHead title={`${className} broadsheet`} sub={`${term}, ${session} · ${subject}`} />
-        <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-3">
-          <label className="text-xs font-bold text-muted" htmlFor="broadsheet-subject">Subject scores:</label>
-          <select id="broadsheet-subject" value={subject} onChange={(e) => setSubject(e.target.value)} className="min-h-10 rounded border border-line bg-white px-3 text-sm font-bold">
-            {SUBJECTS.map((s) => <option key={s}>{s}</option>)}
-          </select>
-        </div>
-            {data.length === 0 ? (
-              <div className="px-5 py-5"><EmptyState message="No entries for this selection yet. Add results above." /></div>
-            ) : (
-              <TableWrap>
-                <table className="w-full min-w-[560px] text-left text-sm">
-                  <thead><tr><Th>Pupil</Th><Th>CA</Th><Th>Exam</Th><Th>Total / 100</Th><Th>Grade</Th></tr></thead>
-                  <tbody>
-                    {data.map((r) => (
-                      <tr key={r.id}>
-                        <Td className="font-bold">{r.studentName}<span className="block text-xs font-medium text-muted">{r.studentCode}</span></Td>
-                        <Td>{r.ca}</Td>
-                        <Td>{r.exam}</Td>
-                        <Td className="font-bold text-brand-700">{r.total}</Td>
-                        <Td><Pill tone={r.grade === 'A' ? 'emerald' : r.grade === 'F' ? 'rose' : 'sky'}>{r.grade}</Pill></Td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </TableWrap>
-            )}
-          </Card>
+    
         </>
       )}
     </div>
