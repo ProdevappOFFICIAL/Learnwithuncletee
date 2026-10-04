@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pill, StatTile, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
 import { useResource } from '@/context/AuthContext';
-import { apiPost } from '@/lib/api';
-import { CLASS_OPTIONS, TERM_OPTIONS, sessionOptions, type GradeData } from '@/data/dashboard';
-import type { StudentRow } from '@/data/dashboard';
+import { apiDelete, apiPost } from '@/lib/api';
+import { UploadButton } from '@/lib/uploadthing';
+import { CLASS_OPTIONS, TERM_OPTIONS, sessionOptions, type GradeData, type ResultDocData } from '@/data/dashboard';
+import { Download, FileText, Trash2 } from 'lucide-react';
 
 interface ClassRow extends GradeData {
   studentName: string;
@@ -19,8 +20,9 @@ export const AdminResultsPage = () => {
   const [session, setSession] = useState('2025/2026');
   const [term, setTerm] = useState('First Term');
   const results = useResource<ClassRow[]>('/school-results/class', { subject, className, session, term });
-  const pupils = useResource<StudentRow[]>('/students', { className, limit: 100 });
-  const [entry, setEntry] = useState({ studentId: '', subject, ca: '', exam: '' });
+  const docs = useResource<ResultDocData[]>('/result-documents', { className, session, term });
+  const [docTitle, setDocTitle] = useState('');
+  const [docUrl, setDocUrl] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const selectClass = 'min-h-11 rounded border border-line bg-white px-3 text-sm font-bold';
@@ -28,25 +30,45 @@ export const AdminResultsPage = () => {
   const data = results.data ?? [];
   const avg = data.length ? data.reduce((s, r) => s + r.total, 0) / data.length : 0;
 
-  const save = async (e: React.FormEvent) => {
+  const uploadDoc = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!entry.studentId) {
-      setNotice('Choose a pupil first.');
+    if (!docUrl) {
+      setNotice('Upload the result PDF first.');
+      return;
+    }
+    if (!docTitle.trim()) {
+      setNotice('Give the document a title (e.g. JSS 2 Broadsheet).');
       return;
     }
     setBusy(true);
     setNotice(null);
     try {
-      await apiPost('/school-results/enter', {
-        entries: [{ studentId: entry.studentId, subject: entry.subject, className, session, term, ca: Number(entry.ca) || 0, exam: Number(entry.exam) || 0 }],
+      await apiPost('/result-documents', {
+        title: docTitle.trim(),
+        className,
+        session,
+        term,
+        subject,
+        fileUrl: docUrl,
       });
-      setNotice(`Result saved for ${className} · ${term}, ${session}.`);
-      setEntry({ studentId: '', subject, ca: '', exam: '' });
-      results.reload();
+      setNotice(`Result PDF published for ${className} · ${term}, ${session}. Pupils can download it now.`);
+      setDocTitle('');
+      setDocUrl('');
+      docs.reload();
     } catch (err: any) {
-      setNotice(err?.message ?? 'Save failed');
+      setNotice(err?.message ?? 'Upload failed');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const deleteDoc = async (docId: string) => {
+    if (!confirm('Delete this result PDF? Pupils will lose access.')) return;
+    try {
+      await apiDelete(`/result-documents/${docId}`);
+      docs.reload();
+    } catch (err: any) {
+      setNotice(err?.message ?? 'Delete failed');
     }
   };
 
@@ -66,7 +88,7 @@ export const AdminResultsPage = () => {
       <PageHeader
         eyebrow="Academics"
         title="Results oversight"
-        text="Add results per grade, session and term — then publish so pupils and parents can see them."
+        text="Publish result PDFs per grade, session and term — pupils in that class can download them. Teacher-entered scores appear in the broadsheet below."
         actions={
           <>
             <button type="button" onClick={() => publish(true)} className="inline-flex min-h-11 items-center rounded bg-brand-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">Publish selection</button>
@@ -77,7 +99,7 @@ export const AdminResultsPage = () => {
       {notice && <p role="status" className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
 
       <Card className="p-5">
-        <p className="text-xs font-bold uppercase tracking-widest text-brand-700">Add result</p>
+        <p className="text-xs font-bold uppercase tracking-widest text-brand-700">Add result · PDF upload</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="block text-sm font-semibold">Grade (class)
             <select value={className} onChange={(e) => setClassName(e.target.value)} className={`${selectClass} mt-2 w-full`}>
@@ -95,22 +117,62 @@ export const AdminResultsPage = () => {
             </select>
           </label>
           <label className="block text-sm font-semibold">Subject
-            <select value={subject} onChange={(e) => { setSubject(e.target.value); setEntry({ ...entry, subject: e.target.value }); }} className={`${selectClass} mt-2 w-full`}>
+            <select value={subject} onChange={(e) => setSubject(e.target.value)} className={`${selectClass} mt-2 w-full`}>
               {SUBJECTS.map((s) => <option key={s}>{s}</option>)}
             </select>
           </label>
         </div>
-        <form onSubmit={save} className="mt-4 grid gap-3 border-t border-line pt-4 sm:grid-cols-[1.6fr_.6fr_.6fr_auto]">
-          <select required value={entry.studentId} onChange={(e) => setEntry({ ...entry, studentId: e.target.value })} className="min-h-11 rounded border border-line bg-white px-3 text-sm">
-            <option value="">— Pupil in {className} —</option>
-            {(pupils.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.user_name}{p.studentProfile?.studentCode ? ` · ${p.studentProfile.studentCode}` : ''}</option>)}
-          </select>
-          <input required type="number" min={0} max={30} placeholder="CA / 30" value={entry.ca} onChange={(e) => setEntry({ ...entry, ca: e.target.value })} className="min-h-11 rounded border border-line px-3 text-sm" />
-          <input required type="number" min={0} max={70} placeholder="Exam / 70" value={entry.exam} onChange={(e) => setEntry({ ...entry, exam: e.target.value })} className="min-h-11 rounded border border-line px-3 text-sm" />
-          <button type="submit" disabled={busy} className="min-h-11 rounded bg-brand-900 px-5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
-            {busy ? '…' : 'Add result'}
-          </button>
+        <form onSubmit={uploadDoc} className="mt-4 grid gap-3 border-t border-line pt-4 sm:grid-cols-[1.4fr_auto_auto]">
+          <label className="block text-sm font-semibold">Document title
+            <input value={docTitle} onChange={(e) => setDocTitle(e.target.value)} placeholder="e.g. JSS 2 Diamond broadsheet" className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm" />
+          </label>
+          <div>
+            <p className="text-sm font-semibold">Result PDF {docUrl && <span className="text-emerald-700">✓ uploaded</span>}</p>
+            <div className="mt-2">
+              <UploadButton endpoint="assignmentUploader" label="Upload PDF" onClientUploadComplete={(res) => setDocUrl(res?.[0]?.ufsUrl ?? '')} onUploadError={(err) => setNotice(err.message)} />
+            </div>
+          </div>
+          <div className="flex items-end">
+            <button type="submit" disabled={busy} className="min-h-11 rounded bg-brand-900 px-5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
+              {busy ? '…' : 'Publish PDF'}
+            </button>
+          </div>
         </form>
+      </Card>
+
+      <Card>
+        <CardHead title="Result documents" sub={`${className} · ${term}, ${session}`} />
+        {docs.loading ? (
+          <div className="px-5 py-5"><LoadingSkeleton rows={3} /></div>
+        ) : docs.error || !docs.data ? (
+          <div className="px-5 py-5"><ErrorState message={docs.error ?? 'No data'} onRetry={docs.reload} /></div>
+        ) : docs.data.length === 0 ? (
+          <div className="px-5 py-5"><EmptyState message="No result PDFs published for this selection yet." /></div>
+        ) : (
+          <ul className="divide-y divide-line">
+            {docs.data.map((d) => (
+              <li key={d.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded bg-brand-50 text-brand-700">
+                    <FileText size={18} aria-hidden="true" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold">{d.title}</p>
+                    <p className="text-xs text-muted">{d.subject ?? 'All subjects'} · by {d.uploader?.user_name ?? 'admin'} · {new Date(d.createdAt).toLocaleDateString()}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <a href={d.fileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">
+                    <Download aria-hidden="true" size={14} className="mr-1" /> Open
+                  </a>
+                  <button type="button" onClick={() => deleteDoc(d.id)} className="inline-flex items-center rounded border border-line px-3 py-1.5 text-xs font-bold text-rose-700 hover:border-rose-300">
+                    <Trash2 aria-hidden="true" size={14} className="mr-1" /> Delete
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
 
       {results.loading ? (

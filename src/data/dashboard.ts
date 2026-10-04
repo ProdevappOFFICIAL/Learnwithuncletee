@@ -93,6 +93,18 @@ export interface GradeData {
   published: boolean;
 }
 
+export interface ResultDocData {
+  id: string;
+  title: string;
+  className: string;
+  session: string;
+  term: string;
+  subject?: string | null;
+  fileUrl: string;
+  createdAt: string;
+  uploader?: { user_name: string };
+}
+
 /** Grade (class) options for result filters and entry forms. */
 export const CLASS_OPTIONS = [
   'Creche',

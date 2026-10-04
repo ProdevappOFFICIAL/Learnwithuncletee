@@ -43,9 +43,10 @@ export const LoginPage = () => {
     const form = new FormData(event.currentTarget);
     const identity = String(form.get('identity') ?? '').trim();
     const password = String(form.get('password') ?? '');
+    const remember = form.get('remember') === 'on';
     setBusy(true);
     try {
-      const me = await login(identity, password);
+      const me = await login(identity, password, { remember });
       navigate(homeForRole(me.role));
     } catch (e: any) {
       setError(e?.message ?? 'Sign-in failed. Check your email and password.');
@@ -142,6 +143,12 @@ export const LoginPage = () => {
             <form className="mt-8 space-y-5" onSubmit={handleLogin}>
               <label className="block text-sm font-semibold">Email address<input className={inputClass} name="identity" type="email" autoComplete="username" required placeholder="you@learnwithuncletee.org" /></label>
               {mode === 'login' && <label className="block text-sm font-semibold">Password<input className={inputClass} name="password" type="password" autoComplete="current-password" required /></label>}
+              {mode === 'login' && (
+                <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-ink">
+                  <input type="checkbox" name="remember" defaultChecked className="h-4 w-4 rounded accent-brand-700" />
+                  Remember me on this device
+                </label>
+              )}
               <button type="submit" disabled={busy} className="min-h-12 w-full rounded bg-brand-500 px-5 py-3 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
                 {busy ? 'Signing in…' : mode === 'login' ? 'Sign in' : 'Request recovery'}
               </button>

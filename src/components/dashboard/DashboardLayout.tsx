@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, LogOut, Menu, Search, X } from 'lucide-react';
 import { ROUTES } from '@/routes/paths';
 import { roleMeta, type DashboardNavItem, type DashboardRole } from '@/data/dashboard';
 import { siteInfo } from '@/data/content';
-import { useAuth } from '@/context/AuthContext';
+import { avatarOf, useAuth } from '@/context/AuthContext';
+import { apiGet } from '@/lib/api';
+import { NotificationDrawer, readSeen, type FeedItem } from './NotificationDrawer';
+import { AccountDialog } from './AccountDialog';
 
 interface Props {
   role: DashboardRole;
@@ -45,6 +48,38 @@ export const DashboardLayout = ({ role, nav }: Props) => {
         ? `${user.teacherProfile.department ?? 'Teacher'} · ${user.teacherProfile.staffCode}`
         : (user?.role ?? 'Guest');
   const initials = user ? initialsOf(user.user_name) : meta.title.slice(0, 2).toUpperCase();
+  const avatar = avatarOf(user);
+
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [unread, setUnread] = useState(0);
+
+  // Badge count: fetch feed silently, diff against locally-seen ids.
+  useEffect(() => {
+    if (!user) {
+      setUnread(0);
+      return;
+    }
+    let cancelled = false;
+    apiGet<FeedItem[]>('/dashboard/notifications')
+      .then((res) => {
+        if (cancelled) return;
+        const seen = new Set(readSeen(user.id));
+        setUnread(res.data.filter((i) => !seen.has(i.id) && i.kind !== 'info').length);
+      })
+      .catch(() => {
+        /* badge stays hidden when offline */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, notifOpen]);
+
+  const openNotif = () => setNotifOpen(true);
+  const closeNotif = () => {
+    // Recompute badge from what the drawer just marked seen.
+    setNotifOpen(false);
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -62,7 +97,7 @@ export const DashboardLayout = ({ role, nav }: Props) => {
       </Link>
 
       <div className="px-5 pb-2 pt-5">
-        <p className="px-1 text-[11px] font-bold uppercase tracking-[.18em] text-white/50">{meta.subtitle}</p>
+        <p className="hidden px-1 text-[11px] font-bold uppercase tracking-[.18em] text-white/50">{meta.subtitle}</p>
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4" aria-label={` navigation`}>
@@ -103,9 +138,9 @@ export const DashboardLayout = ({ role, nav }: Props) => {
       </nav>
 
       <div className="border-t border-white/10 p-4">
-        <div className="flex items-center gap-3 rounded bg-white/10 p-3">
-          {user?.img ? (
-            <img src={user.img} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+        <button type="button" onClick={() => setAccountOpen(true)} aria-label="Open account settings" className="flex w-full items-center gap-3 rounded bg-white/10 p-3 text-left hover:bg-white/15">
+          {avatar ? (
+            <img src={avatar} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
           ) : (
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-lime-accent text-sm font-extrabold text-brand-900">
               {initials}
@@ -115,7 +150,7 @@ export const DashboardLayout = ({ role, nav }: Props) => {
             <span className="block truncate text-sm font-bold">{displayName}</span>
             <span className="block truncate text-xs text-white/60">{detail}</span>
           </span>
-        </div>
+        </button>
         {user ? (
           <button
             type="button"
@@ -188,22 +223,32 @@ export const DashboardLayout = ({ role, nav }: Props) => {
               </label>
               <button
                 type="button"
-                aria-label="Notifications"
+                onClick={openNotif}
+                aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
                 className="relative flex h-10 w-10 items-center justify-center rounded border border-line text-brand-800 hover:bg-brand-50"
               >
                 <Bell size={17} aria-hidden="true" />
-                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-brand-500" />
+                {unread > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-500 px-1 text-[10px] font-extrabold text-white">
+                    {unread > 9 ? '9+' : unread}
+                  </span>
+                )}
               </button>
-              <span className="hidden items-center gap-2 rounded bg-brand-900 py-1.5 pl-1.5 pr-3 text-white sm:flex">
-                {user?.img ? (
-                  <img src={user.img} alt="" className="h-7 w-7 rounded-full object-cover" />
+              <button
+                type="button"
+                onClick={() => setAccountOpen(true)}
+                aria-label="Account settings"
+                className="hidden items-center gap-2 rounded bg-brand-900 py-1.5 pl-1.5 pr-3 text-white hover:bg-brand-700 sm:flex"
+              >
+                {avatar ? (
+                  <img src={avatar} alt="" className="h-7 w-7 rounded-full object-cover" />
                 ) : (
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-lime-accent text-[11px] font-extrabold text-brand-900">
                     {initials}
                   </span>
                 )}
                 <span className="text-xs font-bold">{displayName}</span>
-              </span>
+              </button>
             </div>
           </div>
           {!user && (
@@ -219,6 +264,11 @@ export const DashboardLayout = ({ role, nav }: Props) => {
           </div>
         </main>
       </div>
+
+      {/* Overlays live at layout root: the sticky topbar's backdrop-blur would
+          otherwise trap `fixed` positioning inside the 68px header. */}
+      <NotificationDrawer open={notifOpen} onClose={closeNotif} />
+      <AccountDialog open={accountOpen} onClose={() => setAccountOpen(false)} />
     </div>
   );
 };

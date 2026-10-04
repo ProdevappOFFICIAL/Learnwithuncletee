@@ -3,7 +3,8 @@ import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pi
 import { useAuth, useResource } from '@/context/AuthContext';
 import { apiGet } from '@/lib/api';
 import { printReportCard } from '@/lib/reportCard';
-import { CLASS_OPTIONS, TERM_OPTIONS, sessionOptions, type GradeData } from '@/data/dashboard';
+import { CLASS_OPTIONS, TERM_OPTIONS, sessionOptions, type GradeData, type ResultDocData } from '@/data/dashboard';
+import { Download, FileText } from 'lucide-react';
 
 export const StudentResultsPage = () => {
   const { user } = useAuth();
@@ -18,6 +19,8 @@ export const StudentResultsPage = () => {
 
   // "All results" view loads everything once (for the toggle).
   const allRes = useResource<GradeData[]>('/school-results/mine');
+  // Published PDFs for the pupil's own class (server force-scopes by class).
+  const docsRes = useResource<ResultDocData[]>('/result-documents', mode === 'exact' ? { session, term } : {});
 
   const fetchExact = async () => {
     setFetching(true);
@@ -107,7 +110,7 @@ export const StudentResultsPage = () => {
 
       {shown && (
         <>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-3 hidden">
             <StatTile label="Average" value={`${avg.toFixed(1)}%`} hint={mode === 'exact' ? `${className} · ${term}` : 'Across all results'} />
             <StatTile label="Subjects" value={String(shown.length)} hint={mode === 'exact' ? session : 'All sessions'} />
             <StatTile label="Top grade" value={shown.length ? [...shown].sort((a, b) => b.total - a.total)[0].grade : '—'} hint="Best subject" />
@@ -139,6 +142,36 @@ export const StudentResultsPage = () => {
           </Card>
         </>
       )}
+
+      <Card>
+        <CardHead title="Result documents" sub="PDFs published by the school for your class" />
+        {docsRes.loading ? (
+          <div className="px-5 py-5"><LoadingSkeleton rows={2} /></div>
+        ) : docsRes.error || !docsRes.data ? (
+          <div className="px-5 py-5"><ErrorState message={docsRes.error ?? 'No data'} onRetry={docsRes.reload} /></div>
+        ) : docsRes.data.length === 0 ? (
+          <div className="px-5 py-5"><EmptyState message="No result PDFs published for you yet." /></div>
+        ) : (
+          <ul className="divide-y divide-line">
+            {docsRes.data.map((d) => (
+              <li key={d.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded bg-brand-50 text-brand-700">
+                    <FileText size={18} aria-hidden="true" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold">{d.title}</p>
+                    <p className="text-xs text-muted">{d.className} · {d.term}, {d.session}{d.subject ? ` · ${d.subject}` : ''}</p>
+                  </div>
+                </div>
+                <a href={d.fileUrl} target="_blank" rel="noreferrer" download className="inline-flex items-center rounded bg-brand-500 px-4 py-2 text-xs font-bold text-white hover:bg-brand-700">
+                  <Download aria-hidden="true" size={14} className="mr-1" /> Download PDF
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
     </div>
   );
 };

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pill, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
 import { useResource } from '@/context/AuthContext';
 import { apiPost } from '@/lib/api';
+import { UploadButton } from '@/lib/uploadthing';
 import type { StaffRow } from '@/data/dashboard';
 
 const SUBJECT_CHOICES = ['Mathematics', 'English Language', 'Basic Science', 'Social Studies', 'ICT', 'Civic Education'];
@@ -10,7 +11,7 @@ export const AdminTeachersPage = () => {
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const { data, loading, error, reload } = useResource<StaffRow[]>('/staff', { search: query, limit: 50 });
-  const [form, setForm] = useState({ user_name: '', user_email: '', password: '', department: '', subjects: 'Mathematics' });
+  const [form, setForm] = useState({ user_name: '', user_email: '', password: '', department: '', subjects: 'Mathematics', photoUrl: '' });
   const [created, setCreated] = useState<{ email: string; password: string; staffCode: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -27,9 +28,10 @@ export const AdminTeachersPage = () => {
         password: form.password || undefined,
         department: form.department || undefined,
         subjects: form.subjects.split(',').map((s) => s.trim()).filter(Boolean),
+        photoUrl: form.photoUrl || undefined,
       });
       setCreated({ email: res.data.login.email, password: res.data.login.password, staffCode: res.data.profile.staffCode });
-      setForm({ user_name: '', user_email: '', password: '', department: '', subjects: 'Mathematics' });
+      setForm({ user_name: '', user_email: '', password: '', department: '', subjects: 'Mathematics', photoUrl: '' });
       reload();
     } catch (err: any) {
       setNotice(err?.message ?? 'Could not create teacher');
@@ -56,6 +58,19 @@ export const AdminTeachersPage = () => {
           <label className="block text-sm font-semibold">Password (optional)<input type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Auto-generate" className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm" /></label>
           <label className="block text-sm font-semibold">Department<input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} placeholder="e.g. Sciences" className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm" /></label>
           <label className="block text-sm font-semibold sm:col-span-2">Subjects (comma separated)<input value={form.subjects} onChange={(e) => setForm({ ...form, subjects: e.target.value })} placeholder={SUBJECT_CHOICES.slice(0, 3).join(', ')} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm" /></label>
+          <div className="flex items-center gap-3">
+            {form.photoUrl ? (
+              <img src={form.photoUrl} alt="Avatar preview" className="h-11 w-11 rounded-full border border-line object-cover" />
+            ) : (
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-sm font-extrabold text-brand-700">?</span>
+            )}
+            <div>
+              <p className="text-sm font-semibold">Avatar {form.photoUrl && <span className="text-emerald-700">✓ set</span>}</p>
+              <div className="mt-1">
+                <UploadButton endpoint="avatarUploader" label="Upload avatar" onClientUploadComplete={(res) => setForm({ ...form, photoUrl: res?.[0]?.ufsUrl ?? '' })} onUploadError={(err) => setNotice(err.message)} />
+              </div>
+            </div>
+          </div>
           <div className="sm:col-span-2 lg:col-span-3">
             <button type="submit" disabled={busy} className="min-h-11 w-full rounded bg-brand-500 px-5 py-3 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
               {busy ? 'Creating…' : '+ Add teacher'}

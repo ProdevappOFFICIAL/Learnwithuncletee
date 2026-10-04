@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pill, StatTile, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
-import { useResource } from '@/context/AuthContext';
-import { apiPost } from '@/lib/api';
-import { CLASS_OPTIONS, TERM_OPTIONS, sessionOptions, type GradeData } from '@/data/dashboard';
+import { useAuth, useResource } from '@/context/AuthContext';
+import { apiDelete, apiPost } from '@/lib/api';
+import { UploadButton } from '@/lib/uploadthing';
+import { CLASS_OPTIONS, TERM_OPTIONS, sessionOptions, type GradeData, type ResultDocData } from '@/data/dashboard';
 import type { StudentRow } from '@/data/dashboard';
+import { Download, FileText, Trash2 } from 'lucide-react';
 
 interface ClassRow extends GradeData {
   studentName: string;
@@ -20,7 +22,12 @@ export const TeacherResultsPage = () => {
   const [term, setTerm] = useState('First Term');
   const results = useResource<ClassRow[]>('/school-results/class', { subject, className, session, term });
   const pupils = useResource<StudentRow[]>('/students', { className, limit: 100 });
+  const docs = useResource<ResultDocData[]>('/result-documents', { className, session, term });
+  const { can } = useAuth();
+  const canDeleteDocs = can('results.publish');
   const [entry, setEntry] = useState({ studentId: '', ca: '', exam: '' });
+  const [docTitle, setDocTitle] = useState('');
+  const [docUrl, setDocUrl] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -50,12 +57,54 @@ export const TeacherResultsPage = () => {
     }
   };
 
+  const uploadDoc = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!docUrl) {
+      setNotice('Upload the result PDF first.');
+      return;
+    }
+    if (!docTitle.trim()) {
+      setNotice('Give the document a title (e.g. JSS 2 Mathematics scores).');
+      return;
+    }
+    setBusy(true);
+    setNotice(null);
+    try {
+      await apiPost('/result-documents', {
+        title: docTitle.trim(),
+        className,
+        session,
+        term,
+        subject,
+        fileUrl: docUrl,
+      });
+      setNotice(`Result PDF published for ${className} · ${term}, ${session}. Pupils can download it now.`);
+      setDocTitle('');
+      setDocUrl('');
+      docs.reload();
+    } catch (err: any) {
+      setNotice(err?.message ?? 'Upload failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const deleteDoc = async (docId: string) => {
+    if (!confirm('Delete this result PDF? Pupils will lose access.')) return;
+    try {
+      await apiDelete(`/result-documents/${docId}`);
+      docs.reload();
+    } catch (err: any) {
+      setNotice(err?.message ?? 'Delete failed');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Results"
         title="Results & grading"
-        text="Pick the grade, session and term, then enter CA and exam scores. Totals and grades are computed automatically."
+        text="Pick the grade, session and term, then enter CA and exam scores — or upload a result PDF for the whole class. Totals and grades are computed automatically."
       />
 
       {notice && <p role="status" className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
@@ -104,7 +153,7 @@ export const TeacherResultsPage = () => {
         <ErrorState message={results.error ?? 'No data'} onRetry={results.reload} />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-3 hidden ">
             <StatTile label="Class average" value={`${avg.toFixed(1)}%`} hint={`${className} · ${term}`} />
             <StatTile label="Entries" value={String(data.length)} hint={session} />
             <StatTile label="Pass rate" value={data.length ? `${Math.round((data.filter((r) => r.grade !== 'F').length / data.length) * 100)}%` : '—'} hint="Grade F excluded" />
@@ -133,6 +182,59 @@ export const TeacherResultsPage = () => {
               </TableWrap>
             )}
             <p className="border-t border-line bg-brand-50/60 px-5 py-3 text-xs text-muted">Scores are draft until published by the academic office.</p>
+          </Card>
+
+          <Card>
+            <CardHead title="Result PDFs" sub={`${className} · ${term}, ${session}`} />
+            <form onSubmit={uploadDoc} className="grid gap-3 border-b border-line px-5 py-4 sm:grid-cols-[1.4fr_auto_auto]">
+              <label className="block text-sm font-semibold">Document title
+                <input value={docTitle} onChange={(e) => setDocTitle(e.target.value)} placeholder="e.g. JSS 2 Mathematics scores" className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm" />
+              </label>
+              <div>
+                <p className="text-sm font-semibold">Result PDF {docUrl && <span className="text-emerald-700">✓ uploaded</span>}</p>
+                <div className="mt-2">
+                  <UploadButton endpoint="assignmentUploader" label="Upload PDF" onClientUploadComplete={(res) => setDocUrl(res?.[0]?.ufsUrl ?? '')} onUploadError={(err) => setNotice(err.message)} />
+                </div>
+              </div>
+              <div className="flex items-end">
+                <button type="submit" disabled={busy} className="min-h-11 rounded bg-brand-900 px-5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
+                  {busy ? '…' : 'Publish PDF'}
+                </button>
+              </div>
+            </form>
+            {docs.loading ? (
+              <div className="px-5 py-5"><LoadingSkeleton rows={2} /></div>
+            ) : docs.error || !docs.data ? (
+              <div className="px-5 py-5"><ErrorState message={docs.error ?? 'No data'} onRetry={docs.reload} /></div>
+            ) : docs.data.length === 0 ? (
+              <div className="px-5 py-5"><EmptyState message="No result PDFs published for this selection yet." /></div>
+            ) : (
+              <ul className="divide-y divide-line">
+                {docs.data.map((d) => (
+                  <li key={d.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-10 w-10 items-center justify-center rounded bg-brand-50 text-brand-700">
+                        <FileText size={18} aria-hidden="true" />
+                      </span>
+                      <div>
+                        <p className="text-sm font-bold">{d.title}</p>
+                        <p className="text-xs text-muted">{d.subject ?? 'All subjects'} · by {d.uploader?.user_name ?? 'staff'} · {new Date(d.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <a href={d.fileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">
+                        <Download aria-hidden="true" size={14} className="mr-1" /> Open
+                      </a>
+                      {canDeleteDocs && (
+                        <button type="button" onClick={() => deleteDoc(d.id)} className="inline-flex items-center rounded border border-line px-3 py-1.5 text-xs font-bold text-rose-700 hover:border-rose-300">
+                          <Trash2 aria-hidden="true" size={14} className="mr-1" /> Delete
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Card>
         </>
       )}

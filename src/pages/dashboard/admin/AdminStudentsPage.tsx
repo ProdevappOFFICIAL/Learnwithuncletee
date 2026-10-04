@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pill, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
 import { useAuth, useResource } from '@/context/AuthContext';
 import { apiPost, formatNaira } from '@/lib/api';
+import { UploadButton } from '@/lib/uploadthing';
 import { CLASS_OPTIONS } from '@/data/dashboard';
 import type { StudentRow } from '@/data/dashboard';
 
@@ -69,7 +70,7 @@ export const AdminStudentsPage = () => {
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const { data, loading, error, reload } = useResource<StudentRow[]>('/students', { search: query, limit: 50 });
-  const [form, setForm] = useState({ user_name: '', user_email: '', password: '', className: 'JSS 2 Diamond', guardianName: '', guardianPhone: '' });
+  const [form, setForm] = useState({ user_name: '', user_email: '', password: '', className: 'JSS 2 Diamond', guardianName: '', guardianPhone: '', photoUrl: '' });
   const [created, setCreated] = useState<{ email: string; password: string; studentCode: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -83,9 +84,10 @@ export const AdminStudentsPage = () => {
       const res = await apiPost<{ login: { email: string; password: string }; profile: { studentCode: string } }>('/students', {
         ...form,
         password: form.password || undefined,
+        photoUrl: form.photoUrl || undefined,
       });
       setCreated({ email: res.data.login.email, password: res.data.login.password, studentCode: res.data.profile.studentCode });
-      setForm({ user_name: '', user_email: '', password: '', className: 'JSS 2 Diamond', guardianName: '', guardianPhone: '' });
+      setForm({ user_name: '', user_email: '', password: '', className: 'JSS 2 Diamond', guardianName: '', guardianPhone: '', photoUrl: '' });
       reload();
     } catch (err: any) {
       setNotice(err?.message ?? 'Could not create student');
@@ -118,6 +120,19 @@ export const AdminStudentsPage = () => {
           </label>
           <label className="block text-sm font-semibold">Guardian name<input value={form.guardianName} onChange={(e) => setForm({ ...form, guardianName: e.target.value })} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm" /></label>
           <label className="block text-sm font-semibold">Guardian phone<input value={form.guardianPhone} onChange={(e) => setForm({ ...form, guardianPhone: e.target.value })} placeholder="+234…" className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm" /></label>
+          <div className="flex items-center gap-3">
+            {form.photoUrl ? (
+              <img src={form.photoUrl} alt="Avatar preview" className="h-11 w-11 rounded-full border border-line object-cover" />
+            ) : (
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-sm font-extrabold text-brand-700">?</span>
+            )}
+            <div>
+              <p className="text-sm font-semibold">Avatar {form.photoUrl && <span className="text-emerald-700">✓ set</span>}</p>
+              <div className="mt-1">
+                <UploadButton endpoint="avatarUploader" label="Upload avatar" onClientUploadComplete={(res) => setForm({ ...form, photoUrl: res?.[0]?.ufsUrl ?? '' })} onUploadError={(err) => setNotice(err.message)} />
+              </div>
+            </div>
+          </div>
           <div className="sm:col-span-2 lg:col-span-3">
             <button type="submit" disabled={busy} className="min-h-11 w-full rounded bg-brand-500 px-5 py-3 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
               {busy ? 'Creating…' : '+ Add student'}

@@ -1,14 +1,18 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api, apiPost, tokenStore } from '@/lib/api';
 
+/** Preferred avatar: role profile photo first, then account image. */
+export const avatarOf = (user: Pick<SessionUser, 'img' | 'studentProfile' | 'teacherProfile'> | null | undefined) =>
+  user?.studentProfile?.photoUrl || user?.teacherProfile?.photoUrl || user?.img || null;
+
 export interface SessionUser {
   id: string;
   user_name: string;
   user_email: string;
   role: string;
   img?: string | null;
-  studentProfile?: { studentCode: string; className: string } | null;
-  teacherProfile?: { staffCode: string; department?: string } | null;
+  studentProfile?: { studentCode: string; className: string; photoUrl?: string | null } | null;
+  teacherProfile?: { staffCode: string; department?: string; photoUrl?: string | null } | null;
   permissions: string[];
 }
 
@@ -16,7 +20,7 @@ interface AuthState {
   user: SessionUser | null;
   loading: boolean;
   error: string | null;
-  login: (identity: string, password: string) => Promise<SessionUser>;
+  login: (identity: string, password: string, opts?: { remember?: boolean }) => Promise<SessionUser>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   can: (permission: string) => boolean;
@@ -66,14 +70,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     refresh();
   }, [refresh]);
 
-  const login = useCallback(async (identity: string, password: string) => {
+  const login = useCallback(async (identity: string, password: string, opts?: { remember?: boolean }) => {
     // Backend login accepts user_email today; student/staff codes are
     // resolved profile-side after sign-in (see api-docs § Auth).
     const { data } = await apiPost<{ user: any; accessToken: string }>('/auth/login', {
       user_email: identity,
       user_password: password,
     });
-    tokenStore.set(data.accessToken);
+    tokenStore.set(data.accessToken, opts?.remember ?? true);
     const me = await fetchMe();
     setUser(me);
     setError(null);

@@ -13,14 +13,21 @@ const TOKEN_KEY = 'lwu_access_token';
 export const tokenStore = {
   get: () => {
     try {
-      return localStorage.getItem(TOKEN_KEY);
+      return localStorage.getItem(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_KEY);
     } catch {
       return null;
     }
   },
-  set: (token: string) => {
+  /** persistent=true → localStorage (remember me); false → sessionStorage (cleared on tab close). */
+  set: (token: string, persistent = true) => {
     try {
-      localStorage.setItem(TOKEN_KEY, token);
+      if (persistent) {
+        localStorage.setItem(TOKEN_KEY, token);
+        sessionStorage.removeItem(TOKEN_KEY);
+      } else {
+        sessionStorage.setItem(TOKEN_KEY, token);
+        localStorage.removeItem(TOKEN_KEY);
+      }
     } catch {
       /* private mode — ignore */
     }
@@ -28,6 +35,11 @@ export const tokenStore = {
   clear: () => {
     try {
       localStorage.removeItem(TOKEN_KEY);
+    } catch {
+      /* ignore */
+    }
+    try {
+      sessionStorage.removeItem(TOKEN_KEY);
     } catch {
       /* ignore */
     }
