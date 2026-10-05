@@ -94,9 +94,10 @@ export const NewsDetailPage = () => {
   const copyLink = async () => {
     // Copy the OG-preview URL so social bots can see the banner + title.
     // Human recipients are instantly redirected to the real article page.
-    const apiBase = (import.meta as any).env?.VITE_API_URL ?? 'https://api.learnwithuncletee.org';
+    const rawApiUrl = (import.meta as any).env?.VITE_API_URL ?? 'https://api.learnwithuncletee.org';
+    const origin = rawApiUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
     const shareUrl = id
-      ? `${apiBase}/api/og/news/${id}`
+      ? `${origin}/api/og/news/${id}`
       : window.location.href;
     try {
       await navigator.clipboard.writeText(shareUrl);
