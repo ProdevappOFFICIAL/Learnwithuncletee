@@ -1,12 +1,83 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" prefix="og: https://ogp.me/ns#">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/jpeg" href="/logo.png" />
+    <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0B6B3A" />
-    <meta name="description" content="Learnwithuncletee is a welcoming school community focused on academic excellence, character development and student growth." />
+
+    <!-- ── Primary meta ──────────────────────────────────────────────────── -->
     <title>Learnwithuncletee | Nurturing Future Leaders</title>
+    <meta name="description" content="Learnwithuncletee is a welcoming school community focused on academic excellence, character development and student growth." />
+    <meta name="author" content="Learnwithuncletee" />
+    <meta name="keywords" content="Learnwithuncletee, school, education, Nigeria, students, academic excellence, admissions" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="theme-color" content="#0B6B3A" />
+
+    <!-- ── Open Graph (Facebook, WhatsApp, LinkedIn, Telegram) ──────────── -->
+    <meta property="og:site_name" content="Learnwithuncletee" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_NG" />
+    <meta property="og:url" content="https://learnwithuncletee.org" />
+    <meta property="og:title" content="Learnwithuncletee | Nurturing Future Leaders" />
+    <meta property="og:description" content="Learnwithuncletee is a welcoming school community focused on academic excellence, character development and student growth." />
+    <meta property="og:image" content="https://learnwithuncletee.org/school.JPG" />
+    <meta property="og:image:secure_url" content="https://learnwithuncletee.org/school.JPG" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Learnwithuncletee School Campus" />
+
+    <!-- ── Twitter / X Card ─────────────────────────────────────────────── -->
+    <!-- summary_large_image shows the banner thumbnail on share -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@learnwithuncletee" />
+    <meta name="twitter:creator" content="@learnwithuncletee" />
+    <meta name="twitter:title" content="Learnwithuncletee | Nurturing Future Leaders" />
+    <meta name="twitter:description" content="Learnwithuncletee is a welcoming school community focused on academic excellence, character development and student growth." />
+    <meta name="twitter:image" content="https://learnwithuncletee.org/school.JPG" />
+    <meta name="twitter:image:alt" content="Learnwithuncletee School Campus" />
+
+    <!-- ── Organisation JSON-LD ─────────────────────────────────────────── -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "EducationalOrganization",
+      "@id": "https://learnwithuncletee.org/#organization",
+      "name": "Learnwithuncletee",
+      "url": "https://learnwithuncletee.org",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://learnwithuncletee.org/logo.png",
+        "width": 512,
+        "height": 512
+      },
+      "image": "https://learnwithuncletee.org/school.JPG",
+      "description": "A welcoming school community focused on academic excellence, character development and student growth.",
+      "sameAs": [
+        "https://www.learnwithuncletee.org"
+      ]
+    }
+    </script>
+
+    <!-- ── WebSite JSON-LD (enables Google Sitelinks Searchbox) ─────────── -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "@id": "https://learnwithuncletee.org/#website",
+      "url": "https://learnwithuncletee.org",
+      "name": "Learnwithuncletee",
+      "publisher": { "@id": "https://learnwithuncletee.org/#organization" },
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://learnwithuncletee.org/news?q={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -13,6 +13,7 @@ import { GalleryPage } from '@/pages/GalleryPage';
 import { ContactPage } from '@/pages/ContactPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { ExaminationPage } from '@/pages/ExaminationPage';
+import { ExamRoomPage } from '@/pages/ExamRoomPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { adminNav, studentNav, teacherNav } from '@/data/dashboard';
@@ -69,6 +70,7 @@ export const router = createBrowserRouter([
   { path: ROUTES.contact, element: <ContactPage /> },
   { path: ROUTES.login, element: <LoginPage /> },
   { path: ROUTES.examination, element: <ExaminationPage /> },
+  { path: ROUTES.examinationRoom, element: <ExamRoomPage /> },
   { path: ROUTES.dashboard, element: <DashboardIndexPage /> },
   {
     path: ROUTES.studentDashboard,

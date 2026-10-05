@@ -11,6 +11,7 @@ export const ROUTES = {
   contact: '/contact',
   login: '/login',
   examination: '/examination/:code',
+  examinationRoom: '/examination/:code/room',
   dashboard: '/dashboard',
   studentDashboard: '/dashboard/student',
   studentFees: '/dashboard/student/fees',

@@ -429,6 +429,7 @@ export interface NoticeData {
   likeCount: number;
   dislikeCount: number;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface StudentRow {

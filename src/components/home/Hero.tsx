@@ -68,8 +68,7 @@ export const Hero = () => {
           <button type="button" onClick={() => showSlide(activeIndex - 1)} aria-label="Previous slide" className="flex h-10 w-10 items-center justify-center rounded border border-white/40 hover:bg-white/15"><ChevronLeft aria-hidden="true" size={18} /></button>
           {heroSlides.map((item, index) => <button key={item.id} type="button" onClick={() => showSlide(index)} aria-label={`Show slide ${index + 1}`} aria-current={index === activeIndex} className={`h-2.5 rounded-full transition-all ${index === activeIndex ? 'w-9 bg-lime-accent' : 'w-2.5 bg-white/60 hover:bg-white'}`} />)}
           <button type="button" onClick={() => showSlide(activeIndex + 1)} aria-label="Next slide" className="flex h-10 w-10 items-center justify-center rounded border border-white/40 hover:bg-white/15"><ChevronRight aria-hidden="true" size={18} /></button>
-          <span className="ml-2 text-xs text-white/70">Sample imagery for layout</span>
-        </div>
+            </div>
       </Container>
     </section>
   );

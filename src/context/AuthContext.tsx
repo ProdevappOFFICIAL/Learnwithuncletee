@@ -24,7 +24,7 @@ interface AuthState {
   user: SessionUser | null;
   loading: boolean;
   error: string | null;
-  login: (identity: string, password: string, opts?: { remember?: boolean }) => Promise<SessionUser>;
+  login: (identity: string, password: string, opts?: { remember?: boolean; role?: string }) => Promise<SessionUser>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   can: (permission: string) => boolean;
@@ -71,10 +71,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     refetchOnWindowFocus: true,
   });
 
-  const login = useCallback(async (identity: string, password: string, opts?: { remember?: boolean }) => {
+  const login = useCallback(async (identity: string, password: string, opts?: { remember?: boolean; role?: string }) => {
     const { data } = await apiPost<{ user: any; accessToken: string }>('/auth/login', {
       user_email: identity,
       user_password: password,
+      ...(opts?.role ? { role: opts.role } : {}),
     });
     tokenStore.set(data.accessToken, opts?.remember ?? true);
     const me = await fetchMe();

@@ -61,6 +61,43 @@ export const NewsPage = () => {
         description="School updates, upcoming moments and stories from the Learnwithuncletee learning community."
         image="/school.JPG"
         type="website"
+        author="Learnwithuncletee"
+        robots="index, follow, max-image-preview:large, max-snippet:-1"
+        jsonLd={[
+          {
+            '@context': 'https://schema.org',
+            '@type': 'CollectionPage',
+            name: 'News & Events — Learnwithuncletee',
+            description: 'School updates, upcoming moments and stories from the Learnwithuncletee learning community.',
+            url: 'https://learnwithuncletee.org/news',
+            publisher: {
+              '@type': 'Organization',
+              name: 'Learnwithuncletee',
+              logo: { '@type': 'ImageObject', url: 'https://learnwithuncletee.org/logo.png' },
+            },
+            ...(articles && articles.length > 0
+              ? {
+                  mainEntity: {
+                    '@type': 'ItemList',
+                    itemListElement: articles.slice(0, 10).map((a, i) => ({
+                      '@type': 'ListItem',
+                      position: i + 1,
+                      url: `https://learnwithuncletee.org/news/${a.id}`,
+                      name: a.title,
+                    })),
+                  },
+                }
+              : {}),
+          },
+          {
+            '@context': 'https://schema.org',
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://learnwithuncletee.org' },
+              { '@type': 'ListItem', position: 2, name: 'News & Events', item: 'https://learnwithuncletee.org/news' },
+            ],
+          },
+        ]}
       />
       <PageHero eyebrow="From our community" title="News & Events" text="School updates, upcoming moments and stories from our learning community." image="https://images.unsplash.com/photo-1523580494863-6f3031224c94?auto=format&fit=crop&w=1800&q=85" />
       <section className="py-14 sm:py-18">

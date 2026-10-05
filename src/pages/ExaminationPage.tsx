@@ -1,15 +1,15 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Container } from '@/components/ui/Container';
 import { PageMetadata } from '@/components/ui/PageMetadata';
 import { useAuth } from '@/context/AuthContext';
-import { apiGetPublic, apiPost } from '@/lib/api';
+import { apiGetPublic } from '@/lib/api';
 import { ROUTES } from '@/routes/paths';
-import { CheckCircle2, ChevronLeft, Clock, Send } from 'lucide-react';
+import { siteInfo } from '@/data/content';
+import { CheckCircle2, ChevronLeft } from 'lucide-react';
 
-const NewsContent = lazy(() => import('@/lib/mdxEditor').then((m) => ({ default: m.NewsContent })));
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-interface ExamQuestion {
+export interface ExamQuestion {
   id: string;
   type: 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'FILL_IN_THE_BLANK';
   question: string;
@@ -17,7 +17,7 @@ interface ExamQuestion {
   incorrect_answers: string[];
 }
 
-interface LiveExam {
+export interface LiveExam {
   code: string;
   exam: {
     id: string;
@@ -27,26 +27,18 @@ interface LiveExam {
   };
 }
 
-type Phase = 'loading' | 'unavailable' | 'login' | 'exam' | 'done';
+type Phase = 'loading' | 'unavailable' | 'login' | 'done';
 
-const shuffle = <T,>(arr: T[]): T[] => {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-};
+// Matches LoginPage's input style exactly
+const inputClass =
+  'mt-2 min-h-12 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100';
 
-const fmtTime = (secs: number) => {
-  const m = Math.floor(Math.max(0, secs) / 60);
-  const s = Math.max(0, secs) % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
-};
+// ─── ExaminationPage — login + pre/post-exam shell ────────────────────────────
 
 export const ExaminationPage = () => {
   const { code = '' } = useParams<{ code: string }>();
   const { login } = useAuth();
+
   const [phase, setPhase] = useState<Phase>('loading');
   const [exam, setExam] = useState<LiveExam['exam'] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,23 +47,15 @@ export const ExaminationPage = () => {
   // login form
   const [identity, setIdentity] = useState('');
   const [password, setPassword] = useState('');
-  const [userId, setUserId] = useState<string | null>(null);
 
-  // answers keyed by question id
-  const [picked, setPicked] = useState<Record<string, number | null>>({});
-  const [typed, setTyped] = useState<Record<string, string>>({});
-  const [secondsLeft, setSecondsLeft] = useState(0);
-  const [result, setResult] = useState<{ overallScore: number; attempted: number; total: number } | null>(null);
-
-  // stable shuffled options per question
-  const optionsByQ = useMemo(() => {
-    const map: Record<string, string[]> = {};
-    for (const q of exam?.questions ?? []) {
-      if (q.type === 'TRUE_FALSE') map[q.id] = ['True', 'False'];
-      else map[q.id] = shuffle([q.correct_answer, ...(q.incorrect_answers ?? [])]);
-    }
-    return map;
-  }, [exam]);
+  // result shown after redirect-back from exam room (via sessionStorage)
+  const [result] = useState<{ overallScore: number; attempted: number; total: number } | null>(() => {
+    try {
+      const raw = sessionStorage.getItem(`exam_result_${code}`);
+      if (raw) { sessionStorage.removeItem(`exam_result_${code}`); return JSON.parse(raw); }
+    } catch { /* ignore */ }
+    return null;
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -81,25 +65,20 @@ export const ExaminationPage = () => {
       .then((res) => {
         if (cancelled) return;
         setExam(res.data.exam);
-        setSecondsLeft((res.data.exam.minutes || 60) * 60);
-        setPhase('login');
+        setPhase(result ? 'done' : 'login');
       })
       .catch((e: any) => {
         if (!cancelled) {
-          setError(e?.status === 404 ? 'This examination is not available. Check the code with your teacher.' : (e?.message ?? 'Could not load examination'));
+          setError(
+            e?.status === 404
+              ? 'This examination is not available. Check the code with your teacher.'
+              : (e?.message ?? 'Could not load examination'),
+          );
           setPhase('unavailable');
         }
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [code]);
-
-  useEffect(() => {
-    if (phase !== 'exam' || secondsLeft <= 0) return;
-    const t = window.setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
-    return () => window.clearTimeout(t);
-  }, [phase, secondsLeft]);
 
   const doLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,8 +86,14 @@ export const ExaminationPage = () => {
     setError(null);
     try {
       const me = await login(identity.trim(), password);
-      setUserId(me.id);
-      setPhase('exam');
+      if (!exam) return;
+      // Store exam payload + userId in sessionStorage so ExamRoomPage can pick it up
+      sessionStorage.setItem(
+        `exam_session_${code}`,
+        JSON.stringify({ exam, userId: me.id, startedAt: Date.now() }),
+      );
+      // Hard navigate so ExamRoomPage mounts fresh (prevents back-button to login mid-exam)
+      window.location.href = ROUTES.examinationRoom.replace(':code', code);
     } catch (err: any) {
       setError(err?.message ?? 'Sign-in failed. Use your email or admission no.');
     } finally {
@@ -116,189 +101,174 @@ export const ExaminationPage = () => {
     }
   };
 
-  const submit = async () => {
-    if (!exam || busy || !userId) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const questionAttempts = exam.questions.map((q) => {
-        if (q.type === 'FILL_IN_THE_BLANK') {
-          const text = (typed[q.id] ?? '').trim();
-          return { questionId: q.id, visited: true, attempted: text.length > 0, options: [], userOption: null, userTextAnswer: text };
-        }
-        const idx = picked[q.id] ?? null;
-        return { questionId: q.id, visited: true, attempted: idx !== null, options: optionsByQ[q.id] ?? [], userOption: idx, userTextAnswer: null };
-      });
-      // userId is resolved server-side from the session token.
-      const res = await apiPost<{ overallScore: number; attempted_questions: number; total_questions: number }>('/results', {
-        userId,
-        examId: exam.id,
-        attempted_questions: questionAttempts.filter((a) => a.attempted).length,
-        total_questions: exam.questions.length,
-        questionAttempts,
-      });
-      setResult({ overallScore: res.data.overallScore, attempted: res.data.attempted_questions, total: res.data.total_questions });
-      setPhase('done');
-      window.scrollTo({ top: 0 });
-    } catch (err: any) {
-      setError(err?.message ?? 'Submit failed. Try again.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  useEffect(() => {
-    if (phase === 'exam' && secondsLeft === 0 && exam && exam.questions.length > 0 && !result) {
-      submit();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [secondsLeft]);
-
-  const inputClass = 'mt-2 min-h-12 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500';
+  // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <>
       <PageMetadata
         title={exam ? exam.exam_name : 'Examination'}
-        description={exam ? `Sit ${exam.exam_name} online — answer and submit before time runs out.` : 'Online examination.'}
+        description={
+          exam
+            ? `Sit ${exam.exam_name} online — answer and submit before time runs out.`
+            : 'Online examination.'
+        }
       />
-      <div className="flex min-h-screen flex-col bg-cream font-sans text-ink">
-        <header className="border-b border-line bg-brand-900 text-white">
-          <div className="mx-auto flex min-h-[60px] w-full max-w-3xl items-center gap-3 px-4 sm:px-6">
-            <img src="/logo.png" alt="Learnwithuncletee" className="h-9 w-9 rounded-full border border-white/20 object-cover" />
-            <span className="font-display text-sm font-extrabold leading-tight">
-              Learnwithuncletee
-              <span className="block text-[10px] font-semibold uppercase tracking-widest text-lime-accent">Online examination</span>
-            </span>
-            <span className="ml-auto rounded bg-white/10 px-3 py-1.5 font-mono text-xs font-bold tracking-widest">
-              {code.toUpperCase()}
-            </span>
+
+      <main className="grid min-h-screen lg:grid-cols-[1.05fr_.95fr]">
+
+        {/* ── Left hero panel ── */}
+        <section
+          className="relative isolate flex min-h-[340px] items-end overflow-hidden bg-brand-900 p-7 text-white sm:p-12 lg:min-h-screen lg:p-16"
+          style={{
+            backgroundImage:
+              'linear-gradient(0deg,rgba(4,46,26,.92),rgba(4,58,33,.25)),url(/school.JPG)',
+            backgroundPosition: 'center',
+            backgroundSize: 'cover',
+          }}
+        >
+          <div className="relative max-w-xl">
+            <Link to={ROUTES.home} className="mb-10 inline-flex items-center gap-3">
+              <img src="/logo.png" alt="" className="h-12 w-12 rounded-full object-cover" />
+              <span className="font-extrabold">{siteInfo.name}</span>
+            </Link>
+            <p className="text-xs font-bold uppercase tracking-[.18em] text-lime-accent">
+              Online examination
+            </p>
+            <h1 className="mt-4 text-4xl font-extrabold sm:text-5xl">
+              {exam ? exam.exam_name : 'Online Examination'}
+            </h1>
+            <p className="mt-4 max-w-lg leading-relaxed text-white/80">
+              {exam
+                ? `${exam.questions.length} question${exam.questions.length !== 1 ? 's' : ''} · ${exam.minutes} minutes. Sign in with your school credentials to begin.`
+                : 'Enter your examination code to access your assigned test.'}
+            </p>
+            {exam && phase !== 'done' && (
+              <p className="mt-5 inline-flex items-center gap-2 rounded bg-white/10 px-4 py-2 font-mono text-sm font-bold tracking-widest text-lime-accent">
+                CODE: {code.toUpperCase()}
+              </p>
+            )}
           </div>
-        </header>
-        <main className="flex-1">
-          <section className="py-10 sm:py-14">
-            <Container>
-              <div className="mx-auto max-w-3xl">
+        </section>
 
-            {phase === 'loading' && (
-              <div className="space-y-3" aria-label="Loading">
-                {[0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded bg-white" />)}
-              </div>
-            )}
+        {/* ── Right form panel ── */}
+        <section className="flex items-center justify-center px-5 py-12 sm:px-10">
+          <div className="w-full max-w-md">
 
-            {phase === 'unavailable' && (
-              <div className="border border-line bg-white p-8 text-center">
-                <p className="text-xs font-bold uppercase tracking-widest text-brand-700">Unavailable</p>
-                <h1 className="mt-3 font-display text-2xl font-extrabold">Examination not found</h1>
-                <p className="mx-auto mt-2 max-w-md text-sm text-muted">{error ?? 'Check the code with your teacher.'}</p>
-                <Link to={ROUTES.home} className="mt-6 inline-flex min-h-11 items-center rounded bg-brand-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
-                  <ChevronLeft aria-hidden="true" size={16} className="mr-1" /> Back home
-                </Link>
-              </div>
-            )}
+            <Link
+              to={ROUTES.home}
+              className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-500"
+            >
+              <ChevronLeft aria-hidden="true" size={16} />
+              Back to website
+            </Link>
 
-            {phase === 'login' && exam && (
-              <div className="border border-line bg-white p-6 sm:p-8">
-                <p className="text-xs font-bold uppercase tracking-widest text-brand-700">Online examination · Code {code.toUpperCase()}</p>
-                <h1 className="mt-2 font-display text-2xl font-extrabold sm:text-3xl">{exam.exam_name}</h1>
-                <p className="mt-2 text-sm text-muted">{exam.questions.length} question(s) · {exam.minutes} minutes. Sign in with your email or admission no to begin.</p>
-                <form onSubmit={doLogin} className="mt-6 space-y-4">
-                  <label className="block text-sm font-semibold">Email or admission no
-                    <input value={identity} onChange={(e) => setIdentity(e.target.value)} required placeholder="you@example.com or LWU/2024/0312" autoComplete="username" className={inputClass} />
-                  </label>
-                  <label className="block text-sm font-semibold">Password
-                    <input value={password} onChange={(e) => setPassword(e.target.value)} required type="password" autoComplete="current-password" className={inputClass} />
-                  </label>
-                  {error && <p role="alert" className="border-l-2 border-rose-400 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</p>}
-                  <button type="submit" disabled={busy} className="min-h-12 w-full rounded bg-brand-500 px-5 py-3 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
-                    {busy ? 'Signing in…' : 'Start examination'}
-                  </button>
-                </form>
-              </div>
-            )}
+            <div className="mt-10 w-full max-w-md rounded border border-line bg-cream px-4 pb-10">
 
-            {phase === 'exam' && exam && (
-              <div className="space-y-5">
-                <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border border-line bg-white px-5 py-4">
-                  <div>
-                    <h1 className="font-display text-lg font-extrabold">{exam.exam_name}</h1>
-                    <p className="text-xs text-muted">{exam.questions.length} questions</p>
+              {/* Loading skeleton */}
+              {phase === 'loading' && (
+                <>
+                  <p className="mt-6 text-xs font-bold uppercase tracking-widest text-brand-700">Please wait</p>
+                  <h2 className="mt-3 text-3xl font-extrabold">Loading examination…</h2>
+                  <div className="mt-8 animate-pulse space-y-5" aria-label="Loading">
+                    <div className="h-12 rounded bg-brand-50" />
+                    <div className="h-12 rounded bg-brand-50" />
+                    <div className="h-12 rounded bg-brand-500/40" />
                   </div>
-                  <p className={`inline-flex items-center gap-2 rounded px-3 py-2 font-mono text-sm font-bold ${secondsLeft < 300 ? 'bg-rose-50 text-rose-700' : 'bg-brand-50 text-brand-700'}`} role="timer" aria-label="Time remaining">
-                    <Clock size={15} aria-hidden="true" /> {fmtTime(secondsLeft)}
+                </>
+              )}
+
+              {/* Unavailable */}
+              {phase === 'unavailable' && (
+                <>
+                  <p className="mt-6 text-xs font-bold uppercase tracking-widest text-brand-700">Unavailable</p>
+                  <h2 className="mt-3 text-3xl font-extrabold">Examination not found</h2>
+                  <p className="mt-2 text-sm leading-relaxed text-muted">
+                    {error ?? 'Check the code with your teacher.'}
                   </p>
-                </div>
+                  <Link
+                    to={ROUTES.home}
+                    className="mt-8 inline-flex min-h-12 w-full items-center justify-center rounded bg-brand-900 px-5 py-3 text-sm font-bold text-white hover:bg-brand-700"
+                  >
+                    <ChevronLeft aria-hidden="true" size={16} className="mr-1" /> Back home
+                  </Link>
+                </>
+              )}
 
-                {exam.questions.map((q, i) => (
-                  <article key={q.id} className="border border-line bg-white p-5 sm:p-6">
-                    <p className="text-xs font-bold uppercase tracking-widest text-brand-700">Question {i + 1} · {q.type.replace(/_/g, ' ')}</p>
-                    <div className="mt-2 font-display text-base font-extrabold">
-                      <Suspense fallback={<div className="h-6 animate-pulse rounded bg-brand-50" />}>
-                        <NewsContent markdown={q.question} />
-                      </Suspense>
-                    </div>
-                    {q.type === 'FILL_IN_THE_BLANK' ? (
+              {/* Login */}
+              {phase === 'login' && exam && (
+                <>
+                  <p className="mt-6 text-xs font-bold uppercase tracking-widest text-brand-700">Secure access</p>
+                  <h2 className="mt-3 text-3xl font-extrabold">Sign in to begin</h2>
+                  <p className="mt-2 text-sm leading-relaxed text-muted">
+                    Sign in with the credentials provided by your school.
+                  </p>
+
+                  <form onSubmit={doLogin} className="mt-8 space-y-5">
+                    <label className="block text-sm font-semibold">
+                      Email address / Admission No
                       <input
-                        value={typed[q.id] ?? ''}
-                        onChange={(e) => setTyped({ ...typed, [q.id]: e.target.value })}
-                        placeholder="Type your answer…"
-                        aria-label={`Answer for question ${i + 1}`}
-                        className="mt-4 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500"
+                        value={identity}
+                        onChange={(e) => setIdentity(e.target.value)}
+                        required
+                        placeholder="you@example.com or XXXX/2024/0312"
+                        autoComplete="username"
+                        className={inputClass}
                       />
-                    ) : (
-                      <div className="mt-4 space-y-2" role="radiogroup" aria-label={`Options for question ${i + 1}`}>
-                        {(optionsByQ[q.id] ?? []).map((opt, oi) => (
-                          <label
-                            key={oi}
-                            className={`flex cursor-pointer items-center gap-3 rounded border px-4 py-3 text-sm transition-colors ${
-                              picked[q.id] === oi ? 'border-brand-500 bg-brand-50 font-bold text-brand-800' : 'border-line hover:border-brand-500'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name={`q-${q.id}`}
-                              checked={picked[q.id] === oi}
-                              onChange={() => setPicked({ ...picked, [q.id]: oi })}
-                              className="h-4 w-4 accent-brand-700"
-                            />
-                            {opt}
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </article>
-                ))}
+                    </label>
+                    <label className="block text-sm font-semibold">
+                      Password
+                      <input
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        type="password"
+                        autoComplete="current-password"
+                        className={inputClass}
+                      />
+                    </label>
 
-                {error && <p role="alert" className="border-l-2 border-rose-400 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</p>}
-                <button
-                  type="button"
-                  onClick={submit}
-                  disabled={busy}
-                  className="inline-flex min-h-12 w-full items-center justify-center rounded bg-brand-500 px-5 py-3 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60"
-                >
-                  <Send aria-hidden="true" size={16} className="mr-2" /> {busy ? 'Submitting…' : 'Submit answers'}
-                </button>
-              </div>
-            )}
+                    <button
+                      type="submit"
+                      disabled={busy}
+                      className="min-h-12 w-full rounded bg-brand-500 px-5 py-3 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60"
+                    >
+                      {busy ? 'Signing in…' : 'Start examination'}
+                    </button>
+                  </form>
 
-            {phase === 'done' && result && (
-              <div className="border border-line bg-white p-8 text-center sm:p-12">
-                <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-brand-700">
-                  <CheckCircle2 size={26} aria-hidden="true" />
-                </span>
-                <h1 className="mt-4 font-display text-2xl font-extrabold">Submitted</h1>
-                <p className="mt-2 font-display text-5xl font-extrabold text-brand-700">{result.overallScore}%</p>
-                <p className="mt-2 text-sm text-muted">You attempted {result.attempted} of {result.total} questions. Your teacher can see this in test Results.</p>
-                <Link to={ROUTES.home} className="mt-6 inline-flex min-h-11 items-center rounded bg-brand-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
-                  <ChevronLeft aria-hidden="true" size={16} className="mr-1" /> Back home
-                </Link>
-              </div>
-            )}
+                  {error && (
+                    <p role="alert" className="mt-4 border-l-2 border-rose-400 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                      {error}
+                    </p>
+                  )}
+                </>
+              )}
+
+              {/* Done — result returned from exam room via sessionStorage */}
+              {phase === 'done' && result && (
+                <div className="mt-8 text-center">
+                  <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-brand-700">
+                    <CheckCircle2 size={26} aria-hidden="true" />
+                  </span>
+                  <p className="mt-6 text-xs font-bold uppercase tracking-widest text-brand-700">Examination complete</p>
+                  <h2 className="mt-3 text-3xl font-extrabold">Submitted!</h2>
+                  <p className="mt-4 font-display text-6xl font-extrabold text-brand-700">{result.overallScore}%</p>
+                  <p className="mt-3 text-sm leading-relaxed text-muted">
+                    You attempted {result.attempted} of {result.total} questions. Your teacher can see this in test Results.
+                  </p>
+                  <Link
+                    to={ROUTES.home}
+                    className="mt-8 inline-flex min-h-12 w-full items-center justify-center rounded bg-brand-900 px-5 py-3 text-sm font-bold text-white hover:bg-brand-700"
+                  >
+                    <ChevronLeft aria-hidden="true" size={16} className="mr-1" /> Back home
+                  </Link>
+                </div>
+              )}
+
+            </div>
           </div>
-        </Container>
-          </section>
-        </main>
-      </div>
+        </section>
+      </main>
     </>
   );
 };

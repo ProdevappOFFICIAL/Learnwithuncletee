@@ -92,12 +92,17 @@ export const NewsDetailPage = () => {
   };
 
   const copyLink = async () => {
-    const url = window.location.href;
+    // Copy the OG-preview URL so social bots can see the banner + title.
+    // Human recipients are instantly redirected to the real article page.
+    const apiBase = (import.meta as any).env?.VITE_API_URL ?? 'https://api.learnwithuncletee.org';
+    const shareUrl = id
+      ? `${apiBase}/api/og/news/${id}`
+      : window.location.href;
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(shareUrl);
     } catch {
       const ta = document.createElement('textarea');
-      ta.value = url;
+      ta.value = shareUrl;
       document.body.append(ta);
       ta.select();
       document.execCommand('copy');
@@ -106,6 +111,7 @@ export const NewsDetailPage = () => {
     setCopied(true);
     window.setTimeout(() => setCopied(false), 2000);
   };
+
 
   return (
     <Layout>
@@ -116,7 +122,40 @@ export const NewsDetailPage = () => {
           image={article.coverUrl ?? '/school.JPG'}
           type="article"
           publishedTime={article.createdAt}
+          modifiedTime={article.updatedAt ?? article.createdAt}
           section={article.category}
+          tags={article.category}
+          author="Learnwithuncletee"
+          jsonLd={[
+            {
+              '@context': 'https://schema.org',
+              '@type': 'NewsArticle',
+              headline: article.title,
+              description: article.description || plainExcerpt(article.body),
+              image: [article.coverUrl ?? `${typeof window !== 'undefined' ? window.location.origin : ''}/school.JPG`],
+              datePublished: article.createdAt,
+              dateModified: article.updatedAt ?? article.createdAt,
+              author: [{ '@type': 'Organization', name: 'Learnwithuncletee', url: 'https://learnwithuncletee.org' }],
+              publisher: {
+                '@type': 'Organization',
+                name: 'Learnwithuncletee',
+                logo: { '@type': 'ImageObject', url: 'https://learnwithuncletee.org/logo.png' },
+              },
+              url: typeof window !== 'undefined' ? window.location.href : '',
+              articleSection: article.category,
+              inLanguage: 'en-NG',
+              isAccessibleForFree: true,
+            },
+            {
+              '@context': 'https://schema.org',
+              '@type': 'BreadcrumbList',
+              itemListElement: [
+                { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://learnwithuncletee.org' },
+                { '@type': 'ListItem', position: 2, name: 'News', item: 'https://learnwithuncletee.org/news' },
+                { '@type': 'ListItem', position: 3, name: article.title, item: typeof window !== 'undefined' ? window.location.href : '' },
+              ],
+            },
+          ]}
         />
       )}
 
