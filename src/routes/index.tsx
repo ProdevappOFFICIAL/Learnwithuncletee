@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { ROUTES } from './paths';
+import { RequireAuth, RequireRole } from './guards';
 import { HomePage } from '@/pages/HomePage';
 import { AboutPage } from '@/pages/AboutPage';
 import { AcademicsPage } from '@/pages/AcademicsPage';
@@ -71,32 +72,57 @@ export const router = createBrowserRouter([
   { path: ROUTES.dashboard, element: <DashboardIndexPage /> },
   {
     path: ROUTES.studentDashboard,
-    element: <DashboardLayout role="student" nav={studentNav} />,
+    element: <RequireAuth />,
     children: [
-      { index: true, element: <StudentDashboardPage /> },
-      { path: 'fees', element: <StudentFeesPage /> },
-      { path: 'results', element: <StudentResultsPage /> },
-      { path: 'assignments', element: <StudentAssignmentsPage /> },
-      { path: 'virtual-class', element: <StudentVirtualClassPage /> },
+      {
+        element: (
+          <RequireRole allow={['STUDENT', 'PARENT']}>
+            <DashboardLayout role="student" nav={studentNav} />
+          </RequireRole>
+        ),
+        children: [
+          { index: true, element: <StudentDashboardPage /> },
+          { path: 'fees', element: <StudentFeesPage /> },
+          { path: 'results', element: <StudentResultsPage /> },
+          { path: 'assignments', element: <StudentAssignmentsPage /> },
+          { path: 'virtual-class', element: <StudentVirtualClassPage /> },
+        ],
+      },
     ],
   },
   {
     path: ROUTES.teacherDashboard,
-    element: <DashboardLayout role="teacher" nav={teacherNav} />,
+    element: <RequireAuth />,
     children: [
-      { index: true, element: <TeacherDashboardPage /> },
-      { path: 'attendance', element: <TeacherAttendancePage /> },
-      { path: 'attendance', element: <TeacherAttendancePage /> },
-      { path: 'assignments', element: <TeacherAssignmentsPage /> },
-      { path: 'results', element: <TeacherResultsPage /> },
-      { path: 'classes', element: <TeacherClassesPage /> },
-      { path: 'courses/questions', element: <TeacherCourseQuestionsPage /> },
+      {
+        element: (
+          <RequireRole allow={['TEACHER']}>
+            <DashboardLayout role="teacher" nav={teacherNav} />
+          </RequireRole>
+        ),
+        children: [
+          { index: true, element: <TeacherDashboardPage /> },
+          { path: 'attendance', element: <TeacherAttendancePage /> },
+          { path: 'attendance', element: <TeacherAttendancePage /> },
+          { path: 'assignments', element: <TeacherAssignmentsPage /> },
+          { path: 'results', element: <TeacherResultsPage /> },
+          { path: 'classes', element: <TeacherClassesPage /> },
+          { path: 'courses/questions', element: <TeacherCourseQuestionsPage /> },
+        ],
+      },
     ],
   },
   {
     path: ROUTES.adminDashboard,
-    element: <DashboardLayout role="admin" nav={adminNav} />,
+    element: <RequireAuth />,
     children: [
+      {
+        element: (
+          <RequireRole allow={['ADMIN', 'OWNER']}>
+            <DashboardLayout role="admin" nav={adminNav} />
+          </RequireRole>
+        ),
+        children: [
       { index: true, element: <AdminDashboardPage /> },
       { path: 'members', element: <AdminMembersPage /> },
       { path: 'students', element: <AdminStudentsPage /> },
@@ -125,6 +151,8 @@ export const router = createBrowserRouter([
   { path: 'website/:section', element: <WebsiteSectionPage /> },
       { path: 'settings', element: <AdminSettingsPage /> },
       { path: 'audit-log', element: <AdminAuditLogPage /> },
+        ],
+      },
     ],
   },
   // Back-compat alias: /admin/student -> /dashboard/student

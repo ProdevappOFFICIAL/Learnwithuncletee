@@ -1,5 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { api, apiPost, tokenStore } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
+import { api, apiPost, tokenStore, SESSION_KEY } from '@/lib/api';
+import { queryClient } from '@/lib/queryClient';
+
 
 /** Preferred avatar: role profile photo first, then account image. */
 export const avatarOf = (user: Pick<SessionUser, 'img' | 'student' | 'teacher'> | null | undefined) =>
@@ -41,58 +44,59 @@ export const AuthCtx = createContext<AuthState>({
 
 export const useAuth = () => useContext(AuthCtx);
 
-async function fetchMe(): Promise<SessionUser> {
-  const { data } = await api<SessionUser>('/dashboard/me');
-  return data;
+async function fetchMe(): Promise<SessionUser | null> {
+  // Always attempt: even with no stored access token, the HttpOnly refresh
+  // cookie may still hold a session — the api layer attempts one silent
+  // refresh on 401 before giving up.
+  try {
+    const { data } = await api<SessionUser>('/dashboard/me');
+    return data ?? null;
+  } catch (e: any) {
+    if (e?.status === 401) return null;
+    throw e;
+  }
 }
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<SessionUser | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const refresh = useCallback(async () => {
-    if (!tokenStore.get()) {
-      setLoading(false);
-      return;
-    }
-    try {
-      setUser(await fetchMe());
-      setError(null);
-    } catch (e: any) {
-      if (e?.status === 401) tokenStore.clear();
-      setError(e?.message ?? 'Session expired');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  const {
+    data: user = null,
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: SESSION_KEY,
+    queryFn: fetchMe,
+    // Don't retry: a 401 already went through the single refresh attempt.
+    retry: false,
+    // Revalidate a stale session when the tab regains focus.
+    refetchOnWindowFocus: true,
+  });
 
   const login = useCallback(async (identity: string, password: string, opts?: { remember?: boolean }) => {
-    // Backend login accepts user_email today; student/staff codes are
-    // resolved profile-side after sign-in (see api-docs § Auth).
     const { data } = await apiPost<{ user: any; accessToken: string }>('/auth/login', {
       user_email: identity,
       user_password: password,
     });
     tokenStore.set(data.accessToken, opts?.remember ?? true);
     const me = await fetchMe();
-    setUser(me);
-    setError(null);
+    if (!me) throw new Error('Sign-in succeeded but the session could not be verified.');
+    // Instant UI: seed the cache so protected routes render without a flash.
+    queryClient.setQueryData(SESSION_KEY, me);
     return me;
   }, []);
 
   const logout = useCallback(async () => {
     try {
-      await apiPost('/auth/logout');
+      // No auth header needed: backend revokes by refresh cookie.
+      await apiPost('/auth/logout', {});
     } catch {
       /* still clear locally */
     }
     tokenStore.clear();
-    setUser(null);
+    queryClient.removeQueries({ queryKey: SESSION_KEY });
+  }, []);
+
+  const refresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: SESSION_KEY });
   }, []);
 
   const can = useCallback(
@@ -105,8 +109,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   );
 
   const value = useMemo(
-    () => ({ user, loading, error, login, logout, refresh, can }),
-    [user, loading, error, login, logout, refresh, can],
+    () => ({ user, loading, error: queryError ? 'Session expired' : null, login, logout, refresh, can }),
+    [user, loading, queryError, login, logout, refresh, can],
   );
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;

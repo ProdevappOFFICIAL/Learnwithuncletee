@@ -435,6 +435,7 @@ export const DashboardLayout = ({ role, nav }: Props) => {
 
   return (
     <div className="flex min-h-screen bg-cream font-sans text-ink">
+      
       {/* Desktop sidebar */}
       <aside
         className={`sticky top-0 hidden h-screen shrink-0 transition-[width] duration-200 lg:block ${

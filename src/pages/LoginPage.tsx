@@ -4,7 +4,7 @@ import { ROUTES } from '@/routes/paths';
 import { siteInfo } from '@/data/content';
 import { PageMetadata } from '@/components/ui/PageMetadata';
 import { ChevronLeft } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, avatarOf } from '@/context/AuthContext';
 import { apiPost } from '@/lib/api';
 
 const inputClass = 'mt-2 min-h-12 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100';
@@ -23,7 +23,7 @@ export const LoginPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const { login } = useAuth();
+  const { login, logout, user, loading: sessionLoading } = useAuth();
   const navigate = useNavigate();
 
   const switchMode = (m: Mode) => {
@@ -124,7 +124,48 @@ export const LoginPage = () => {
                 : 'Enter your account email or ID and contact the school office to complete recovery.'}
           </p>
 
-          {mode === 'signup' ? (
+          {sessionLoading ? (
+            <div className="mt-8 animate-pulse space-y-5" aria-label="Checking session">
+              <div className="h-12 rounded bg-brand-50" />
+              <div className="h-12 rounded bg-brand-50" />
+              <div className="h-12 rounded bg-brand-500/40" />
+            </div>
+          ) : user && mode === 'login' ? (
+            <div className="mt-8 space-y-4">
+              <button
+                type="button"
+                onClick={() => navigate(homeForRole(user.role))}
+                className="flex w-full items-center gap-4 rounded border border-line bg-white p-4 text-left transition-colors hover:border-brand-500"
+              >
+                {avatarOf(user) ? (
+                  <img src={avatarOf(user) as string} alt="" className="h-12 w-12 rounded-full object-cover" />
+                ) : (
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-900 text-sm font-extrabold text-lime-accent">
+                    {user.user_name
+                      .split(' ')
+                      .map((p) => p.replace('.', '')[0])
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .join('')
+                      .toUpperCase() || 'LW'}
+                  </span>
+                )}
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-brand-700">Continue as {user.user_email}</span>
+                  <span className="block truncate text-xs text-muted">
+                    {user.user_name} · {user.role.charAt(0) + user.role.slice(1).toLowerCase()}
+                  </span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => logout()}
+                className="w-full text-center text-sm font-semibold text-brand-700 underline underline-offset-4"
+              >
+                Use a different account
+              </button>
+            </div>
+          ) : mode === 'signup' ? (
             <form className="mt-8 space-y-5" onSubmit={handleSignup}>
               <label className="block text-sm font-semibold">Full name<input className={inputClass} name="user_name" autoComplete="name" required placeholder="e.g. Daniel E." /></label>
               <label className="block text-sm font-semibold">Email address<input className={inputClass} name="user_email" type="email" autoComplete="email" required placeholder="you@example.com" /></label>
