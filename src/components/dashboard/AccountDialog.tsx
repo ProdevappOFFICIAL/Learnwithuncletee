@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Bell, KeyRound, MonitorSmartphone, UserRound, X } from 'lucide-react';
+import { Bell, KeyRound, MonitorSmartphone, Smartphone, UserRound, X } from 'lucide-react';
 import { avatarOf, useAuth } from '@/context/AuthContext';
 import { apiDelete, apiGet, apiPatch, apiPut } from '@/lib/api';
 import { UploadButton } from '@/lib/uploadthing';
@@ -274,11 +274,23 @@ export const AccountDialog = ({ open, onClose }: { open: boolean; onClose: () =>
                     <ul className="divide-y divide-line border border-line">
                       {sessions.map((s) => (
                         <li key={s.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                          <div>
-                            <p className="text-sm font-bold">{s.deviceName || s.deviceType}</p>
+                          <div className="flex min-w-0 items-center gap-3">
+                            {String(s.deviceType ?? '').toLowerCase() === 'desktop' ? (
+                              <MonitorSmartphone size={18} aria-hidden="true" className="shrink-0 text-brand-700" />
+                            ) : (
+                              <Smartphone size={18} aria-hidden="true" className="shrink-0 text-muted" />
+                            )}
+                            <div className="min-w-0">
+                            <p className="flex items-center gap-2 text-sm font-bold">
+                              {s.deviceName || s.deviceType}
+                              {String(s.deviceType ?? '').toLowerCase() === 'desktop' && (
+                                <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-brand-700">Desktop app</span>
+                              )}
+                            </p>
                             <p className="text-xs text-muted">Last used {new Date(s.lastUsedAt).toLocaleString()}</p>
+                            </div>
                           </div>
-                          <button type="button" onClick={() => revokeSession(s.id)} className="rounded border border-line px-3 py-1.5 text-xs font-bold text-rose-700 hover:border-rose-300">
+                          <button type="button" onClick={() => revokeSession(s.id)} className="shrink-0 rounded border border-line px-3 py-1.5 text-xs font-bold text-rose-700 hover:border-rose-300">
                             Revoke
                           </button>
                         </li>

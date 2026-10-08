@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, Modal, PageHeader, Pill, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
 import { useAuth, useResource } from '@/context/AuthContext';
-import { apiDelete, apiPatch, apiPost, formatNaira } from '@/lib/api';
+import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { UploadButton } from '@/lib/uploadthing';
-import type { ClassItem, CombinationItem, StudentRow } from '@/data/dashboard';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import type { ClassItem, CombinationItem, DisciplineActionItem, ResultDocItem, StudentRow } from '@/data/dashboard';
+import { FileText, Gavel, Pencil, Plus, Trash2 } from 'lucide-react';
 
 interface PendingUser {
   id: string;
@@ -15,7 +16,22 @@ interface PendingUser {
   createdAt: string;
 }
 
-//const inputClass = 'mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500';
+// ─── Caching strategy ─────────────────────────────────────────────────────────
+// staleTime 5 min (directory changes rarely) + gcTime 30 min (back/forward is
+// instant) + keepPreviousData (page turns reuse old rows, no flash) +
+// prefetch of adjacent pages + targeted invalidation on every mutation.
+
+const PAGE_SIZE = 10;
+const LIST_STALE = 5 * 60 * 1000;
+const LIST_GC = 30 * 60 * 1000;
+
+const fetchStudents = (search: string, classId: string, page: number) =>
+  apiGet<StudentRow[]>('/students', {
+    search: search || undefined,
+    classId: classId || undefined,
+    page,
+    limit: PAGE_SIZE,
+  });
 
 const PendingApprovals = () => {
   const { can } = useAuth();
@@ -68,6 +84,202 @@ const PendingApprovals = () => {
   );
 };
 
+const initialsOf = (name: string) =>
+  name.split(' ').map((p) => p.replace('.', '')[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'LW';
+
+/** Pupil photo with initials fallback. */
+export const PupilPhoto = ({ row, size = 'h-10 w-10' }: { row: Pick<StudentRow, 'user_name' | 'img' | 'student'>; size?: string }) => {
+  const src = row.student?.photoUrl || row.img || null;
+  if (src) return <img src={src} alt="" className={`${size} shrink-0 rounded-full border border-line object-cover`} />;
+  return (
+    <span className={`flex ${size} shrink-0 items-center justify-center rounded-full bg-brand-900 text-xs font-extrabold text-lime-accent`}>
+      {initialsOf(row.user_name)}
+    </span>
+  );
+};
+
+/** Uploaded result sheets belonging to one pupil. */
+const PupilResults = ({ row, onClose }: { row: StudentRow; onClose: () => void }) => {
+  const docs = useQuery({
+    queryKey: ['student-results', row.id],
+    queryFn: () => apiGet<ResultDocItem[]>('/result-documents', { studentId: row.id }),
+    staleTime: LIST_STALE,
+    gcTime: LIST_GC,
+  });
+  const list = docs.data?.data ?? [];
+
+  return (
+    <Modal open onClose={onClose} title={`Results — ${row.user_name}`}>
+      {docs.isPending ? (
+        <LoadingSkeleton rows={3} />
+      ) : docs.isError || !docs.data ? (
+        <ErrorState message="Could not load results" onRetry={() => docs.refetch()} />
+      ) : list.length === 0 ? (
+        <EmptyState message="No uploaded results for this pupil yet." />
+      ) : (
+        <ul className="divide-y divide-line">
+          {list.map((d) => (
+            <li key={d.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <FileText aria-hidden="true" size={18} className="shrink-0 text-brand-700" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold">{d.title}</p>
+                  <p className="text-xs text-muted">
+                    {[d.subject, d.session, d.term].filter(Boolean).join(' · ')}
+                    {' · '}{new Date(d.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+              <a href={d.fileUrl} target="_blank" rel="noreferrer" className="rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">
+                Open PDF
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Modal>
+  );
+};
+
+const DISCIPLINE_PRESETS = ['Warning', 'Detention', 'Suspension', 'Advise to withdraw', 'Repeat class', 'Expulsion', 'Community service'];
+
+const disciplineTone = (action: string) =>
+  ['Suspension', 'Expulsion', 'Advise to withdraw'].includes(action) ? 'rose' : action === 'Warning' || action === 'Detention' ? 'amber' : 'ink';
+
+/** Discipline history + record-a-new-action, per pupil. */
+const PupilDiscipline = ({ row, onClose }: { row: StudentRow; onClose: () => void }) => {
+  const qc = useQueryClient();
+  const key = ['discipline', row.id] as const;
+  const history = useQuery({
+    queryKey: key,
+    queryFn: () => apiGet<DisciplineActionItem[]>('/discipline', { studentId: row.id }),
+    staleTime: 60 * 1000,
+    gcTime: LIST_GC,
+  });
+  const [action, setAction] = useState(DISCIPLINE_PRESETS[0]);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const list = history.data?.data ?? [];
+  const refresh = () => qc.invalidateQueries({ queryKey: key });
+
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!action.trim()) {
+      setMsg('Pick or type an action.');
+      return;
+    }
+    setBusy('add');
+    setMsg(null);
+    try {
+      await apiPost('/discipline', { studentId: row.id, action: action.trim(), reason: reason.trim() || undefined });
+      setAction(DISCIPLINE_PRESETS[0]);
+      setReason('');
+      setMsg('Action recorded.');
+      refresh();
+    } catch (err: any) {
+      setMsg(err?.message ?? 'Could not record action');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const lift = async (id: string) => {
+    setBusy(id);
+    try {
+      await apiPatch(`/discipline/${id}/lift`);
+      refresh();
+    } catch (err: any) {
+      setMsg(err?.message ?? 'Could not lift action');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const del = async (id: string) => {
+    if (!confirm('Delete this discipline record? This cannot be undone.')) return;
+    setBusy(id);
+    try {
+      await apiDelete(`/discipline/${id}`);
+      refresh();
+    } catch (err: any) {
+      setMsg(err?.message ?? 'Could not delete record');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title={`Discipline — ${row.user_name}`}>
+      <form onSubmit={add} className="space-y-3 border-b border-line pb-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-sm font-semibold">Action
+            <input
+              value={action}
+              onChange={(e) => setAction(e.target.value)}
+              list="discipline-presets"
+              placeholder="e.g. Suspension"
+              className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500"
+            />
+            <datalist id="discipline-presets">
+              {DISCIPLINE_PRESETS.map((p) => <option key={p} value={p} />)}
+            </datalist>
+          </label>
+          <label className="block text-sm font-semibold">Reason
+            <input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Why is this action taken?"
+              className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500"
+            />
+          </label>
+        </div>
+        <button type="submit" disabled={busy === 'add'} className="min-h-11 rounded bg-brand-500 px-5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
+          {busy === 'add' ? 'Recording…' : 'Record action'}
+        </button>
+      </form>
+      {msg && <p role="status" className="mt-3 border-l-2 border-lime-accent bg-brand-50 px-4 py-2 text-sm text-brand-800">{msg}</p>}
+      <div className="mt-3">
+        {history.isPending ? (
+          <LoadingSkeleton rows={3} />
+        ) : history.isError ? (
+          <ErrorState message="Could not load history" onRetry={() => history.refetch()} />
+        ) : list.length === 0 ? (
+          <EmptyState message="No discipline records for this pupil." />
+        ) : (
+          <ul className="divide-y divide-line">
+            {list.map((d) => (
+              <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
+                <div>
+                  <p className="flex flex-wrap items-center gap-2 text-sm font-bold">
+                    {d.action}
+                    <Pill tone={d.status === 'LIFTED' ? 'emerald' : disciplineTone(d.action) as any}>
+                      {d.status === 'LIFTED' ? 'Lifted' : 'Active'}
+                    </Pill>
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted">
+                    {[d.reason, d.creator?.user_name ? `by ${d.creator.user_name}` : null, new Date(d.createdAt).toLocaleDateString()].filter(Boolean).join(' · ')}
+                  </p>
+                </div>
+                <span className="flex gap-1.5">
+                  {d.status !== 'LIFTED' && (
+                    <button type="button" disabled={busy === d.id} onClick={() => lift(d.id)} className="rounded border border-line px-2.5 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-60">
+                      Lift
+                    </button>
+                  )}
+                  <button type="button" disabled={busy === d.id} onClick={() => del(d.id)} aria-label="Delete record" title="Delete" className="rounded border border-line px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:border-rose-300 disabled:opacity-60">
+                    <Trash2 aria-hidden="true" size={14} />
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Modal>
+  );
+};
+
 interface StudentForm {
   user_name: string;
   user_email: string;
@@ -92,7 +304,41 @@ export const AdminStudentsPage = () => {
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [classFilter, setClassFilter] = useState('');
-  const { data, loading, error, reload } = useResource<StudentRow[]>('/students', { search: query, classId: classFilter || undefined, limit: 50 });
+  const [page, setPage] = useState(1);
+  const qc = useQueryClient();
+
+  const list = useQuery({
+    queryKey: ['admin-students', query, classFilter, page],
+    queryFn: () => fetchStudents(query, classFilter, page),
+    staleTime: LIST_STALE,
+    gcTime: LIST_GC,
+    placeholderData: keepPreviousData,
+  });
+  const rows = list.data?.data ?? [];
+  const total = (list.data?.meta as { total?: number } | undefined)?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+
+  // Prefetch neighbours so Prev/Next feel instant.
+  useEffect(() => {
+    if (safePage < pageCount) {
+      void qc.prefetchQuery({
+        queryKey: ['admin-students', query, classFilter, safePage + 1],
+        queryFn: () => fetchStudents(query, classFilter, safePage + 1),
+        staleTime: LIST_STALE,
+      });
+    }
+    if (safePage > 1) {
+      void qc.prefetchQuery({
+        queryKey: ['admin-students', query, classFilter, safePage - 1],
+        queryFn: () => fetchStudents(query, classFilter, safePage - 1),
+        staleTime: LIST_STALE,
+      });
+    }
+  }, [qc, query, classFilter, safePage, pageCount]);
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['admin-students'] });
+
   const classes = useResource<ClassItem[]>('/classes');
   const combinations = useResource<CombinationItem[]>('/combinations', { limit: 100 });
 
@@ -103,6 +349,8 @@ export const AdminStudentsPage = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const [resultsRow, setResultsRow] = useState<StudentRow | null>(null);
+  const [disciplineRow, setDisciplineRow] = useState<StudentRow | null>(null);
 
   const openCreate = () => {
     setEditing(null);
@@ -160,7 +408,7 @@ export const AdminStudentsPage = () => {
       }
       setModalOpen(false);
       setEditing(null);
-      reload();
+      invalidate();
     } catch (err: any) {
       setNotice(err?.message ?? 'Save failed');
     } finally {
@@ -173,7 +421,7 @@ export const AdminStudentsPage = () => {
     setRowBusy(row.id);
     try {
       await apiDelete(`/users/${row.id}`);
-      reload();
+      invalidate();
     } catch (err: any) {
       setNotice(err?.message ?? 'Delete failed');
     } finally {
@@ -185,7 +433,7 @@ export const AdminStudentsPage = () => {
     setRowBusy(row.id);
     try {
       await apiPatch(`/students/${row.id}`, { active: !row.active });
-      reload();
+      invalidate();
     } catch (err: any) {
       setNotice(err?.message ?? 'Could not change status');
     } finally {
@@ -209,63 +457,96 @@ export const AdminStudentsPage = () => {
       {notice && !modalOpen && <p role="status" className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
 
       <Card>
-        <CardHead title="Student directory" sub="Search, filter and manage records" />
+        <CardHead title="Student directory" sub={`${total} pupil(s) · search, filter and manage records`} />
         <form
           className="flex flex-wrap gap-2 border-b border-line px-5 py-4"
           onSubmit={(e) => {
             e.preventDefault();
             setQuery(search);
+            setPage(1);
           }}
         >
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, email or admission no…" className="min-h-11 w-full max-w-xs rounded border border-line px-3 text-sm outline-none focus:border-brand-500" />
-          <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)} aria-label="Filter by class" className="min-h-11 rounded border border-line bg-white px-3 text-sm font-semibold">
+          <select value={classFilter} onChange={(e) => { setClassFilter(e.target.value); setPage(1); }} aria-label="Filter by class" className="min-h-11 rounded border border-line bg-white px-3 text-sm font-semibold">
             <option value="">All classes</option>
             {(classes.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <button type="submit" className="min-h-11 rounded bg-brand-900 px-4 text-sm font-bold text-white hover:bg-brand-700">Search</button>
           {(search || classFilter) && (
-            <button type="button" onClick={() => { setSearch(''); setQuery(''); setClassFilter(''); }} className="min-h-11 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">
+            <button type="button" onClick={() => { setSearch(''); setQuery(''); setClassFilter(''); setPage(1); }} className="min-h-11 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">
               Reset
             </button>
           )}
         </form>
-        {loading ? (
+        {list.isPending ? (
           <div className="px-5 py-5"><LoadingSkeleton rows={5} /></div>
-        ) : error || !data ? (
-          <div className="px-5 py-5"><ErrorState message={error ?? 'No data'} onRetry={reload} /></div>
-        ) : data.length === 0 ? (
+        ) : list.isError || !list.data ? (
+          <div className="px-5 py-5"><ErrorState message="Could not load students" onRetry={() => list.refetch()} /></div>
+        ) : rows.length === 0 ? (
           <div className="px-5 py-5"><EmptyState message="No students found. Enroll the first one." /></div>
         ) : (
-          <TableWrap>
-            <table className="w-full min-w-[880px] text-left text-sm">
-              <thead><tr><Th>Pupil</Th><Th>Class</Th><Th>Combination</Th><Th>Balance</Th><Th>Average</Th><Th>Status</Th><Th><span className="sr-only">Actions</span></Th></tr></thead>
-              <tbody>
-                {data.map((r) => (
-                  <tr key={r.id}>
-                    <Td><span className="font-bold">{r.user_name}</span><span className="block text-xs text-muted">{r.student?.studentCode ?? r.user_email}</span></Td>
-                    <Td>{r.student?.className ?? '—'}</Td>
-                    <Td className="text-muted">{r.student?.combination?.name ?? '—'}</Td>
-                    <Td>{(r.balanceKobo ?? 0) > 0 ? <Pill tone="amber">{formatNaira(r.balanceKobo)}</Pill> : <Pill tone="emerald">Clear</Pill>}</Td>
-                    <Td className="font-bold text-brand-700">{r.average !== null && r.average !== undefined ? `${r.average.toFixed(1)}%` : '—'}</Td>
-                    <Td><Pill tone={r.active ? 'emerald' : 'rose'}>{r.active ? 'Active' : 'Inactive'}</Pill></Td>
-                    <Td>
-                      <span className="flex gap-1.5">
-                        <button type="button" onClick={() => openEdit(r)} aria-label={`Edit ${r.user_name}`} title="Edit" className="rounded border border-line px-2.5 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">
-                          <Pencil aria-hidden="true" size={14} />
+          <>
+            <TableWrap>
+              <table className={`w-full min-w-[960px] text-left text-sm transition-opacity ${list.isFetching ? 'opacity-60' : ''}`}>
+                <thead><tr><Th>Photo</Th><Th>Pupil</Th><Th>Class</Th><Th>Combination</Th><Th>Results</Th><Th>Discipline</Th><Th>Status</Th><Th><span className="sr-only">Actions</span></Th></tr></thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.id}>
+                      <Td><PupilPhoto row={r} /></Td>
+                      <Td><span className="font-bold">{r.user_name}</span><span className="block text-xs text-muted">{r.student?.studentCode ?? r.user_email}</span></Td>
+                      <Td>{r.student?.className ?? '—'}</Td>
+                      <Td className="text-muted">{r.student?.combination?.name ?? '—'}</Td>
+                      <Td>
+                        <button type="button" onClick={() => setResultsRow(r)} title="View uploaded results" className="inline-flex items-center gap-1.5 rounded border border-line px-2.5 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">
+                          <FileText aria-hidden="true" size={14} /> View
                         </button>
-                        <button type="button" disabled={rowBusy === r.id} onClick={() => toggleActive(r)} aria-label={r.active ? `Deactivate ${r.user_name}` : `Activate ${r.user_name}`} title={r.active ? 'Deactivate' : 'Activate'} className="rounded border border-line px-2.5 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-60">
-                          {r.active ? 'Deactivate' : 'Activate'}
+                      </Td>
+                      <Td>
+                        <button type="button" onClick={() => setDisciplineRow(r)} title="Record or review discipline actions" className="inline-flex items-center gap-1.5 rounded border border-line px-2.5 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">
+                          <Gavel aria-hidden="true" size={14} /> Manage
                         </button>
-                        <button type="button" disabled={rowBusy === r.id} onClick={() => remove(r)} aria-label={`Delete ${r.user_name}`} title="Delete" className="rounded border border-line px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:border-rose-300 disabled:opacity-60">
-                          <Trash2 aria-hidden="true" size={14} />
-                        </button>
-                      </span>
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableWrap>
+                      </Td>
+                      <Td><Pill tone={r.active ? 'emerald' : 'rose'}>{r.active ? 'Active' : 'Inactive'}</Pill></Td>
+                      <Td>
+                        <span className="flex gap-1.5">
+                          <button type="button" onClick={() => openEdit(r)} aria-label={`Edit ${r.user_name}`} title="Edit" className="rounded border border-line px-2.5 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">
+                            <Pencil aria-hidden="true" size={14} />
+                          </button>
+                          <button type="button" disabled={rowBusy === r.id} onClick={() => toggleActive(r)} aria-label={r.active ? `Deactivate ${r.user_name}` : `Activate ${r.user_name}`} title={r.active ? 'Deactivate' : 'Activate'} className="rounded border border-line px-2.5 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-60">
+                            {r.active ? 'Deactivate' : 'Activate'}
+                          </button>
+                          <button type="button" disabled={rowBusy === r.id} onClick={() => remove(r)} aria-label={`Delete ${r.user_name}`} title="Delete" className="rounded border border-line px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:border-rose-300 disabled:opacity-60">
+                            <Trash2 aria-hidden="true" size={14} />
+                          </button>
+                        </span>
+                      </Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-5 py-3 text-sm">
+              <p className="text-muted">{total} pupil(s) · page {safePage} of {pageCount}</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={safePage <= 1 || list.isFetching}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="min-h-10 rounded border border-line px-4 text-sm font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-50"
+                >
+                  ← Prev
+                </button>
+                <button
+                  type="button"
+                  disabled={safePage >= pageCount || list.isFetching}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="min-h-10 rounded border border-line px-4 text-sm font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-50"
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </Card>
 
@@ -347,7 +628,7 @@ export const AdminStudentsPage = () => {
         </form>
       </Modal>
       {created && (
-        <Card className="border-lime-accent p-4 text-sm" >
+        <Card className="hidden border-lime-accent p-4 text-sm" >
           <p className="font-extrabold text-brand-800">Last created login (copy before leaving):</p>
           <ul className="mt-2 space-y-1 font-mono text-[13px]">
             <li>Email: <b>{created.email}</b></li>
@@ -356,6 +637,8 @@ export const AdminStudentsPage = () => {
           </ul>
         </Card>
       )}
+      {resultsRow && <PupilResults row={resultsRow} onClose={() => setResultsRow(null)} />}
+      {disciplineRow && <PupilDiscipline row={disciplineRow} onClose={() => setDisciplineRow(null)} />}
     </div>
   );
 };

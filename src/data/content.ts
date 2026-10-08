@@ -10,7 +10,7 @@ export const siteInfo = {
   address: '5 Unity Avenue , Valentino Ondo',
   phoneContacts: [
     { label: 'Central Admin', number: '+2347039334594', href: 'tel:+2347039334594' },
-    { label: 'School Secretary', number: '08034422974', href: 'tel:08034422974' },
+    { label: 'School Secretary', number: '+2348034422974', href: 'tel:+2348034422974' },
   ],
   email: 'info@learnwithuncletee.org',
   hours: 'Opening hours to be confirmed',

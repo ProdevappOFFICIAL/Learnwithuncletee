@@ -10,11 +10,18 @@ import { queryClient } from './queryClient';
 /** Session key shared with AuthContext (kept here to avoid an import cycle). */
 export const SESSION_KEY = ['session'] as const;
 
-/** Tell every session consumer the session is dead (guards redirect to login). */
+/**
+ * Tell every session consumer the session is dead (guards redirect to login).
+ *
+ * IMPORTANT: use setQueryData, NOT invalidateQueries. Invalidating refetches
+ * /dashboard/me, which 401s -> refresh 401s -> lands back here -> infinite loop.
+ * Writing `null` directly flips the guards to "logged out" with no network call.
+ */
 function notifySessionDead() {
   tokenStore.clear();
+  refreshTokenStore.clear();
   try {
-    queryClient.invalidateQueries({ queryKey: SESSION_KEY });
+    queryClient.setQueryData(SESSION_KEY, null);
   } catch {
     /* query client not mounted yet */
   }
@@ -24,6 +31,8 @@ export const API_BASE =
   (import.meta as any).env?.VITE_API_URL?.replace(/\/$/, '') ?? 'http://localhost:4000/api';
 
 const TOKEN_KEY = 'lwu_access_token';
+const REFRESH_KEY = 'lwu_refresh_token';
+const DEVICE_KEY = 'lwu_device_id';
 
 export const tokenStore = {
   get: () => {
@@ -69,6 +78,66 @@ export const tokenStore = {
   },
 };
 
+/** Refresh token mirror of tokenStore — sent in the /auth/refresh body as a
+ * fallback for contexts where the HttpOnly cookie is blocked (plain-http dev,
+ * third-party-cookie blocking). Same storage posture as the access token. */
+export const refreshTokenStore = {
+  get: () => {
+    try {
+      return localStorage.getItem(REFRESH_KEY) ?? sessionStorage.getItem(REFRESH_KEY);
+    } catch {
+      return null;
+    }
+  },
+  set: (token: string, persistent = true) => {
+    try {
+      if (persistent) {
+        localStorage.setItem(REFRESH_KEY, token);
+        sessionStorage.removeItem(REFRESH_KEY);
+      } else {
+        sessionStorage.setItem(REFRESH_KEY, token);
+        localStorage.removeItem(REFRESH_KEY);
+      }
+    } catch {
+      /* private mode — ignore */
+    }
+  },
+  clear: () => {
+    try {
+      localStorage.removeItem(REFRESH_KEY);
+    } catch {
+      /* ignore */
+    }
+    try {
+      sessionStorage.removeItem(REFRESH_KEY);
+    } catch {
+      /* ignore */
+    }
+  },
+};
+
+/**
+ * Stable per-browser device id. Send it as `deviceId` on login so the backend
+ * scopes session reuse to this browser instead of rotating another device's
+ * refresh token. Survives logout on purpose (it identifies the browser, not
+ * the session).
+ */
+export const getDeviceId = (): string => {
+  try {
+    let id = localStorage.getItem(DEVICE_KEY);
+    if (!id) {
+      id =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem(DEVICE_KEY, id);
+    }
+    return id;
+  } catch {
+    return `dev-${Math.random().toString(36).slice(2)}`;
+  }
+};
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -82,16 +151,16 @@ let refreshPromise: Promise<string> | null = null;
 
 async function refreshAccessToken(): Promise<string> {
   if (!refreshPromise) {
-    // The refresh token travels in the HttpOnly cookie (credentials:include).
-    // No token is readable from JS by design; if the cookie is absent
-    // (e.g. localhost http drops `secure` cookies), this 401s and the
-    // caller treats the session as over.
+    // The refresh token travels in the HttpOnly cookie (credentials:include);
+    // the stored token is also sent in the body as a fallback for contexts
+    // where the cookie is blocked. The backend accepts either.
     refreshPromise = (async () => {
+      const storedRefresh = refreshTokenStore.get();
       const res = await fetch(`${API_BASE}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: '{}',
+        body: JSON.stringify(storedRefresh ? { refreshToken: storedRefresh } : {}),
       });
       let payload: any = null;
       try {
@@ -119,7 +188,9 @@ interface RequestOptions {
 
 export async function api<T = any>(path: string, opts: RequestOptions = {}): Promise<{ data: T; meta?: any; message?: string }> {
   const { method = 'GET', body, query, auth = true } = opts;
-  const url = new URL(`${API_BASE}${path.startsWith('/') ? path : `/${path}`}`);
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const isAuthEndpoint = normalizedPath.startsWith('/auth/');
+  const url = new URL(`${API_BASE}${normalizedPath}`);
   if (query) {
     for (const [k, v] of Object.entries(query)) {
       if (v !== undefined && v !== '') url.searchParams.set(k, String(v));
@@ -150,8 +221,8 @@ export async function api<T = any>(path: string, opts: RequestOptions = {}): Pro
   let payload = await readPayload(res);
 
   // One silent refresh on 401 (never for the auth endpoints themselves —
-  // a 401 there means the session is genuinely over).
-  if (res.status === 401 && auth && !path.startsWith('/auth/')) {
+  // a 401 there is a credentials/refresh failure, not a reason to retry).
+  if (res.status === 401 && auth && !isAuthEndpoint) {
     try {
       const fresh = await refreshAccessToken();
       tokenStore.set(fresh, tokenStore.isPersistent());
@@ -164,7 +235,10 @@ export async function api<T = any>(path: string, opts: RequestOptions = {}): Pro
   }
 
   if (!res.ok) {
-    if (res.status === 401) notifySessionDead();
+    // A 401 from /auth/* (wrong password, bad refresh token) must NOT mark the
+    // session dead — that is what used to kick off the refresh loop. Only a
+    // 401 on a protected endpoint that survived the refresh attempt counts.
+    if (res.status === 401 && auth && !isAuthEndpoint) notifySessionDead();
     throw new ApiError(res.status, payload?.message ?? `Request failed (${res.status})`);
   }
   return { data: payload?.data as T, meta: payload?.meta, message: payload?.message };

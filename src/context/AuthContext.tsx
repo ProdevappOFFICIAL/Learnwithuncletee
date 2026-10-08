@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { api, apiPost, tokenStore, SESSION_KEY } from '@/lib/api';
+import { api, apiPost, tokenStore, refreshTokenStore, SESSION_KEY } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
 
 
@@ -67,17 +67,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     queryFn: fetchMe,
     // Don't retry: a 401 already went through the single refresh attempt.
     retry: false,
-    // Revalidate a stale session when the tab regains focus.
-    refetchOnWindowFocus: true,
+    // Off: with no session, every tab-focus refires me → refresh → 401
+    // console spam. Session still revalidates on mount and after login/logout.
+    refetchOnWindowFocus: false,
   });
 
   const login = useCallback(async (identity: string, password: string, opts?: { remember?: boolean; role?: string }) => {
-    const { data } = await apiPost<{ user: any; accessToken: string }>('/auth/login', {
+    const { data } = await apiPost<{ user: any; accessToken: string; refreshToken?: string }>('/auth/login', {
       user_email: identity,
       user_password: password,
       ...(opts?.role ? { role: opts.role } : {}),
     });
-    tokenStore.set(data.accessToken, opts?.remember ?? true);
+    const persistent = opts?.remember ?? true;
+    tokenStore.set(data.accessToken, persistent);
+    // Stored refresh token keeps silent refresh working even where the
+    // HttpOnly cookie is blocked (plain-http dev, 3P-cookie blocking).
+    if (data.refreshToken) refreshTokenStore.set(data.refreshToken, persistent);
     const me = await fetchMe();
     if (!me) throw new Error('Sign-in succeeded but the session could not be verified.');
     // Instant UI: seed the cache so protected routes render without a flash.
@@ -87,12 +92,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = useCallback(async () => {
     try {
-      // No auth header needed: backend revokes by refresh cookie.
-      await apiPost('/auth/logout', {});
+      // Send the stored refresh token too: the backend revokes by body token
+      // when the HttpOnly cookie is unavailable.
+      await apiPost('/auth/logout', { refreshToken: refreshTokenStore.get() ?? undefined });
     } catch {
       /* still clear locally */
     }
     tokenStore.clear();
+    refreshTokenStore.clear();
     queryClient.removeQueries({ queryKey: SESSION_KEY });
   }, []);
 

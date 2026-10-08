@@ -17,7 +17,7 @@ interface ClassRow extends GradeData {
 export const AdminResultsPage = () => {
   const sessions = sessionOptions();
   const [subject, _setSubject] = useState('Mathematics');
-  const [className, setClassName] = useState('JSS 2 Diamond');
+  const [className, setClassName] = useState('');
   const [session, setSession] = useState('2025/2026');
   const [term, setTerm] = useState('First Term');
   const [docStudentId, setDocStudentId] = useState('');
@@ -27,7 +27,7 @@ export const AdminResultsPage = () => {
 
   const classesRes = useResource<ClassItem[]>('/classes');
   const classOptions = Array.from(
-    new Set([...(classesRes.data ?? []).map((c) => c.name), 'JSS 2 Diamond']),
+    new Set([...(classesRes.data ?? []).map((c) => c.name)]),
   );
   const effectiveClass = classOptions.includes(className) ? className : (classOptions[0] ?? className);
   const results = useResource<ClassRow[]>('/school-results/class', { subject, className: effectiveClass, session, term });

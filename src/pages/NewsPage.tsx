@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Container } from '@/components/ui/Container';
 import { PageHero } from '@/components/ui/PageHero';
 import { PageMetadata } from '@/components/ui/PageMetadata';
 import { apiGetPublic } from '@/lib/api';
+import { usePagedList } from '@/lib/pagedQuery';
 import type { NoticeData } from '@/data/dashboard';
-import { ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const filters = ['All', 'Announcement', 'Academic', 'Sports', 'Cultural', 'Events', 'News'] as const;
 type NewsFilter = (typeof filters)[number];
@@ -35,24 +36,28 @@ const NewsCard = ({ article }: { article: NoticeData }) => (
 
 export const NewsPage = () => {
   const [filter, setFilter] = useState<NewsFilter>('All');
-  const [articles, setArticles] = useState<NoticeData[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
 
-  useEffect(() => {
-    let cancelled = false;
-    apiGetPublic<NoticeData[]>('/public-notices', { limit: 50 })
-      .then((res) => {
-        if (!cancelled) setArticles(res.data);
-      })
-      .catch((e: any) => {
-        if (!cancelled) setError(e?.message ?? 'Could not load news');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Server-filtered + paged: category/search travel in the query key, pages are
+  // cached (5-min stale) and neighbours prefetched by the shared hook.
+  const news = usePagedList<NoticeData>(
+    ['public-news', filter, query],
+    (page, limit) =>
+      apiGetPublic<NoticeData[]>('/public-notices', {
+        category: filter === 'All' ? undefined : filter,
+        search: query || undefined,
+        page,
+        limit,
+      }),
+    { initialLimit: 9 },
+  );
+  const articles = news.rows;
 
-  const list = (articles ?? []).filter((a) => filter === 'All' || a.category === filter);
+  const pickFilter = (f: NewsFilter) => {
+    setFilter(f);
+    news.resetPage();
+  };
 
   return (
     <Layout>
@@ -102,25 +107,70 @@ export const NewsPage = () => {
       <PageHero eyebrow="From our community" title="News & Events" text="School updates, upcoming moments and stories from our learning community." image="https://images.unsplash.com/photo-1523580494863-6f3031224c94?auto=format&fit=crop&w=1800&q=85" />
       <section className="py-14 sm:py-18">
         <Container>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Filter news by category">
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter news by category">
             {filters.map((item) => (
-              <button key={item} type="button" onClick={() => setFilter(item)} aria-pressed={filter === item} className={`min-h-10 rounded px-4 py-2 text-sm font-semibold ${filter === item ? 'bg-brand-700 text-white' : 'border border-line text-muted hover:border-brand-500 hover:text-brand-700'}`}>
+              <button key={item} type="button" onClick={() => pickFilter(item)} aria-pressed={filter === item} className={`min-h-10 rounded px-4 py-2 text-sm font-semibold ${filter === item ? 'bg-brand-700 text-white' : 'border border-line text-muted hover:border-brand-500 hover:text-brand-700'}`}>
                 {item}
               </button>
             ))}
           </div>
-          {error ? (
-            <p role="alert" className="mt-9 border-l-2 border-rose-400 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}. Is the API running?</p>
-          ) : articles === null ? (
+          <form
+            className="mt-4 flex flex-wrap gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setQuery(search);
+              news.resetPage();
+            }}
+          >
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search announcements…"
+              aria-label="Search announcements"
+              className="min-h-11 w-full max-w-sm rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500"
+            />
+            <button type="submit" className="min-h-11 rounded bg-brand-900 px-4 text-sm font-bold text-white hover:bg-brand-700">Search</button>
+            {search && (
+              <button type="button" onClick={() => { setSearch(''); setQuery(''); news.resetPage(); }} className="min-h-11 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">
+                Reset
+              </button>
+            )}
+          </form>
+          {news.isError ? (
+            <p role="alert" className="mt-9 border-l-2 border-rose-400 bg-rose-50 px-4 py-3 text-sm text-rose-800">Could not load news. Is the API running? <button type="button" onClick={() => news.refetch()} className="font-bold underline">Retry</button></p>
+          ) : news.isPending ? (
             <div className="mt-9 grid gap-7 sm:grid-cols-2 lg:grid-cols-3" aria-label="Loading">
               {[0, 1, 2].map((i) => <div key={i} className="h-64 animate-pulse bg-brand-50" />)}
             </div>
           ) : (
             <>
-              <div className="mt-9 grid gap-7 sm:grid-cols-2 lg:grid-cols-3">
-                {list.map((article) => <NewsCard key={article.id} article={article} />)}
+              <div className={`mt-9 grid gap-7 sm:grid-cols-2 lg:grid-cols-3 transition-opacity ${news.isFetching ? 'opacity-60' : ''}`}>
+                {articles.map((article) => <NewsCard key={article.id} article={article} />)}
               </div>
-              {list.length === 0 && <p className="py-16 text-center text-muted">No updates in this category yet.</p>}
+              {articles.length === 0 && <p className="py-16 text-center text-muted">No updates in this category yet.</p>}
+              {news.pageCount > 1 && (
+                <div className="mt-9 flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <p className="text-muted">{news.total} stor{news.total === 1 ? 'y' : 'ies'} · page {news.page} of {news.pageCount}</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={news.page <= 1 || news.isFetching}
+                      onClick={() => news.setPage(news.page - 1)}
+                      className="inline-flex min-h-10 items-center rounded border border-line px-4 font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-50"
+                    >
+                      <ChevronLeft aria-hidden="true" size={16} className="mr-1" /> Newer
+                    </button>
+                    <button
+                      type="button"
+                      disabled={news.page >= news.pageCount || news.isFetching}
+                      onClick={() => news.setPage(news.page + 1)}
+                      className="inline-flex min-h-10 items-center rounded border border-line px-4 font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-50"
+                    >
+                      Older <ChevronRight aria-hidden="true" size={16} className="ml-1" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </Container>

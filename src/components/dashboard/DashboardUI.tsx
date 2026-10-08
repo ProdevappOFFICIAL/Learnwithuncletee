@@ -186,3 +186,62 @@ export const Modal = ({
     </div>
   );
 };
+
+/** Shared pager: Prev/Next + position + per-page selector. */
+export const Pagination = ({
+  total,
+  page,
+  pageCount,
+  limit,
+  onPage,
+  onLimit,
+  disabled,
+  noun = 'record(s)',
+}: {
+  total: number;
+  page: number;
+  pageCount: number;
+  limit: number;
+  onPage: (next: number) => void;
+  onLimit: (next: number) => void;
+  disabled?: boolean;
+  noun?: string;
+}) => (
+  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-5 py-3 text-sm">
+    <p className="text-muted">
+      {total} {noun} · page {page} of {pageCount}
+    </p>
+    <div className="flex flex-wrap items-center gap-2">
+      <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted">
+        Per page
+        <select
+          value={limit}
+          onChange={(e) => onLimit(Number(e.target.value))}
+          disabled={disabled}
+          aria-label="Rows per page"
+          className="min-h-10 rounded border border-line bg-white px-2 text-sm font-bold text-ink disabled:opacity-50"
+        >
+          {[5, 10, 20, 50].map((n) => (
+            <option key={n} value={n}>{n}</option>
+          ))}
+        </select>
+      </label>
+      <button
+        type="button"
+        disabled={disabled || page <= 1}
+        onClick={() => onPage(page - 1)}
+        className="min-h-10 rounded border border-line px-4 text-sm font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-50"
+      >
+        ← Prev
+      </button>
+      <button
+        type="button"
+        disabled={disabled || page >= pageCount}
+        onClick={() => onPage(page + 1)}
+        className="min-h-10 rounded border border-line px-4 text-sm font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-50"
+      >
+        Next →
+      </button>
+    </div>
+  </div>
+);

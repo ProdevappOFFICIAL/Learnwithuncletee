@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHead, ErrorState, LoadingSkeleton, PageHeader } from '@/components/dashboard/DashboardUI';
-import { useResource } from '@/context/AuthContext';
-import { apiPatch, apiPut } from '@/lib/api';
+import { apiGet, apiPatch, apiPut } from '@/lib/api';
+import { LIST_GC, LIST_STALE } from '@/lib/pagedQuery';
 
 interface MatrixRow {
   key: string;
@@ -12,14 +13,30 @@ interface MatrixRow {
 
 const ROLES = ['BURSAR', 'TEACHER', 'STUDENT', 'PARENT'];
 
+const SETTINGS_KEY = ['admin-settings'];
+const MATRIX_KEY = ['permissions-matrix'];
+
 export const AdminSettingsPage = () => {
-  const settings = useResource<Record<string, string>>('/settings');
-  const matrix = useResource<{ permissions: unknown; matrix: MatrixRow[] }>('/permissions/matrix');
+  const qc = useQueryClient();
+  // School profile changes rarely — long cache, instant back-navigation.
+  const settings = useQuery({
+    queryKey: SETTINGS_KEY,
+    queryFn: () => apiGet<Record<string, string>>('/settings'),
+    staleTime: LIST_STALE,
+    gcTime: LIST_GC,
+  });
+  // Permission matrix: cached, but every toggle invalidates immediately.
+  const matrix = useQuery({
+    queryKey: MATRIX_KEY,
+    queryFn: () => apiGet<{ permissions: unknown; matrix: MatrixRow[] }>('/permissions/matrix'),
+    staleTime: LIST_STALE,
+    gcTime: LIST_GC,
+  });
   const [draft, setDraft] = useState<Record<string, string> | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const values = draft ?? settings.data ?? {};
+  const values = draft ?? settings.data?.data ?? {};
 
   const saveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +44,7 @@ export const AdminSettingsPage = () => {
     setNotice(null);
     try {
       const res = await apiPatch<Record<string, string>>('/settings', values);
-      settings.setData(res.data);
+      qc.setQueryData(SETTINGS_KEY, { data: res.data });
       setDraft(null);
       setNotice('School settings saved.');
     } catch (err: any) {
@@ -41,7 +58,7 @@ export const AdminSettingsPage = () => {
     setNotice(null);
     try {
       await apiPut('/permissions/matrix', { role, key, allowed: !current });
-      matrix.reload();
+      await qc.invalidateQueries({ queryKey: MATRIX_KEY });
       setNotice(`${role} ${!current ? 'granted' : 'denied'} ${key}. Sidebar and API update immediately.`);
     } catch (err: any) {
       setNotice(err?.message ?? 'Permission update failed');
@@ -59,10 +76,10 @@ export const AdminSettingsPage = () => {
       <Card className="p-5">
         <p className="text-xs font-bold uppercase tracking-widest text-brand-700">School profile</p>
         <h3 className="mt-2 font-display text-lg font-extrabold">Identity, contacts & session</h3>
-        {settings.loading ? (
+        {settings.isPending ? (
           <div className="mt-4"><LoadingSkeleton rows={4} /></div>
-        ) : settings.error || !settings.data ? (
-          <div className="mt-4"><ErrorState message={settings.error ?? 'No data'} onRetry={settings.reload} /></div>
+        ) : settings.isError || !settings.data ? (
+          <div className="mt-4"><ErrorState message="Could not load settings" onRetry={() => settings.refetch()} /></div>
         ) : (
           <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={saveSettings}>
             {[
@@ -90,10 +107,10 @@ export const AdminSettingsPage = () => {
 
       <Card>
         <CardHead title="Roles & access" sub="Toggle what each role can see and do" />
-        {matrix.loading ? (
+        {matrix.isPending ? (
           <div className="px-5 py-5"><LoadingSkeleton rows={6} /></div>
-        ) : matrix.error || !matrix.data ? (
-          <div className="px-5 py-5"><ErrorState message={matrix.error ?? 'No data'} onRetry={matrix.reload} /></div>
+        ) : matrix.isError || !matrix.data ? (
+          <div className="px-5 py-5"><ErrorState message="Could not load permissions" onRetry={() => matrix.refetch()} /></div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
@@ -106,7 +123,7 @@ export const AdminSettingsPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {matrix.data.matrix.map((row) => (
+                {matrix.data.data.matrix.map((row) => (
                   <tr key={row.key}>
                     <td className="border-b border-line px-5 py-2.5">
                       <span className="font-bold">{row.label}</span>

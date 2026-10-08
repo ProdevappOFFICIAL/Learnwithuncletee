@@ -17,7 +17,7 @@ export const AdminVirtualClassPage = () => {
     try {
       await apiPost('/virtual-lessons', { ...form, durationMins: Number(form.durationMins) || 45, coverUrl: coverUrl || undefined });
       setNotice('Lesson scheduled.');
-      setForm({ topic: '', subject: 'Mathematics', className: 'JSS 2 Diamond', startsAt: '', durationMins: '45', joinUrl: 'https://meet.google.com/new' });
+      setForm({ topic: '', subject: 'Mathematics', className: '', startsAt: '', durationMins: '45', joinUrl: 'https://meet.google.com/new' });
       setCoverUrl('');
       reload();
     } catch (err: any) {

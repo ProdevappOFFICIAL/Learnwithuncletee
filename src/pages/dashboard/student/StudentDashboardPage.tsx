@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom';
 import { ROUTES } from '@/routes/paths';
 import { useAuth, useResource } from '@/context/AuthContext';
 import { BannerCard, Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pill, StatTile } from '@/components/dashboard/DashboardUI';
+import { activeConduct, useMyConduct } from './StudentConductPage';
+import { ShieldAlert } from 'lucide-react';
 
 interface StudentOverview {
   profile: { className: string; studentCode: string } | null;
@@ -13,6 +15,8 @@ interface StudentOverview {
 export const StudentDashboardPage = () => {
   const { user } = useAuth();
   const { data, loading, error, reload } = useResource<StudentOverview>('/dashboard/student');
+  const conduct = useMyConduct();
+  const live = activeConduct(conduct.data?.data ?? []);
 
   return (
     <div className="space-y-6">
@@ -48,6 +52,32 @@ export const StudentDashboardPage = () => {
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {data.stats.map((s) => <StatTile key={s.id} label={s.label} value={s.value} hint={s.hint} />)}
           </div>
+
+          {/* Conduct strip — access decision: pupils always keep Results /
+              Assignments / Virtual Class open; active actions only show here
+              and on the Conduct page until the office lifts them. */}
+          {!conduct.isPending && !conduct.isError && (
+            live.length > 0 ? (
+              <Card className="border-rose-300">
+                <Link to={ROUTES.studentConduct} className="flex items-start gap-3 px-5 py-4">
+                  <ShieldAlert aria-hidden="true" size={20} className="mt-0.5 shrink-0 text-rose-700" />
+                  <span>
+                    <span className="block text-sm font-extrabold text-rose-800">
+                      {live.length} active discipline action{live.length === 1 ? '' : 's'} — view your conduct record →
+                    </span>
+                    <span className="mt-1 block text-xs text-muted">Your classes and results stay accessible while this is resolved.</span>
+                  </span>
+                </Link>
+              </Card>
+            ) : (
+              <Card className="border-lime-accent">
+                <Link to={ROUTES.studentConduct} className="flex items-center gap-3 px-5 py-3">
+                  <ShieldAlert aria-hidden="true" size={18} className="shrink-0 text-emerald-700" />
+                  <span className="text-sm"><b className="text-emerald-800">Good conduct</b> <span className="text-muted">— no active actions. View record →</span></span>
+                </Link>
+              </Card>
+            )
+          )}
 
           <div className="grid gap-5 lg:grid-cols-[1.2fr_.8fr]">
             <Card>

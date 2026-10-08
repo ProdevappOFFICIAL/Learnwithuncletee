@@ -13,6 +13,7 @@ import {
   Rocket,
   ScrollText,
   Settings,
+  ShieldAlert,
   UserCog,
   Users,
   Video,
@@ -60,6 +61,12 @@ export const studentNav: DashboardNavItem[] = [
     label: "Virtual Class",
     icon: Video,
     permission: "virtual.read",
+  },
+  {
+    to: ROUTES.studentConduct,
+    label: "Conduct",
+    icon: ShieldAlert,
+    permission: "discipline.read",
   },
 ];
 
@@ -120,13 +127,13 @@ export const adminNav: DashboardNavItem[] = [
       //    { to: ROUTES.adminStudents, label: 'Add Member', icon: UserPlus, permission: 'students.write' },
     ],
   },
-  {
+ /* {
     to: ROUTES.adminAdmissions,
     label: "Admissions",
     icon: ClipboardList,
     badge: "24",
     permission: "admissions.read",
-  },
+  },*/
   {
     to: ROUTES.adminAttendance,
     label: "Attendance",
@@ -442,6 +449,7 @@ export interface StudentRow {
   student?: {
     studentCode: string;
     className: string;
+    photoUrl?: string | null;
     guardianName?: string;
     guardianPhone?: string;
     combinationId?: string | null;
@@ -457,9 +465,11 @@ export interface StaffRow {
   user_email: string;
   role: string;
   active: boolean;
+  img?: string | null;
   teacher?: {
     staffCode: string;
     department?: string;
+    photoUrl?: string | null;
     subjects: string[];
   } | null;
 }
@@ -469,8 +479,31 @@ export interface ClassItem {
   name: string;
 }
 
-export interface CombinationItem {
+export interface DisciplineActionItem {
   id: string;
+  studentId: string;
+  action: string;
+  reason?: string | null;
+  status: 'ACTIVE' | 'LIFTED' | string;
+  createdBy: string;
+  createdAt: string;
+  student?: { id: string; user_name: string; user_email: string } | null;
+  creator?: { id: string; user_name: string } | null;
+}
+
+export interface ResultDocItem {
+  id: string;
+  title: string;
+  className: string;
+  session: string;
+  term: string;
+  subject?: string | null;
+  studentId?: string | null;
+  fileUrl: string;
+  createdAt: string;
+}
+
+export interface CombinationItem {  id: string;
   name: string;
   subjects: Array<{
     subject: { id: string; name: string; code?: string | null };

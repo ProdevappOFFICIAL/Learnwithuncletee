@@ -12,6 +12,7 @@ import { NewsDetailPage } from '@/pages/NewsDetailPage';
 import { GalleryPage } from '@/pages/GalleryPage';
 import { ContactPage } from '@/pages/ContactPage';
 import { LoginPage } from '@/pages/LoginPage';
+import { ConnectDesktopPage } from '@/pages/ConnectDesktopPage';
 import { ExaminationPage } from '@/pages/ExaminationPage';
 import { ExamRoomPage } from '@/pages/ExamRoomPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
@@ -23,6 +24,7 @@ import { StudentFeesPage } from '@/pages/dashboard/student/StudentFeesPage';
 import { StudentResultsPage } from '@/pages/dashboard/student/StudentResultsPage';
 import { StudentAssignmentsPage } from '@/pages/dashboard/student/StudentAssignmentsPage';
 import { StudentVirtualClassPage } from '@/pages/dashboard/student/StudentVirtualClassPage';
+import { StudentConductPage } from '@/pages/dashboard/student/StudentConductPage';
 import { TeacherDashboardPage } from '@/pages/dashboard/teacher/TeacherDashboardPage';
 import { TeacherAttendancePage } from '@/pages/dashboard/teacher/TeacherAttendancePage';
 import { TeacherAssignmentsPage } from '@/pages/dashboard/teacher/TeacherAssignmentsPage';
@@ -69,6 +71,11 @@ export const router = createBrowserRouter([
   { path: ROUTES.gallery, element: <GalleryPage /> },
   { path: ROUTES.contact, element: <ContactPage /> },
   { path: ROUTES.login, element: <LoginPage /> },
+  {
+    path: ROUTES.connectDesktop,
+    element: <RequireAuth />,
+    children: [{ index: true, element: <ConnectDesktopPage /> }],
+  },
   { path: ROUTES.examination, element: <ExaminationPage /> },
   { path: ROUTES.examinationRoom, element: <ExamRoomPage /> },
   { path: ROUTES.dashboard, element: <DashboardIndexPage /> },
@@ -88,6 +95,7 @@ export const router = createBrowserRouter([
           { path: 'results', element: <StudentResultsPage /> },
           { path: 'assignments', element: <StudentAssignmentsPage /> },
           { path: 'virtual-class', element: <StudentVirtualClassPage /> },
+          { path: 'conduct', element: <StudentConductPage /> },
         ],
       },
     ],

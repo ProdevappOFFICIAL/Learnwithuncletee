@@ -172,7 +172,7 @@ export const AboutPage = () => (
             ))}
           </div>
         </div>
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-5 border-t border-line pt-7">
+        <div className="hidden mt-8 flex flex-wrap items-center justify-between gap-5 border-t border-line pt-7">
           <p className="text-sm text-muted">
             Figures are sample placeholders pending school verification.
           </p>

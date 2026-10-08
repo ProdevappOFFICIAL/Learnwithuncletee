@@ -5,12 +5,87 @@ import { apiGet } from '@/lib/api';
 import { printReportCard } from '@/lib/reportCard';
 import { TERM_OPTIONS, sessionOptions, type GradeData, type ResultDocData } from '@/data/dashboard';
 import type { ClassItem } from '@/data/dashboard';
-import {  ExternalLink, FileText } from 'lucide-react';
+import { ExternalLink, FileText } from 'lucide-react';
+
+interface OnlineAttempt {
+  id: string;
+  overallScore: number;
+  attempted_questions: number;
+  total_questions: number;
+  date: string;
+  exam?: { exam_name: string };
+  subjectScores?: Record<string, { correct: number; total: number }>;
+  subjectNames?: Record<string, string>;
+}
+
+/** Pupil's own online-exam sittings with per-subject marks (backend self-scopes). */
+const OnlineAttempts = () => {
+  const { data, loading, error, reload } = useResource<OnlineAttempt[]>('/results', { limit: 50 });
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const list = data ?? [];
+
+  return (
+    <Card>
+      <CardHead title="Online exam attempts" sub="Your sittings on the platform, newest first" />
+      {loading ? (
+        <div className="px-5 py-5"><LoadingSkeleton rows={2} /></div>
+      ) : error || !data ? (
+        <div className="px-5 py-5"><ErrorState message={error ?? 'No data'} onRetry={reload} /></div>
+      ) : list.length === 0 ? (
+        <div className="px-5 py-5"><EmptyState message="No online attempts yet — your scores appear here after you sit an exam." /></div>
+      ) : (
+        <ul className="divide-y divide-line">
+          {list.map((r) => {
+            const open = expanded === r.id;
+            const parts = Object.entries(r.subjectScores ?? {})
+              .map(([id, s]) => ({ id, name: r.subjectNames?.[id] ?? 'Subject', correct: s.correct, total: s.total }))
+              .sort((a, b) => a.name.localeCompare(b.name));
+            return (
+              <li key={r.id} className="px-5 py-4">
+                <button
+                  type="button"
+                  onClick={() => setExpanded(open ? null : r.id)}
+                  aria-expanded={open}
+                  className="flex w-full flex-wrap items-center justify-between gap-3 text-left"
+                >
+                  <span>
+                    <span className="block text-sm font-bold">{r.exam?.exam_name ?? 'Exam'}</span>
+                    <span className="mt-0.5 block text-xs text-muted">
+                      {new Date(r.date).toLocaleString()} · attempted {r.attempted_questions}/{r.total_questions}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <Pill tone={r.overallScore >= 75 ? 'emerald' : r.overallScore < 40 ? 'rose' : 'sky'}>{r.overallScore}%</Pill>
+                    <span className="text-xs font-bold text-brand-700">{open ? 'Hide ▲' : 'Subjects ▼'}</span>
+                  </span>
+                </button>
+                {open && (
+                  parts.length === 0 ? (
+                    <p className="mt-3 text-xs text-muted">No per-subject data on this attempt.</p>
+                  ) : (
+                    <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {parts.map((p) => (
+                        <li key={p.id} className="flex items-center justify-between gap-2 rounded border border-line bg-cream px-3 py-2">
+                          <span className="truncate text-xs font-bold">{p.name}</span>
+                          <span className="shrink-0 font-mono text-xs font-extrabold text-brand-700">{p.correct}/{p.total}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Card>
+  );
+};
 
 export const StudentResultsPage = () => {
   const { user } = useAuth();
   const sessions = sessionOptions();
-  const [className, setClassName] = useState(user?.student?.className ?? 'JSS 2 Diamond');
+  const [className, setClassName] = useState(user?.student?.className ?? '');
   const [session, setSession] = useState('2025/2026');
   const [term, setTerm] = useState('First Term');
   const [mode, setMode] = useState<'exact' | 'all'>('exact');
@@ -156,6 +231,8 @@ export const StudentResultsPage = () => {
           </Card>
         </>
       )}
+
+      <OnlineAttempts />
 
       <Card>
         <CardHead title="Result documents" sub="Class sheets plus report sheets addressed to you" />

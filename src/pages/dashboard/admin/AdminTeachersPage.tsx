@@ -1,10 +1,35 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, Modal, PageHeader, Pill, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
 import { useResource } from '@/context/AuthContext';
-import { apiDelete, apiPatch, apiPost } from '@/lib/api';
+import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { UploadButton } from '@/lib/uploadthing';
 import type { ClassItem, CourseAssignmentItem, ExamItem, StaffRow, SubjectItem } from '@/data/dashboard';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
+
+// Same caching strategy as the student directory: 5-min stale directory data,
+// 30-min garbage collection, previous-page rows kept during page turns, and
+// adjacent pages prefetched so Prev/Next feel instant.
+const PAGE_SIZE = 10;
+const LIST_STALE = 5 * 60 * 1000;
+const LIST_GC = 30 * 60 * 1000;
+
+const fetchStaff = (search: string, page: number) =>
+  apiGet<StaffRow[]>('/staff', { search: search || undefined, page, limit: PAGE_SIZE });
+
+const initialsOf = (name: string) =>
+  name.split(' ').map((p) => p.replace('.', '')[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'LW';
+
+/** Staff picture with initials fallback. */
+const StaffPicture = ({ row }: { row: StaffRow }) => {
+  const src = row.teacher?.photoUrl || row.img || null;
+  if (src) return <img src={src} alt="" className="h-10 w-10 shrink-0 rounded-full border border-line object-cover" />;
+  return (
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-900 text-xs font-extrabold text-lime-accent">
+      {initialsOf(row.user_name)}
+    </span>
+  );
+};
 
 interface TeacherForm {
   user_name: string;
@@ -19,7 +44,39 @@ const emptyForm = (): TeacherForm => ({ user_name: '', user_email: '', password:
 export const AdminTeachersPage = () => {
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
-  const { data, loading, error, reload } = useResource<StaffRow[]>('/staff', { search: query, limit: 50 });
+  const [page, setPage] = useState(1);
+  const qc = useQueryClient();
+  const list = useQuery({
+    queryKey: ['admin-staff', query, page],
+    queryFn: () => fetchStaff(query, page),
+    staleTime: LIST_STALE,
+    gcTime: LIST_GC,
+    placeholderData: keepPreviousData,
+  });
+  const data = list.data?.data ?? null;
+  const total = (list.data?.meta as { total?: number } | undefined)?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const loading = list.isPending;
+  const error = list.isError ? 'Could not load staff' : null;
+  const reload = () => qc.invalidateQueries({ queryKey: ['admin-staff'] });
+
+  useEffect(() => {
+    if (safePage < pageCount) {
+      void qc.prefetchQuery({
+        queryKey: ['admin-staff', query, safePage + 1],
+        queryFn: () => fetchStaff(query, safePage + 1),
+        staleTime: LIST_STALE,
+      });
+    }
+    if (safePage > 1) {
+      void qc.prefetchQuery({
+        queryKey: ['admin-staff', query, safePage - 1],
+        queryFn: () => fetchStaff(query, safePage - 1),
+        staleTime: LIST_STALE,
+      });
+    }
+  }, [qc, query, safePage, pageCount]);
   const assignments = useResource<CourseAssignmentItem[]>('/course-assignments', { limit: 100 });
   const exams = useResource<ExamItem[]>('/exams', { limit: 100 });
   const subjects = useResource<SubjectItem[]>('/subjects', { limit: 100 });
@@ -212,16 +269,22 @@ export const AdminTeachersPage = () => {
       </Card>
 
       <Card>
-        <CardHead title="Staff directory" sub="Search, edit and manage records" />
+        <CardHead title="Staff directory" sub={`${total} staff · search, edit and manage records`} />
         <form
           className="flex flex-wrap gap-2 border-b border-line px-5 py-4"
           onSubmit={(e) => {
             e.preventDefault();
             setQuery(search);
+            setPage(1);
           }}
         >
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name or email…" className="min-h-11 w-full max-w-xs rounded border border-line px-3 text-sm outline-none focus:border-brand-500" />
           <button type="submit" className="min-h-11 rounded bg-brand-900 px-4 text-sm font-bold text-white hover:bg-brand-700">Search</button>
+          {search && (
+            <button type="button" onClick={() => { setSearch(''); setQuery(''); setPage(1); }} className="min-h-11 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">
+              Reset
+            </button>
+          )}
         </form>
         {loading ? (
           <div className="px-5 py-5"><LoadingSkeleton rows={5} /></div>
@@ -230,14 +293,16 @@ export const AdminTeachersPage = () => {
         ) : data.length === 0 ? (
           <div className="px-5 py-5"><EmptyState message="No staff found." /></div>
         ) : (
+          <>
           <TableWrap>
-            <table className="w-full min-w-[880px] text-left text-sm">
-              <thead><tr><Th>Staff</Th><Th>Role</Th><Th>Assigned courses</Th><Th>Status</Th><Th><span className="sr-only">Actions</span></Th></tr></thead>
+            <table className={`w-full min-w-[880px] text-left text-sm transition-opacity ${list.isFetching ? 'opacity-60' : ''}`}>
+              <thead><tr><Th>Picture</Th><Th>Staff</Th><Th>Role</Th><Th>Assigned courses</Th><Th>Status</Th><Th><span className="sr-only">Actions</span></Th></tr></thead>
               <tbody>
                 {data.map((s) => {
                   const courses = coursesByTeacher(s.id);
                   return (
                     <tr key={s.id}>
+                      <Td><StaffPicture row={s} /></Td>
                       <Td><span className="font-bold">{s.user_name}</span><span className="block text-xs text-muted">{s.user_email}{s.teacher ? ` · ${s.teacher.staffCode}` : ''}</span></Td>
                       <Td><Pill tone="ink">{s.role}</Pill></Td>
                       <Td className="text-muted">
@@ -272,6 +337,28 @@ export const AdminTeachersPage = () => {
               </tbody>
             </table>
           </TableWrap>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-5 py-3 text-sm">
+            <p className="text-muted">{total} staff · page {safePage} of {pageCount}</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={safePage <= 1 || list.isFetching}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="min-h-10 rounded border border-line px-4 text-sm font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-50"
+              >
+                ← Prev
+              </button>
+              <button
+                type="button"
+                disabled={safePage >= pageCount || list.isFetching}
+                onClick={() => setPage((p) => p + 1)}
+                className="min-h-10 rounded border border-line px-4 text-sm font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-50"
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+          </>
         )}
       </Card>
 

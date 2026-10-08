@@ -1,8 +1,8 @@
 import { Suspense, lazy, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pill } from '@/components/dashboard/DashboardUI';
-import { useResource } from '@/context/AuthContext';
-import { apiDelete, apiPatch, apiPost } from '@/lib/api';
+import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pagination, Pill } from '@/components/dashboard/DashboardUI';
+import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
+import { usePagedList } from '@/lib/pagedQuery';
 import { UploadButton } from '@/lib/uploadthing';
 import { ROUTES } from '@/routes/paths';
 import type { NoticeData } from '@/data/dashboard';
@@ -12,6 +12,7 @@ import { Eye, Pencil } from 'lucide-react';
 const NewsEditor = lazy(() => import('@/lib/mdxEditor').then((m) => ({ default: m.NewsEditor })));
 
 const DRAFT_KEY = 'lwu_news_draft';
+const CATEGORIES = ['Announcement', 'Academic', 'Sports', 'Cultural', 'Events'];
 
 interface ComposeDraft {
   title: string;
@@ -36,7 +37,22 @@ const readSavedDraft = (): ComposeDraft => {
 
 export const AdminNewsPage = () => {
   const navigate = useNavigate();
-  const { data, loading, error, reload } = useResource<NoticeData[]>('/notices');
+  const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState('');
+
+  const posts = usePagedList<NoticeData>(
+    ['admin-notices', query, category],
+    (page, limit) =>
+      apiGet<NoticeData[]>('/notices', {
+        search: query || undefined,
+        category: category || undefined,
+        page,
+        limit,
+      }),
+    { initialLimit: 10 },
+  );
+
   const [draft, setDraft] = useState<ComposeDraft>(readSavedDraft);
   const [editorKey, setEditorKey] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
@@ -84,7 +100,7 @@ export const AdminNewsPage = () => {
       setDraft(EMPTY_DRAFT);
       clearPersisted();
       setEditorKey((k) => k + 1); // remount editor (markdown is initial-only)
-      reload();
+      posts.invalidate();
     } catch (err: any) {
       setNotice(err?.message ?? 'Save failed');
     } finally {
@@ -128,7 +144,7 @@ export const AdminNewsPage = () => {
   const toggle = async (id: string, isPublished: boolean) => {
     try {
       await apiPatch(`/notices/${id}`, { isPublished: !isPublished });
-      reload();
+      posts.invalidate();
     } catch (err: any) {
       setNotice(err?.message ?? 'Update failed');
     }
@@ -143,7 +159,7 @@ export const AdminNewsPage = () => {
         clearPersisted();
         setEditorKey((k) => k + 1);
       }
-      reload();
+      posts.invalidate();
     } catch (err: any) {
       setNotice(err?.message ?? 'Delete failed');
     }
@@ -163,7 +179,7 @@ export const AdminNewsPage = () => {
           <form className="mt-5 space-y-4" onSubmit={save}>
             <label className="block text-sm font-semibold">Title<input required value={draft.title} onChange={(e) => set({ title: e.target.value })} placeholder="e.g. Open day — 15 Nov" className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500" /></label>
             <label className="block text-sm font-semibold">Category
-              <select value={draft.category} onChange={(e) => set({ category: e.target.value })} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm"><option>Announcement</option><option>Academic</option><option>Sports</option><option>Cultural</option><option>Events</option></select>
+              <select value={draft.category} onChange={(e) => set({ category: e.target.value })} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm">{CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select>
             </label>
             <label className="block text-sm font-semibold">Description (short excerpt)
               <textarea rows={2} value={draft.description} onChange={(e) => set({ description: e.target.value })} placeholder="One or two sentences shown on cards and under the title…" className="mt-2 w-full rounded border border-line bg-white px-3 py-3 text-sm outline-none focus:border-brand-500" />
@@ -199,29 +215,72 @@ export const AdminNewsPage = () => {
         </Card>
 
         <Card>
-          <CardHead title="Published" sub={`${data?.length ?? 0} post(s)`} />
-          {loading ? (
+          <CardHead title="Published" sub={`${posts.total} post(s)`} />
+          <form
+            className="flex flex-wrap gap-2 border-b border-line px-5 py-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setQuery(search);
+              posts.resetPage();
+            }}
+          >
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search title or excerpt…"
+              aria-label="Search posts"
+              className="min-h-11 w-full max-w-xs rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500"
+            />
+            <select
+              value={category}
+              onChange={(e) => { setCategory(e.target.value); posts.resetPage(); }}
+              aria-label="Filter by category"
+              className="min-h-11 rounded border border-line bg-white px-3 text-sm font-semibold"
+            >
+              <option value="">All categories</option>
+              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <button type="submit" className="min-h-11 rounded bg-brand-900 px-4 text-sm font-bold text-white hover:bg-brand-700">Search</button>
+            {(search || category) && (
+              <button type="button" onClick={() => { setSearch(''); setQuery(''); setCategory(''); posts.resetPage(); }} className="min-h-11 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">
+                Reset
+              </button>
+            )}
+          </form>
+          {posts.isPending ? (
             <div className="px-5 py-5"><LoadingSkeleton rows={4} /></div>
-          ) : error || !data ? (
-            <div className="px-5 py-5"><ErrorState message={error ?? 'No data'} onRetry={reload} /></div>
-          ) : data.length === 0 ? (
-            <div className="px-5 py-5"><EmptyState message="No posts yet." /></div>
+          ) : posts.isError ? (
+            <div className="px-5 py-5"><ErrorState message="Could not load posts" onRetry={() => posts.refetch()} /></div>
+          ) : posts.rows.length === 0 ? (
+            <div className="px-5 py-5"><EmptyState message={query || category ? 'No posts match your filters.' : 'No posts yet.'} /></div>
           ) : (
-            <ul className="divide-y divide-line">
-              {data.map((n) => (
-                <li key={n.id} className="px-5 py-4">
-                  <div className="flex items-center gap-2"><Pill tone="sky">{n.category}</Pill><span className="text-xs text-muted">{new Date(n.createdAt).toLocaleDateString()}</span>{!n.isPublished && <Pill tone="amber">Hidden</Pill>}</div>
-                  <h4 className="mt-2 font-display text-sm font-extrabold">{n.title}</h4>
-                  {n.description && <p className="mt-1 text-sm text-muted">{n.description}</p>}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" onClick={() => previewExisting(n.id)} className="inline-flex items-center rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700"><Eye aria-hidden="true" size={14} className="mr-1" /> Preview</button>
-                    <button type="button" onClick={() => startEdit(n)} className="inline-flex items-center rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700"><Pencil aria-hidden="true" size={14} className="mr-1" /> Edit</button>
-                    <button type="button" onClick={() => toggle(n.id, n.isPublished)} className="rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">{n.isPublished ? 'Hide' : 'Show'}</button>
-                    <button type="button" onClick={() => remove(n.id)} className="rounded border border-line px-3 py-1.5 text-xs font-bold text-rose-700 hover:border-rose-300">Delete</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <>
+              <ul className={`divide-y divide-line transition-opacity ${posts.isFetching ? 'opacity-60' : ''}`}>
+                {posts.rows.map((n) => (
+                  <li key={n.id} className="px-5 py-4">
+                    <div className="flex items-center gap-2"><Pill tone="sky">{n.category}</Pill><span className="text-xs text-muted">{new Date(n.createdAt).toLocaleDateString()}</span>{!n.isPublished && <Pill tone="amber">Hidden</Pill>}</div>
+                    <h4 className="mt-2 font-display text-sm font-extrabold">{n.title}</h4>
+                    {n.description && <p className="mt-1 text-sm text-muted">{n.description}</p>}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button type="button" onClick={() => previewExisting(n.id)} className="inline-flex items-center rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700"><Eye aria-hidden="true" size={14} className="mr-1" /> Preview</button>
+                      <button type="button" onClick={() => startEdit(n)} className="inline-flex items-center rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700"><Pencil aria-hidden="true" size={14} className="mr-1" /> Edit</button>
+                      <button type="button" onClick={() => toggle(n.id, n.isPublished)} className="rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">{n.isPublished ? 'Hide' : 'Show'}</button>
+                      <button type="button" onClick={() => remove(n.id)} className="rounded border border-line px-3 py-1.5 text-xs font-bold text-rose-700 hover:border-rose-300">Delete</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <Pagination
+                total={posts.total}
+                page={posts.page}
+                pageCount={posts.pageCount}
+                limit={posts.limit}
+                onPage={posts.setPage}
+                onLimit={posts.setLimit}
+                disabled={posts.isFetching}
+                noun="post(s)"
+              />
+            </>
           )}
         </Card>
       </div>

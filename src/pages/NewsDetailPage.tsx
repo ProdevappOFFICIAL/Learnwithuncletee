@@ -1,10 +1,12 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Layout } from '@/components/layout/Layout';
 import { Container } from '@/components/ui/Container';
 import { PageMetadata } from '@/components/ui/PageMetadata';
 import { ROUTES } from '@/routes/paths';
 import { apiGetPublic, apiPost } from '@/lib/api';
+import { LIST_GC, LIST_STALE } from '@/lib/pagedQuery';
 import type { NoticeData } from '@/data/dashboard';
 import { Check, ChevronLeft, Link2, ThumbsDown, ThumbsUp } from 'lucide-react';
 
@@ -25,40 +27,40 @@ const plainExcerpt = (markdown: string, max = 160) => {
 
 export const NewsDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  const [article, setArticle] = useState<NoticeData | null>(null);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'missing' | 'error'>('loading');
+  // Per-article cache: revisits and back-navigation never refetch in-window.
+  const articleQuery = useQuery({
+    queryKey: ['public-notice', id ?? ''],
+    queryFn: () => apiGetPublic<NoticeData>(`/public-notices/${id}`),
+    enabled: !!id,
+    staleTime: LIST_STALE,
+    gcTime: LIST_GC,
+    retry: false,
+  });
+  const article = articleQuery.data?.data ?? null;
+  const status: 'loading' | 'ready' | 'missing' | 'error' = !id
+    ? 'missing'
+    : articleQuery.isPending
+      ? 'loading'
+      : articleQuery.isError
+        ? ((articleQuery.error as any)?.status === 404 ? 'missing' : 'error')
+        : 'ready';
   const [vote, setVote] = useState<Vote>(null);
   const [counts, setCounts] = useState({ likeCount: 0, dislikeCount: 0 });
   const [voting, setVoting] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (!id) {
-      setStatus('missing');
-      return;
-    }
-    let cancelled = false;
-    setStatus('loading');
+    if (!id) return;
     try {
       setVote((localStorage.getItem(voteKey(id)) as Vote) ?? null);
     } catch {
       /* private mode — voting still works, just not remembered */
     }
-    apiGetPublic<NoticeData>(`/public-notices/${id}`)
-      .then((res) => {
-        if (!cancelled) {
-          setArticle(res.data);
-          setCounts({ likeCount: res.data.likeCount, dislikeCount: res.data.dislikeCount });
-          setStatus('ready');
-        }
-      })
-      .catch((e: any) => {
-        if (!cancelled) setStatus(e?.status === 404 ? 'missing' : 'error');
-      });
-    return () => {
-      cancelled = true;
-    };
   }, [id]);
+
+  useEffect(() => {
+    if (article) setCounts({ likeCount: article.likeCount, dislikeCount: article.dislikeCount });
+  }, [article]);
 
   const castVote = async (next: 'like' | 'dislike') => {
     if (!id || !article || voting) return;
@@ -186,9 +188,20 @@ export const NewsDetailPage = () => {
                 ? 'It may have been removed or hidden by the school.'
                 : 'Check your connection and try again.'}
             </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
+              {status === 'error' && (
+                <button
+                  type="button"
+                  onClick={() => articleQuery.refetch()}
+                  className="inline-flex min-h-11 items-center rounded border border-line bg-white px-5 py-2.5 text-sm font-bold text-ink hover:border-brand-500 hover:text-brand-700"
+                >
+                  Try again
+                </button>
+              )}
             <Link to={ROUTES.news} className="mt-6 inline-flex min-h-11 items-center rounded bg-brand-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
               <ChevronLeft aria-hidden="true" size={16} className="mr-1" /> Back to News
             </Link>
+            </div>
           </div>
         </Container>
       )}

@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageMetadata } from '@/components/ui/PageMetadata';
-import { apiPost } from '@/lib/api';
+import { apiGet, apiPost } from '@/lib/api';
 import { ROUTES } from '@/routes/paths';
 import { siteInfo } from '@/data/content';
 import {
@@ -188,13 +188,97 @@ const WarningOverlay = ({
   </div>
 );
 
+// ─── Submit confirmation dialog ───────────────────────────────────────────────
+
+const SubmitConfirm = ({
+  total,
+  answeredCount,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  total: number;
+  answeredCount: number;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) => {
+  const left = total - answeredCount;
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-brand-900/80 p-4 backdrop-blur-sm" role="alertdialog" aria-modal="true" aria-labelledby="submit-title">
+      <div className="w-full max-w-sm overflow-hidden rounded-xl bg-white shadow-2xl">
+        <div className="px-5 py-4">
+          <h2 id="submit-title" className="font-display text-base font-extrabold">Submit examination?</h2>
+          <p className="mt-2 text-sm text-ink">
+            You answered <strong>{answeredCount} of {total}</strong>
+            {left > 0 ? (
+              <>, <strong className="text-rose-700">{left} unanswered</strong> — unanswered questions score zero.</>
+            ) : (
+              <>. Every question answered — well done.</>
+            )}
+          </p>
+          <p className="mt-1 text-xs text-muted">This cannot be undone.</p>
+        </div>
+        <div className="flex gap-3 px-5 pb-5">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="inline-flex min-h-10 flex-1 items-center justify-center rounded border border-line bg-white px-3 py-2 text-sm font-semibold text-ink hover:border-brand-500 hover:text-brand-700"
+            autoFocus
+          >
+            Keep answering
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded bg-brand-500 px-3 py-2 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60"
+          >
+            <Send size={15} aria-hidden="true" />
+            {busy ? 'Submitting…' : 'Submit now'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Small keyboard-hint chip ─────────────────────────────────────────────────
+
+const Kbd = ({ children }: { children: string }) => (
+  <kbd className="rounded border border-line bg-white px-1.5 py-0.5 font-mono text-[11px] font-bold text-ink">{children}</kbd>
+);
+
 // ─── Session payload stored by ExaminationPage on login ───────────────────────
 
 interface ExamSession {
   exam: LiveExam['exam'];
+  questions: ExamQuestion[];
+  gate?: { className: string; combinationName: string | null } | null;
   userId: string;
   startedAt: number; // Date.now() ms
 }
+
+interface RoomProgress {
+  picked: Record<string, number | null>;
+  typed: Record<string, string>;
+  currentQ: number;
+}
+
+const readProgress = (key: string): RoomProgress => {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return { picked: {}, typed: {}, currentQ: 0 };
+    const p = JSON.parse(raw) as Partial<RoomProgress>;
+    return {
+      picked: p.picked && typeof p.picked === 'object' ? p.picked : {},
+      typed: p.typed && typeof p.typed === 'object' ? p.typed : {},
+      currentQ: typeof p.currentQ === 'number' && p.currentQ >= 0 ? p.currentQ : 0,
+    };
+  } catch {
+    return { picked: {}, typed: {}, currentQ: 0 };
+  }
+};
 
 // ─── ExamRoomPage ─────────────────────────────────────────────────────────────
 
@@ -212,6 +296,12 @@ export const ExamRoomPage = () => {
 
   const exam = session?.exam ?? null;
   const userId = session?.userId ?? null;
+  // New sessions carry questions separately (filtered + answers stripped);
+  // fall back to exam-embedded rows for legacy in-flight sessions.
+  const questions: ExamQuestion[] = useMemo(
+    () => session?.questions ?? ((session?.exam as any)?.questions ?? []),
+    [session],
+  );
 
   // If no valid session, redirect back to login
   useEffect(() => {
@@ -220,14 +310,34 @@ export const ExamRoomPage = () => {
     }
   }, [session, code]);
 
-  // ── Answer state ─────────────────────────────────────────────────────────────
-  const [picked, setPicked] = useState<Record<string, number | null>>({});
-  const [typed, setTyped] = useState<Record<string, string>>({});
-  const [currentQ, setCurrentQ] = useState(0);
+  // ── Answer state (persisted so a tab reload resumes, timer keeps running) ────
+  const progressKey = `${sessionKey}:progress`;
+  const [picked, setPicked] = useState<Record<string, number | null>>(() => readProgress(progressKey).picked);
+  const [typed, setTyped] = useState<Record<string, string>>(() => readProgress(progressKey).typed);
+  const [currentQ, setCurrentQ] = useState(() => readProgress(progressKey).currentQ);
   const [calcOpen, setCalcOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(progressKey, JSON.stringify({ picked, typed, currentQ }));
+    } catch {
+      /* private mode — resume unavailable, exam still works */
+    }
+  }, [picked, typed, currentQ, progressKey]);
+
+  // ── Sitter avatar (top-right) ───────────────────────────────────────────────
+  const [sitter, setSitter] = useState<{ user_name: string; img?: string | null; student?: { photoUrl?: string | null } | null } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    apiGet<{ user_name: string; img?: string | null; student?: { photoUrl?: string | null } | null }>('/dashboard/me')
+      .then((res) => { if (!cancelled) setSitter(res.data); })
+      .catch(() => { /* avatar is decorative — exam works without it */ });
+    return () => { cancelled = true; };
+  }, []);
 
   // ── Timer ───────────────────────────────────────────────────────────────────
   const [secondsLeft, setSecondsLeft] = useState(() => {
@@ -262,13 +372,9 @@ export const ExamRoomPage = () => {
   }, [submitted]);
 
   useEffect(() => {
-    // Block reload / tab close
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (submitted) return;
-      e.preventDefault();
-      e.returnValue = 'Your examination is in progress. Leaving will submit your answers.';
-    };
-
+    // Relaxed exit guard: a plain reload resumes from saved progress (answers +
+    // current question persist, timer runs from startedAt), so only genuine
+    // tab-switching counts as a violation — no more reload block.
     // Tab switch / window minimise
     const onVisibilityChange = () => {
       if (document.hidden) handleViolation();
@@ -280,26 +386,33 @@ export const ExamRoomPage = () => {
       handleViolation();
     };
 
-    window.addEventListener('beforeunload', onBeforeUnload);
     document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('blur', onBlur);
 
     return () => {
-      window.removeEventListener('beforeunload', onBeforeUnload);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('blur', onBlur);
     };
   }, [handleViolation, submitted]);
 
   // ── Stable shuffled options ─────────────────────────────────────────────────
+  // The server pre-shuffles options per question (answers never reach the
+  // client). Legacy sessions still carry answers — shuffle those client-side.
   const optionsByQ = useMemo(() => {
     const map: Record<string, string[]> = {};
-    for (const q of exam?.questions ?? []) {
-      if (q.type === 'TRUE_FALSE') map[q.id] = ['True', 'False'];
-      else map[q.id] = shuffle([q.correct_answer, ...(q.incorrect_answers ?? [])]);
+    for (const q of questions) {
+      if (q.type === 'FILL_IN_THE_BLANK') {
+        map[q.id] = [];
+      } else if (q.options && q.options.length > 0) {
+        map[q.id] = q.options;
+      } else if (q.type === 'TRUE_FALSE') {
+        map[q.id] = ['True', 'False'];
+      } else {
+        map[q.id] = shuffle([q.correct_answer ?? '', ...(q.incorrect_answers ?? [])]);
+      }
     }
     return map;
-  }, [exam]);
+  }, [questions]);
 
   const answered = (q: ExamQuestion) =>
     q.type === 'FILL_IN_THE_BLANK'
@@ -312,7 +425,7 @@ export const ExamRoomPage = () => {
     setBusy(true);
     setError(null);
     try {
-      const questionAttempts = exam.questions.map((q) => {
+      const questionAttempts = questions.map((q) => {
         if (q.type === 'FILL_IN_THE_BLANK') {
           const text = (typed[q.id] ?? '').trim();
           return { questionId: q.id, visited: true, attempted: text.length > 0, options: [], userOption: null, userTextAnswer: text };
@@ -324,11 +437,12 @@ export const ExamRoomPage = () => {
         userId,
         examId: exam.id,
         attempted_questions: questionAttempts.filter((a) => a.attempted).length,
-        total_questions: exam.questions.length,
+        total_questions: questions.length,
         questionAttempts,
       });
       setSubmitted(true);
       sessionStorage.removeItem(sessionKey);
+      sessionStorage.removeItem(progressKey);
       // Store result for ExaminationPage to display on redirect
       sessionStorage.setItem(
         `exam_result_${code}`,
@@ -340,14 +454,14 @@ export const ExamRoomPage = () => {
       setError(err?.message ?? 'Submit failed. Please try again.');
       setBusy(false);
     }
-  }, [exam, busy, userId, submitted, picked, typed, optionsByQ, sessionKey, code]);
+  }, [exam, busy, userId, submitted, picked, typed, optionsByQ, sessionKey, progressKey, code, questions]);
 
   // Keep submitRef in sync so the anti-cheat handler can call it
   useEffect(() => { submitRef.current = submit; }, [submit]);
 
   // Auto-submit when timer reaches zero
   useEffect(() => {
-    if (secondsLeft === 0 && !submitted && exam && exam.questions.length > 0) {
+    if (secondsLeft === 0 && !submitted && exam && questions.length > 0) {
       submit();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -355,9 +469,50 @@ export const ExamRoomPage = () => {
 
   const goTo = (idx: number) => {
     if (!exam) return;
-    setCurrentQ(Math.max(0, Math.min(exam.questions.length - 1, idx)));
+    setCurrentQ(Math.max(0, Math.min(questions.length - 1, idx)));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // ── Keyboard shortcuts: A… selects options, P previous, N next ─────────────
+  // Ignored while typing, while dialogs are open, or after submit.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (submitted || calcOpen || warnOpen || confirmOpen) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // Typing targets keep their keys; focused radios/checkboxes don't block shortcuts.
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName ?? '';
+      const isTextEntry =
+        tag === 'TEXTAREA' ||
+        tag === 'SELECT' ||
+        (t?.isContentEditable ?? false) ||
+        (tag === 'INPUT' && ['TEXT', 'PASSWORD', 'EMAIL', 'SEARCH', 'NUMBER', 'TEL', 'URL'].includes((t as HTMLInputElement).type?.toUpperCase()));
+      if (isTextEntry) return;
+      const total = questions.length;
+      if (!total) return;
+      const q = questions[Math.min(currentQ, total - 1)];
+      if (!q) return;
+      const k = e.key.toLowerCase();
+      if (k >= 'a' && k <= 'z') {
+        const idx = k.charCodeAt(0) - 97;
+        const opts = optionsByQ[q.id] ?? [];
+        if (q.type !== 'FILL_IN_THE_BLANK' && idx < opts.length) {
+          setPicked((p) => ({ ...p, [q.id]: idx }));
+          e.preventDefault();
+        }
+        return;
+      }
+      if (k === 'p') {
+        goTo(currentQ - 1);
+        return;
+      }
+      if (k === 'n') {
+        goTo(currentQ + 1);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [submitted, calcOpen, warnOpen, confirmOpen, questions, currentQ, optionsByQ, goTo]);
 
   // ── Guard: no session ───────────────────────────────────────────────────────
   if (!exam || !userId) {
@@ -368,10 +523,33 @@ export const ExamRoomPage = () => {
     );
   }
 
-  const total = exam.questions.length;
-  const q = exam.questions[currentQ];
-  const isFirst = currentQ === 0;
-  const isLast = currentQ === total - 1;
+  const total = questions.length;
+  // Clamp: resumed progress could exceed the list if the feed changed.
+  const safeCurrent = total ? Math.min(currentQ, total - 1) : 0;
+  const q = questions[safeCurrent];
+
+  // ── Guard: filter chain assigned nothing (wrong class/combination, or an
+  // exam whose subjects don't overlap the pupil's combination) ────────────────
+  if (total === 0) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-cream px-4 font-sans text-ink">
+        <div className="w-full max-w-md border border-line bg-white p-8 text-center">
+          <p className="text-xs font-bold uppercase tracking-widest text-brand-700">No questions assigned</p>
+          <h1 className="mt-3 font-display text-2xl font-extrabold">{exam.exam_name}</h1>
+          <p className="mt-3 text-sm leading-relaxed text-muted">
+            Your class/combination has no questions in this exam. Check with your teacher —
+            they may need to link your subjects to this exam.
+          </p>
+          <Link to={ROUTES.examination.replace(':code', code)} className="mt-6 inline-flex min-h-11 items-center rounded bg-brand-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
+            Back
+          </Link>
+        </div>
+      </div>
+    );
+  }
+  const isFirst = safeCurrent === 0;
+  const isLast = safeCurrent === total - 1;
+  const answeredCount = questions.filter(answered).length;
 
   return (
     <>
@@ -390,6 +568,16 @@ export const ExamRoomPage = () => {
         />
       )}
 
+      {confirmOpen && (
+        <SubmitConfirm
+          total={total}
+          answeredCount={answeredCount}
+          busy={busy}
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={() => { setConfirmOpen(false); submit(); }}
+        />
+      )}
+
       <div className="flex min-h-screen flex-col bg-cream font-sans text-ink">
 
         {/* ── Sticky header ── */}
@@ -400,7 +588,7 @@ export const ExamRoomPage = () => {
             </Link>
             <div className="min-w-0 flex-1">
               <p className="truncate font-display text-sm font-extrabold">{exam.exam_name}</p>
-              <p className="text-xs text-muted">Question {currentQ + 1} of {total}</p>
+              <p className="text-xs text-muted">Question {safeCurrent + 1} of {total}</p>
             </div>
 
             {/* Calculator */}
@@ -413,6 +601,17 @@ export const ExamRoomPage = () => {
             >
               <Calculator size={16} aria-hidden="true" />
             </button>
+
+            {/* Sitter avatar */}
+            {sitter && (
+              <span title={sitter.user_name} className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-900 text-xs font-extrabold text-lime-accent ring-1 ring-line">
+                {sitter.student?.photoUrl || sitter.img ? (
+                  <img src={(sitter.student?.photoUrl || sitter.img) as string} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  sitter.user_name.split(' ').map((p) => p.replace('.', '')[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'LW'
+                )}
+              </span>
+            )}
 
             {/* Timer */}
             <p
@@ -432,9 +631,9 @@ export const ExamRoomPage = () => {
 
             {/* ── Dot-nav progress bar ── */}
             <nav aria-label="Question navigation" className="mb-6 flex flex-wrap items-center gap-1.5">
-              {exam.questions.map((x, i) => {
+              {questions.map((x, i) => {
                 const done = answered(x);
-                const active = i === currentQ;
+                const active = i === safeCurrent;
                 return (
                   <button
                     key={i}
@@ -454,14 +653,14 @@ export const ExamRoomPage = () => {
                 );
               })}
               <span className="ml-auto text-xs text-muted">
-                {exam.questions.filter(answered).length}/{total} answered
+                {questions.filter(answered).length}/{total} answered
               </span>
             </nav>
 
             {/* ── Question card ── */}
-            <article className="border border-line bg-white p-5 sm:p-8" aria-label={`Question ${currentQ + 1}`}>
+            <article className="border border-line bg-white p-5 sm:p-8" aria-label={`Question ${safeCurrent + 1}`}>
               <p className="text-xs font-bold uppercase tracking-widest text-brand-700">
-                Question {currentQ + 1} of {total} · {q.type.replace(/_/g, ' ')}
+                Question {safeCurrent + 1} of {total} · {q.type.replace(/_/g, ' ')}{q.subject?.name ? ` · ${q.subject.name}` : ''}
               </p>
               <div className="mt-3 font-display text-base font-extrabold leading-relaxed sm:text-lg">
                 <Suspense fallback={<div className="h-6 animate-pulse rounded bg-brand-50" />}>
@@ -474,11 +673,11 @@ export const ExamRoomPage = () => {
                   value={typed[q.id] ?? ''}
                   onChange={(e) => setTyped({ ...typed, [q.id]: e.target.value })}
                   placeholder="Type your answer…"
-                  aria-label={`Answer for question ${currentQ + 1}`}
+                  aria-label={`Answer for question ${safeCurrent + 1}`}
                   className="mt-5 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
                 />
               ) : (
-                <div className="mt-5 space-y-2.5" role="radiogroup" aria-label={`Options for question ${currentQ + 1}`}>
+                <div className="mt-5 space-y-2.5" role="radiogroup" aria-label={`Options for question ${safeCurrent + 1}`}>
                   {(optionsByQ[q.id] ?? []).map((opt, oi) => (
                     <label
                       key={oi}
@@ -506,8 +705,9 @@ export const ExamRoomPage = () => {
             <div className="mt-5 flex items-center justify-between gap-3">
               <button
                 type="button"
-                onClick={() => goTo(currentQ - 1)}
+                onClick={() => goTo(safeCurrent - 1)}
                 disabled={isFirst}
+                title="Previous (P)"
                 className="inline-flex min-h-11 items-center gap-2 rounded border border-line bg-white px-5 py-2.5 text-sm font-semibold text-ink transition-colors hover:border-brand-500 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronLeft size={16} aria-hidden="true" /> Previous
@@ -516,8 +716,9 @@ export const ExamRoomPage = () => {
               {isLast ? (
                 <button
                   type="button"
-                  onClick={submit}
+                  onClick={() => setConfirmOpen(true)}
                   disabled={busy}
+                  title="Review and submit"
                   className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded bg-brand-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60"
                 >
                   <Send size={15} aria-hidden="true" />
@@ -526,7 +727,8 @@ export const ExamRoomPage = () => {
               ) : (
                 <button
                   type="button"
-                  onClick={() => goTo(currentQ + 1)}
+                  onClick={() => goTo(safeCurrent + 1)}
+                  title="Next (N)"
                   className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded bg-brand-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700"
                 >
                   Next <ChevronRight size={16} aria-hidden="true" />
@@ -538,7 +740,7 @@ export const ExamRoomPage = () => {
             {!isLast && (
               <button
                 type="button"
-                onClick={submit}
+                onClick={() => setConfirmOpen(true)}
                 disabled={busy}
                 className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded border border-line bg-white px-5 py-2 text-sm font-semibold text-muted hover:border-brand-500 hover:text-brand-700 disabled:opacity-60"
               >
@@ -546,6 +748,12 @@ export const ExamRoomPage = () => {
                 {busy ? 'Submitting…' : 'Submit now (finish early)'}
               </button>
             )}
+
+            {/* Keyboard hints */}
+            <p className="mt-3 text-center text-xs text-muted">
+              Shortcuts: <Kbd>A</Kbd>–<Kbd>{String.fromCharCode(64 + Math.min((optionsByQ[q.id] ?? []).length, 26))}</Kbd> answer
+              {' · '}<Kbd>P</Kbd> previous {' · '}<Kbd>N</Kbd> next
+            </p>
 
             {error && (
               <p role="alert" className="mt-4 border-l-2 border-rose-400 bg-rose-50 px-4 py-3 text-sm text-rose-800">

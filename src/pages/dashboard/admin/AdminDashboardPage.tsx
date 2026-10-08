@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { ROUTES } from '@/routes/paths';
-import { useResource } from '@/context/AuthContext';
+import { apiGet } from '@/lib/api';
+import { LIST_GC } from '@/lib/pagedQuery';
 import { BannerCard, Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, StatTile } from '@/components/dashboard/DashboardUI';
 
 interface AdminOverview {
@@ -9,7 +11,15 @@ interface AdminOverview {
 }
 
 export const AdminDashboardPage = () => {
-  const { data, loading, error, reload } = useResource<AdminOverview>('/dashboard/admin');
+  // School snapshot: fresh for 2 minutes, kept 30 — navigating away and back
+  // never refetches within the window.
+  const overview = useQuery({
+    queryKey: ['admin-overview'],
+    queryFn: () => apiGet<AdminOverview>('/dashboard/admin'),
+    staleTime: 2 * 60 * 1000,
+    gcTime: LIST_GC,
+  });
+  const data = overview.data?.data;
 
   return (
     <div className="space-y-6">
@@ -19,7 +29,7 @@ export const AdminDashboardPage = () => {
         text="Admissions, fees, staffing and academics — everything that needs your attention today."
         actions={
           <>
-            <Link to={ROUTES.adminAdmissions} className="inline-flex min-h-11 items-center rounded bg-brand-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
+            <Link to={ROUTES.adminAdmissions} className="hidden min-h-11 items-center rounded bg-brand-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
               Review admissions
             </Link>
             <Link to={ROUTES.adminNews} className="inline-flex min-h-11 items-center rounded bg-brand-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
@@ -29,10 +39,10 @@ export const AdminDashboardPage = () => {
         }
       />
 
-      {loading ? (
+      {overview.isPending ? (
         <LoadingSkeleton rows={6} />
-      ) : error || !data ? (
-        <ErrorState message={error ?? 'No data'} onRetry={reload} />
+      ) : overview.isError || !data ? (
+        <ErrorState message="Could not load overview" onRetry={() => overview.refetch()} />
       ) : (
         <>
           <BannerCard
@@ -41,11 +51,11 @@ export const AdminDashboardPage = () => {
             text="Live enrolment, collections and grading queue below — all pulled from the database."
             image="/students_playing_games.jfif"
             action={
-              <Link to={ROUTES.adminFees} className="inline-flex min-h-11 items-center rounded bg-lime-accent px-5 py-2.5 text-sm font-bold text-brand-900">View fee collection</Link>
+              <Link to={ROUTES.adminExams} className="inline-flex min-h-11 items-center rounded bg-lime-accent px-5 py-2.5 text-sm font-bold text-brand-900">View Exam & Test</Link>
             }
           />
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {data.stats.map((s) => <StatTile key={s.id} label={s.label} value={s.value} hint={s.hint} />)}
           </div>
 

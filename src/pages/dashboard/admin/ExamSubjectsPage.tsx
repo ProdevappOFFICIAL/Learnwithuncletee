@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, Modal, PageHeader } from '@/components/dashboard/DashboardUI';
+import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, Modal, PageHeader, Pagination } from '@/components/dashboard/DashboardUI';
 import { useAuth, useResource } from '@/context/AuthContext';
-import { apiDelete, apiPost, apiPut } from '@/lib/api';
+import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api';
+import { usePagedList } from '@/lib/pagedQuery';
 import { ROUTES } from '@/routes/paths';
-import { BookOpen, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
+import { BookOpen, ChevronRight, HelpCircle, Pencil, Plus, Trash2 } from 'lucide-react';
 
 interface SubjectItem {
   id: string;
@@ -12,6 +13,7 @@ interface SubjectItem {
   code?: string | null;
   description?: string | null;
   classes?: Array<{ id: string; name: string }>;
+  _count?: { questions?: number };
 }
 
 interface ExamInfo {
@@ -25,21 +27,21 @@ export const ExamSubjectsPage = () => {
   const { classId = '', examId = '' } = useParams<{ classId: string; examId: string }>();
   const { user } = useAuth();
   const exam = useResource<ExamInfo>(examId ? `/exams/${examId}` : null);
-  const { data, loading, error, reload } = useResource<SubjectItem[]>('/subjects');
   const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
+
+  // Subjects attached to THIS exam — two exams under one class differ.
+  // (The exam link is authoritative; the class link is kept in sync.)
+  const subjects = usePagedList<SubjectItem>(
+    ['exam-subjects', examId, query],
+    (page, limit) => apiGet<SubjectItem[]>('/subjects', { examId, searchTerm: query || undefined, page, limit }),
+  );
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<SubjectItem | null>(null);
   const [form, setForm] = useState({ name: '', code: '', description: '' });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-
-  // Only subjects linked to this class — mirrors the EXAMPLE linkage rule.
-  const linked = (data ?? []).filter((s) => (s.classes ?? []).some((c) => c.id === classId));
-  const list = linked.filter(
-    (s) =>
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      (s.code ?? '').toLowerCase().includes(search.toLowerCase()),
-  );
 
   const openCreate = () => {
     setEditing(null);
@@ -70,6 +72,7 @@ export const ExamSubjectsPage = () => {
         description: form.description.trim() || undefined,
         workspaceId: user?.workspaceId,
         classIds: [classId],
+        examIds: [examId],
       };
       if (editing) {
         await apiPut(`/subjects/${editing.id}`, payload);
@@ -80,7 +83,7 @@ export const ExamSubjectsPage = () => {
       }
       setModalOpen(false);
       setEditing(null);
-      reload();
+      subjects.invalidate();
     } catch (err: any) {
       setNotice(err?.message ?? 'Save failed');
     } finally {
@@ -93,7 +96,7 @@ export const ExamSubjectsPage = () => {
     try {
       await apiDelete(`/subjects/${subject.id}`);
       setNotice(`Subject "${subject.name}" deleted.`);
-      reload();
+      subjects.invalidate();
     } catch (err: any) {
       setNotice(err?.message ?? 'Delete failed');
     }
@@ -106,7 +109,7 @@ export const ExamSubjectsPage = () => {
       <PageHeader
         eyebrow={`Exam & Test · ${examName}`}
         title={`Subjects — ${examName}`}
-        text="Subjects linked to this class. Select a subject to manage its questions."
+        text="Subjects in this exam. Select a subject to manage its questions."
         actions={
           <button type="button" onClick={openCreate} className="inline-flex min-h-11 items-center rounded bg-brand-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
             <Plus aria-hidden="true" size={16} className="mr-2" /> Add New Subject
@@ -123,8 +126,15 @@ export const ExamSubjectsPage = () => {
       {notice && <p role="status" className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
 
       <Card>
-        <CardHead title="Subjects in this class" sub={`${list.length} shown`} />
-        <div className="border-b border-line px-5 py-4">
+        <CardHead title="Subjects in this exam" sub={`${subjects.total} shown`} />
+        <form
+          className="flex flex-wrap gap-2 border-b border-line px-5 py-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setQuery(search);
+            subjects.resetPage();
+          }}
+        >
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -132,41 +142,63 @@ export const ExamSubjectsPage = () => {
             aria-label="Search subjects"
             className="min-h-11 w-full max-w-sm rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500"
           />
-        </div>
-        {loading ? (
+          <button type="submit" className="min-h-11 rounded bg-brand-900 px-4 text-sm font-bold text-white hover:bg-brand-700">Search</button>
+          {search && (
+            <button type="button" onClick={() => { setSearch(''); setQuery(''); subjects.resetPage(); }} className="min-h-11 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">
+              Reset
+            </button>
+          )}
+        </form>
+        {subjects.isPending ? (
           <div className="px-5 py-5"><LoadingSkeleton rows={4} /></div>
-        ) : error || !data ? (
-          <div className="px-5 py-5"><ErrorState message={error ?? 'No data'} onRetry={reload} /></div>
-        ) : list.length === 0 ? (
-          <div className="px-5 py-5"><EmptyState message={search ? 'No subjects match your search.' : 'No subjects linked to this class yet — add the first one.'} /></div>
+        ) : subjects.isError ? (
+          <div className="px-5 py-5"><ErrorState message="Could not load subjects" onRetry={() => subjects.refetch()} /></div>
+        ) : subjects.rows.length === 0 ? (
+            <div className="px-5 py-5"><EmptyState message={query ? 'No subjects match your search.' : 'No subjects in this exam yet — add the first one.'} /></div>
         ) : (
-          <ul className="divide-y divide-line">
-            {list.map((subject) => (
-              <li key={subject.id} className="group flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                <Link to={`/dashboard/admin/exams/${classId}/${examId}/${subject.id}`} className="flex min-w-0 flex-1 items-center gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-700 group-hover:bg-brand-500 group-hover:text-white">
-                    <BookOpen size={18} aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate font-display text-base font-extrabold group-hover:text-brand-700">
-                      {subject.name}
-                      {subject.code && <span className="ml-2 text-xs font-bold text-muted">{subject.code}</span>}
+          <>
+            <ul className={`divide-y divide-line transition-opacity ${subjects.isFetching ? 'opacity-60' : ''}`}>
+              {subjects.rows.map((subject) => (
+                <li key={subject.id} className="group flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <Link to={`/dashboard/admin/exams/${classId}/${examId}/${subject.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-700 group-hover:bg-brand-500 group-hover:text-white">
+                      <BookOpen size={18} aria-hidden="true" />
                     </span>
-                    {subject.description && <span className="block truncate text-xs text-muted">{subject.description}</span>}
+                    <span className="min-w-0">
+                      <span className="block truncate font-display text-base font-extrabold group-hover:text-brand-700">
+                        {subject.name}
+                        {subject.code && <span className="ml-2 text-xs font-bold text-muted">{subject.code}</span>}
+                      </span>
+                      <span className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted">
+                        {subject.description && <span className="truncate">{subject.description}</span>}
+                        {subject.description && <span>·</span>}
+                        <span className="inline-flex items-center gap-1"><HelpCircle size={12} aria-hidden="true" /> {subject._count?.questions ?? 0} questions</span>
+                      </span>
+                    </span>
+                    <ChevronRight size={16} aria-hidden="true" className="ml-auto shrink-0 text-muted group-hover:text-brand-700" />
+                  </Link>
+                  <span className="flex shrink-0 gap-2 border-t border-line pt-3 sm:border-t-0 sm:pt-0 sm:pl-4">
+                    <button type="button" onClick={() => openEdit(subject)} aria-label={`Edit ${subject.name}`} title="Edit" className="rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">
+                      <Pencil aria-hidden="true" size={14} />
+                    </button>
+                    <button type="button" onClick={() => remove(subject)} aria-label={`Delete ${subject.name}`} title="Delete" className="rounded border border-line px-3 py-1.5 text-xs font-bold text-rose-700 hover:border-rose-300">
+                      <Trash2 aria-hidden="true" size={14} />
+                    </button>
                   </span>
-                  <ChevronRight size={16} aria-hidden="true" className="ml-auto shrink-0 text-muted group-hover:text-brand-700" />
-                </Link>
-                <span className="flex shrink-0 gap-2 border-t border-line pt-3 sm:border-t-0 sm:pt-0 sm:pl-4">
-                  <button type="button" onClick={() => openEdit(subject)} aria-label={`Edit ${subject.name}`} title="Edit" className="rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">
-                    <Pencil aria-hidden="true" size={14} />
-                  </button>
-                  <button type="button" onClick={() => remove(subject)} aria-label={`Delete ${subject.name}`} title="Delete" className="rounded border border-line px-3 py-1.5 text-xs font-bold text-rose-700 hover:border-rose-300">
-                    <Trash2 aria-hidden="true" size={14} />
-                  </button>
-                </span>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+            <Pagination
+              total={subjects.total}
+              page={subjects.page}
+              pageCount={subjects.pageCount}
+              limit={subjects.limit}
+              onPage={subjects.setPage}
+              onLimit={subjects.setLimit}
+              disabled={subjects.isFetching}
+              noun="subject(s)"
+            />
+          </>
         )}
       </Card>
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ROUTES } from '@/routes/paths';
 import { siteInfo } from '@/data/content';
 import { PageMetadata } from '@/components/ui/PageMetadata';
@@ -33,6 +33,8 @@ export const LoginPage = () => {
   const [busy, setBusy] = useState(false);
   const { login, logout, user, loading: sessionLoading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const fromDesktop = searchParams.get('source') === 'desktop';
 
   const switchMode = (m: Mode) => { setMode(m); setError(null); setSuccess(null); };
 
@@ -53,7 +55,9 @@ export const LoginPage = () => {
     setBusy(true);
     try {
       const me = await login(identity, password, { remember, role: roleHint });
-      navigate(homeForRole(me.role));
+      // Desktop connect flow: the app opened /login?source=desktop — hand off
+      // to the exchange-code page instead of the role dashboard.
+      navigate(fromDesktop ? ROUTES.connectDesktop : homeForRole(me.role));
     } catch (e: any) {
       setError(e?.message ?? 'Sign-in failed. Check your credentials.');
     } finally {
@@ -169,7 +173,7 @@ export const LoginPage = () => {
               <div className="mt-8 space-y-4">
                 <button
                   type="button"
-                  onClick={() => navigate(homeForRole(user.role))}
+                  onClick={() => navigate(fromDesktop ? ROUTES.connectDesktop : homeForRole(user.role))}
                   className="flex w-full items-center gap-4 rounded border border-line bg-white p-4 text-left transition-colors hover:border-brand-500"
                 >
                   {avatarOf(user) ? (

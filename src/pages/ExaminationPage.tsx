@@ -2,19 +2,24 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageMetadata } from '@/components/ui/PageMetadata';
 import { useAuth } from '@/context/AuthContext';
-import { apiGetPublic } from '@/lib/api';
+import { apiGet, apiGetPublic } from '@/lib/api';
 import { ROUTES } from '@/routes/paths';
 import { siteInfo } from '@/data/content';
 import { CheckCircle2, ChevronLeft } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+/** One sitting question: options are pre-shuffled server-side, answers never sent. */
 export interface ExamQuestion {
   id: string;
   type: 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'FILL_IN_THE_BLANK';
   question: string;
-  correct_answer: string;
-  incorrect_answers: string[];
+  subjectId?: string;
+  subject?: { id: string; name: string } | null;
+  options?: string[];
+  // Legacy sessions (stored before answer-stripping) may still carry these.
+  correct_answer?: string;
+  incorrect_answers?: string[];
 }
 
 export interface LiveExam {
@@ -23,8 +28,16 @@ export interface LiveExam {
     id: string;
     exam_name: string;
     minutes: number;
-    questions: ExamQuestion[];
+    class?: { id: string; name: string } | null;
+    _count?: { questions: number };
   };
+}
+
+interface QuestionFeed {
+  exam: { id: string; exam_name: string; minutes: number };
+  questions: ExamQuestion[];
+  subjects: Array<{ id: string; name: string }>;
+  gate: { className: string; combinationName: string | null } | null;
 }
 
 type Phase = 'loading' | 'unavailable' | 'login' | 'done';
@@ -87,10 +100,21 @@ export const ExaminationPage = () => {
     try {
       const me = await login(identity.trim(), password);
       if (!exam) return;
+      // Post-login: pull this pupil's filtered question feed (class → exam →
+      // combination → subject). 403 here means the exam isn't for their class.
+      const feed = await apiGet<QuestionFeed>(`/exam-deployments/by-code/${code}/questions`);
+      if (feed.data.questions.length === 0) {
+        setError(
+          `Signed in as ${me.user_name}, but no questions are assigned to you in ${feed.data.exam.exam_name}` +
+          (feed.data.gate?.combinationName ? ` for combination ${feed.data.gate.combinationName}` : '') +
+          '. Check with your teacher.',
+        );
+        return;
+      }
       // Store exam payload + userId in sessionStorage so ExamRoomPage can pick it up
       sessionStorage.setItem(
         `exam_session_${code}`,
-        JSON.stringify({ exam, userId: me.id, startedAt: Date.now() }),
+        JSON.stringify({ exam: feed.data.exam, questions: feed.data.questions, subjects: feed.data.subjects, gate: feed.data.gate, userId: me.id, startedAt: Date.now() }),
       );
       // Hard navigate so ExamRoomPage mounts fresh (prevents back-button to login mid-exam)
       window.location.href = ROUTES.examinationRoom.replace(':code', code);
@@ -139,7 +163,7 @@ export const ExaminationPage = () => {
             </h1>
             <p className="mt-4 max-w-lg leading-relaxed text-white/80">
               {exam
-                ? `${exam.questions.length} question${exam.questions.length !== 1 ? 's' : ''} · ${exam.minutes} minutes. Sign in with your school credentials to begin.`
+                ? `${exam._count?.questions ?? 0} question${(exam._count?.questions ?? 0) !== 1 ? 's' : ''} · ${exam.minutes} minutes. Sign in with your school credentials to begin.`
                 : 'Enter your examination code to access your assigned test.'}
             </p>
             {exam && phase !== 'done' && (
