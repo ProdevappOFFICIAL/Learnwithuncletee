@@ -9,6 +9,7 @@ import { API_BASE, tokenStore } from '@/lib/api';
  *
  * FileRoutes (see api/src/modules/upload/upload.router.ts):
  * avatarUploader | assignmentUploader | lessonMaterialUploader | galleryUploader
+ * | formResponseUploader (public — gated by x-form-id, see `formId` prop)
  */
 
 // Intentionally `any`: the canonical router type lives server-side and must
@@ -20,23 +21,29 @@ export type UploadEndpoint =
   | 'avatarUploader'
   | 'assignmentUploader'
   | 'lessonMaterialUploader'
-  | 'galleryUploader';
+  | 'galleryUploader'
+  | 'formResponseUploader';
 
 interface UploadButtonProps {
   endpoint: UploadEndpoint;
   onClientUploadComplete?: (res: Array<{ ufsUrl: string; name: string }>) => void;
   onUploadError?: (error: Error) => void;
   label?: string;
+  /** Public form uploads: sent as x-form-id so the server can gate by form. */
+  formId?: string;
 }
 
 /** Brand-styled file picker backed by UploadThing. Same API as UT's UploadButton. */
-export const UploadButton = ({ endpoint, onClientUploadComplete, onUploadError, label = 'Choose file & upload' }: UploadButtonProps) => {
+export const UploadButton = ({ endpoint, onClientUploadComplete, onUploadError, label = 'Choose file & upload', formId }: UploadButtonProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const { startUpload } = useUploadThing(endpoint as any, {
     headers: () => {
       const token = tokenStore.get();
-      return token ? { Authorization: `Bearer ${token}` } : {};
+      return {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(formId ? { 'x-form-id': formId } : {}),
+      };
     },
     onClientUploadComplete: (res: any) => onClientUploadComplete?.(res),
     onUploadError: (e: any) => onUploadError?.(e instanceof Error ? e : new Error(e?.message ?? 'Upload failed')),

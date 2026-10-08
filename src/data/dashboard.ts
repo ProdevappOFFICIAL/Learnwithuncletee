@@ -167,6 +167,26 @@ export const adminNav: DashboardNavItem[] = [
     permission: "news.read",
   },
   {
+    label: "Forms",
+    icon: ScrollText,
+    to: ROUTES.adminForms,
+    permission: "forms.read",
+    children: [
+      {
+        to: ROUTES.adminForms,
+        label: "Manage",
+        icon: FileText,
+        permission: "forms.read",
+      },
+      {
+        to: ROUTES.adminFormResponses,
+        label: "Responses",
+        icon: ClipboardList,
+        permission: "forms.read",
+      },
+    ],
+  },
+  {
     to: ROUTES.adminResults,
     label: "Results",
     icon: FileBarChart2,
@@ -479,8 +499,7 @@ export interface ClassItem {
   name: string;
 }
 
-export interface DisciplineActionItem {
-  id: string;
+export interface DisciplineActionItem {  id: string;
   studentId: string;
   action: string;
   reason?: string | null;
@@ -500,6 +519,36 @@ export interface ResultDocItem {
   subject?: string | null;
   studentId?: string | null;
   fileUrl: string;
+  createdAt: string;
+}
+
+export interface FormFieldItem {
+  id: string;
+  type: 'TEXT' | 'FILL_BLANK' | 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'FILE' | 'PAYMENT' | string;
+  label: string;
+  required: boolean;
+  options?: string[] | null;
+  order: number;
+}
+
+export interface FormItem {
+  id: string;
+  title: string;
+  description?: string | null;
+  isPublished: boolean;
+  isClosed: boolean;
+  amountKobo: number;
+  fields?: FormFieldItem[];
+  _count?: { fields?: number; responses?: number };
+  createdAt: string;
+}
+
+export interface FormResponseItem {
+  id: string;
+  email: string;
+  answers: Record<string, any>;
+  paymentRef?: string | null;
+  paymentStatus: string;
   createdAt: string;
 }
 

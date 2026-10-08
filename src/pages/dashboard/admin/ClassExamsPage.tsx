@@ -5,6 +5,7 @@ import { useAuth, useResource } from '@/context/AuthContext';
 import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api';
 import { usePagedList } from '@/lib/pagedQuery';
 import { ROUTES } from '@/routes/paths';
+import type { CombinationItem } from '@/data/dashboard';
 import { BookOpen, ChevronRight, Clock, Eye, EyeOff, FileText, Pencil, Plus, Trash2, Users } from 'lucide-react';
 
 interface ExamItem {
@@ -12,6 +13,8 @@ interface ExamItem {
   exam_name: string;
   minutes: number;
   visible?: boolean;
+  combinationId?: string | null;
+  combination?: { id: string; name: string } | null;
   class?: { name: string };
   _count?: { questions?: number; results?: number; subjects?: number };
   students?: number;
@@ -30,6 +33,7 @@ export const ClassExamsPage = () => {
   const { classId = '' } = useParams<{ classId: string }>();
   const { user } = useAuth();
   const cls = useResource<ClassInfo>(classId ? `/classes/${classId}` : null);
+  const combinations = useResource<CombinationItem[]>('/combinations', { limit: 100 });
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [visibility, setVisibility] = useState<VisibilityFilter>('');
@@ -46,20 +50,25 @@ export const ClassExamsPage = () => {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ExamItem | null>(null);
-  const [form, setForm] = useState({ exam_name: '', minutes: '60', visible: true });
+  const [form, setForm] = useState({ exam_name: '', minutes: '60', visible: true, combinationId: '' });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ exam_name: '', minutes: '60', visible: true });
+    setForm({ exam_name: '', minutes: '60', visible: true, combinationId: '' });
     setNotice(null);
     setModalOpen(true);
   };
 
   const openEdit = (exam: ExamItem) => {
     setEditing(exam);
-    setForm({ exam_name: exam.exam_name, minutes: String(exam.minutes), visible: exam.visible ?? true });
+    setForm({
+      exam_name: exam.exam_name,
+      minutes: String(exam.minutes),
+      visible: exam.visible ?? true,
+      combinationId: exam.combinationId ?? exam.combination?.id ?? '',
+    });
     setNotice(null);
     setModalOpen(true);
   };
@@ -75,10 +84,22 @@ export const ClassExamsPage = () => {
     setNotice(null);
     try {
       if (editing) {
-        await apiPut(`/exams/${editing.id}`, { exam_name: form.exam_name.trim(), minutes, visible: form.visible });
+        await apiPut(`/exams/${editing.id}`, {
+          exam_name: form.exam_name.trim(),
+          minutes,
+          visible: form.visible,
+          combinationId: form.combinationId || null,
+        });
         setNotice('Exam updated.');
       } else {
-        await apiPost('/exams', { exam_name: form.exam_name.trim(), minutes, visible: form.visible, classId, workspaceId: user?.workspaceId });
+        await apiPost('/exams', {
+          exam_name: form.exam_name.trim(),
+          minutes,
+          visible: form.visible,
+          combinationId: form.combinationId || null,
+          classId,
+          workspaceId: user?.workspaceId,
+        });
         setNotice(`Exam "${form.exam_name.trim()}" created under ${cls.data?.name ?? 'this class'}.`);
       }
       setModalOpen(false);
@@ -198,6 +219,11 @@ export const ClassExamsPage = () => {
                     <ChevronRight size={16} aria-hidden="true" className="ml-auto shrink-0 text-muted group-hover:text-brand-700" />
                   </Link>
                   <span className="flex shrink-0 items-center gap-2 border-t border-line pt-3 sm:border-t-0 sm:pt-0 sm:pl-4">
+                    {exam.combination?.name && (
+                      <Pill tone="sky">
+                        Combo: {exam.combination.name}
+                      </Pill>
+                    )}
                     <Pill tone={exam.visible ?? true ? 'emerald' : 'amber'}>{exam.visible ?? true ? 'Visible' : 'Hidden'}</Pill>
                     <button type="button" onClick={() => toggleVisibility(exam)} aria-label={exam.visible ?? true ? `Hide ${exam.exam_name}` : `Show ${exam.exam_name}`} title="Toggle visibility" className="rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">
                       {exam.visible ?? true ? <EyeOff aria-hidden="true" size={14} /> : <Eye aria-hidden="true" size={14} />}
@@ -242,6 +268,22 @@ export const ClassExamsPage = () => {
               </button>
             </span>
           </div>
+
+          <label className="block text-sm font-semibold">Assigned Combination
+            <select
+              value={form.combinationId}
+              onChange={(e) => setForm({ ...form, combinationId: e.target.value })}
+              className={inputClass}
+            >
+              <option value="">All Combinations (General / Unassigned)</option>
+              {(combinations.data ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <p className="text-xs text-muted">This exam will belong to <b>{className}</b>.</p>
           {notice && <p role="status" className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
           <div className="flex gap-3">

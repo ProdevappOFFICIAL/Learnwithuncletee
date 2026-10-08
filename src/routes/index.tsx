@@ -42,6 +42,9 @@ import { AdminAssignmentsPage } from '@/pages/dashboard/admin/AdminAssignmentsPa
 import { AdminVirtualClassPage } from '@/pages/dashboard/admin/AdminVirtualClassPage';
 import { AdminNewsPage } from '@/pages/dashboard/admin/AdminNewsPage';
 import { AdminNewsPreviewPage } from '@/pages/dashboard/admin/AdminNewsPreviewPage';
+import { AdminFormsPage } from '@/pages/dashboard/admin/AdminFormsPage';
+import { FormResponsesPage } from '@/pages/dashboard/admin/FormResponsesPage';
+import { FormPage } from '@/pages/FormPage';
 import { AdminMembersPage } from '@/pages/dashboard/admin/AdminMembersPage';
 import { AdminWebsitePage } from '@/pages/dashboard/admin/AdminWebsitePage';
 import { AdminWebsitePagesPage } from '@/pages/dashboard/admin/AdminWebsitePagesPage';
@@ -78,6 +81,7 @@ export const router = createBrowserRouter([
   },
   { path: ROUTES.examination, element: <ExaminationPage /> },
   { path: ROUTES.examinationRoom, element: <ExamRoomPage /> },
+  { path: ROUTES.formPublic, element: <FormPage /> },
   { path: ROUTES.dashboard, element: <DashboardIndexPage /> },
   {
     path: ROUTES.studentDashboard,
@@ -146,6 +150,8 @@ export const router = createBrowserRouter([
       { path: 'virtual-class', element: <AdminVirtualClassPage /> },
       { path: 'news', element: <AdminNewsPage /> },
   { path: 'news/preview', element: <AdminNewsPreviewPage /> },
+  { path: 'forms', element: <AdminFormsPage /> },
+  { path: 'forms/responses', element: <FormResponsesPage /> },
   { path: 'exams', element: <ExamClassesPage /> },
   { path: 'exams/all', element: <AllExamsPage /> },
   { path: 'exams/subjects', element: <AllSubjectsPage /> },

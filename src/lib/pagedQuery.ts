@@ -28,19 +28,21 @@ interface FetchResult<T> {
 export function usePagedList<T>(
   key: Array<string | number>,
   fetchPage: (page: number, limit: number) => Promise<FetchResult<T[]>>,
-  opts?: { initialLimit?: number },
+  opts?: { initialLimit?: number; staleTime?: number; gcTime?: number },
 ) {
   const [page, setPage] = useState(1);
   const [limit, setLimitState] = useState(opts?.initialLimit ?? 10);
   const qc = useQueryClient();
   const keyJson = JSON.stringify(key);
+  const staleTime = opts?.staleTime ?? LIST_STALE;
+  const gcTime = opts?.gcTime ?? LIST_GC;
 
   const query = useQuery({
     // eslint-disable-next-line @tanstack/query/exhaustive-deps
     queryKey: [...(JSON.parse(keyJson) as Array<string | number>), page, limit],
     queryFn: () => fetchPage(page, limit),
-    staleTime: LIST_STALE,
-    gcTime: LIST_GC,
+    staleTime,
+    gcTime,
     placeholderData: keepPreviousData,
   });
 
@@ -54,18 +56,18 @@ export function usePagedList<T>(
       void qc.prefetchQuery({
         queryKey: [...k, safePage + 1, limit],
         queryFn: () => fetchPage(safePage + 1, limit),
-        staleTime: LIST_STALE,
+        staleTime,
       });
     }
     if (safePage > 1) {
       void qc.prefetchQuery({
         queryKey: [...k, safePage - 1, limit],
         queryFn: () => fetchPage(safePage - 1, limit),
-        staleTime: LIST_STALE,
+        staleTime,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [qc, keyJson, safePage, pageCount, limit]);
+  }, [qc, keyJson, safePage, pageCount, limit, staleTime]);
 
   return {
     rows: query.data?.data ?? [],
