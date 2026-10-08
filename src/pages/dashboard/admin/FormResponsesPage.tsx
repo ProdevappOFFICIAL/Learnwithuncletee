@@ -11,7 +11,7 @@ export const FormResponsesPage = () => {
 
   const responses = usePagedList<FormResponseItem>(
     ['form-responses', formId],
-    (page, limit) => apiGet<FormResponseItem>(`/forms/${formId}/responses`, { page, limit }),
+    (page, limit) => apiGet<FormResponseItem[]>(`/forms/${formId}/responses`, { page, limit }),
   );
   const [fields, setFields] = useState<FormFieldItem[]>([]);
   const [detail, setDetail] = useState<FormResponseItem | null>(null);

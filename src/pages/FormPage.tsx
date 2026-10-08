@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { Layout } from '@/components/layout/Layout';
 import { Container } from '@/components/ui/Container';
 import { PageMetadata } from '@/components/ui/PageMetadata';
 import { PageHero } from '@/components/ui/PageHero';
@@ -33,7 +32,7 @@ export const FormPage = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   // Paystack appends ?reference= (and ?trxref=) on return from checkout.
-  const [paymentRef, setPaymentRef] = useState<string | null>(() => searchParams.get('reference') || searchParams.get('trxref'));
+  const [paymentRef] = useState<string | null>(() => searchParams.get('reference') || searchParams.get('trxref'));
 
   useEffect(() => {
     let cancelled = false;
