@@ -31,10 +31,12 @@ interface UploadButtonProps {
   label?: string;
   /** Public form uploads: sent as x-form-id so the server can gate by form. */
   formId?: string;
+  /** File picker filter, e.g. ".pdf,.docx,image/png,image/jpeg". Omit = all files. */
+  accept?: string;
 }
 
 /** Brand-styled file picker backed by UploadThing. Same API as UT's UploadButton. */
-export const UploadButton = ({ endpoint, onClientUploadComplete, onUploadError, label = 'Choose file & upload', formId }: UploadButtonProps) => {
+export const UploadButton = ({ endpoint, onClientUploadComplete, onUploadError, label = 'Choose file & upload', formId, accept }: UploadButtonProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const { startUpload } = useUploadThing(endpoint as any, {
@@ -57,6 +59,7 @@ export const UploadButton = ({ endpoint, onClientUploadComplete, onUploadError, 
         type="file"
         className="hidden"
         aria-label={label}
+        accept={accept}
         onChange={async (e) => {
           const files = Array.from(e.target.files ?? []);
           if (!files.length) return;

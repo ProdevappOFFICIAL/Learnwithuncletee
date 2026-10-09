@@ -528,6 +528,7 @@ export interface FormFieldItem {
   label: string;
   required: boolean;
   options?: string[] | null;
+  config?: { accept?: string[] } | null;
   order: number;
 }
 
@@ -535,6 +536,7 @@ export interface FormItem {
   id: string;
   title: string;
   description?: string | null;
+  coverUrl?: string | null;
   isPublished: boolean;
   isClosed: boolean;
   amountKobo: number;

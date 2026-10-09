@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pagination, Pill } from '@/components/dashboard/DashboardUI';
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { usePagedList } from '@/lib/pagedQuery';
+import { UploadButton } from '@/lib/uploadthing';
 import { ROUTES } from '@/routes/paths';
 import type { FormFieldItem, FormItem } from '@/data/dashboard';
-import { ArrowDown, ArrowUp, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, Copy, ExternalLink, Eye, Pencil, Plus, Trash2 } from 'lucide-react';
 
 type FieldType = 'TEXT' | 'FILL_BLANK' | 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'FILE' | 'PAYMENT';
 
@@ -24,7 +25,21 @@ interface DraftField {
   label: string;
   required: boolean;
   optionsText: string;
+  /** FILE only: friendly upload kinds (pdf, docx, png, jpeg). Empty = all files. */
+  accept: string[];
 }
+
+export const ACCEPT_OPTIONS = [
+  { value: 'pdf', label: 'PDF', accept: '.pdf' },
+  { value: 'docx', label: 'DOCX', accept: '.docx' },
+  { value: 'png', label: 'PNG', accept: 'image/png' },
+  { value: 'jpeg', label: 'JPEG', accept: 'image/jpeg' },
+] as const;
+
+export const acceptAttr = (accept: string[]) =>
+  accept.length === 0
+    ? undefined
+    : accept.map((a) => ACCEPT_OPTIONS.find((o) => o.value === a)?.accept ?? a).join(',');
 
 const toDraft = (f: FormFieldItem, i: number): DraftField => ({
   key: f.id || `new-${i}`,
@@ -32,6 +47,7 @@ const toDraft = (f: FormFieldItem, i: number): DraftField => ({
   label: f.label,
   required: !!f.required,
   optionsText: (f.options ?? []).join('\n'),
+  accept: Array.isArray((f.config as any)?.accept) ? (f.config as any).accept.map(String) : [],
 });
 
 const inputClass = 'mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500';
@@ -49,27 +65,56 @@ export const AdminFormsPage = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [coverUrl, setCoverUrl] = useState('');
   const [amountNaira, setAmountNaira] = useState('');
   const [fields, setFields] = useState<DraftField[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   // Keys of questions currently failing validation (empty label/options).
   const [invalidKeys, setInvalidKeys] = useState<string[]>([]);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const resetBuilder = () => {
     setEditingId(null);
     setTitle('');
     setDescription('');
+    setCoverUrl('');
     setAmountNaira('');
     setFields([]);
+    setInvalidKeys([]);
   };
+
+  const openPreview = () => {
+    navigate(ROUTES.adminFormPreview, {
+      state: {
+        draft: {
+          title,
+          description,
+          coverUrl,
+          amountKobo: Math.round((parseFloat(amountNaira) || 0) * 100),
+          fields: fields.map((f) => ({
+            type: f.type,
+            label: f.label,
+            required: f.required,
+            options: f.type === 'MULTIPLE_CHOICE' || f.type === 'TRUE_FALSE'
+              ? f.optionsText.split('\n').map((s) => s.trim()).filter(Boolean)
+              : undefined,
+            accept: f.accept,
+          })),
+        },
+      },
+    });
+  };
+
+ 
 
   const addField = (type: FieldType) => {
     if (type === 'PAYMENT' && fields.some((f) => f.type === 'PAYMENT')) {
       setNotice('Only one payment field per form.');
       return;
     }
-    setFields((prev) => [...prev, { key: `new-${Date.now()}-${prev.length}`, type, label: '', required: false, optionsText: type === 'TRUE_FALSE' ? 'True\nFalse' : '' }]);
+    setFields((prev) => [...prev, { key: `new-${Date.now()}-${prev.length}`, type, label: '', required: false, optionsText: type === 'TRUE_FALSE' ? 'True\nFalse' : '', accept: [] }]);
     setNotice(null);
   };
 
@@ -92,8 +137,10 @@ export const AdminFormsPage = () => {
       setEditingId(full.id);
       setTitle(full.title);
       setDescription(full.description ?? '');
+      setCoverUrl(full.coverUrl ?? '');
       setAmountNaira(full.amountKobo > 0 ? String(full.amountKobo / 100) : '');
       setFields((full.fields ?? []).map(toDraft));
+      setInvalidKeys([]);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       setNotice(err?.message ?? 'Could not load form');
@@ -136,6 +183,7 @@ export const AdminFormsPage = () => {
       const payload = {
         title: title.trim(),
         description: description.trim() || undefined,
+        coverUrl: coverUrl || undefined,
         amountKobo: Math.round((parseFloat(amountNaira) || 0) * 100),
         fields: fields.map((f) => ({
           type: f.type,
@@ -144,6 +192,7 @@ export const AdminFormsPage = () => {
           options: f.type === 'MULTIPLE_CHOICE' || f.type === 'TRUE_FALSE'
             ? f.optionsText.split('\n').map((s) => s.trim()).filter(Boolean)
             : undefined,
+          config: f.type === 'FILE' && f.accept.length > 0 ? { accept: f.accept } : undefined,
         })),
       };
       if (editingId) {
@@ -182,6 +231,24 @@ export const AdminFormsPage = () => {
     }
   };
 
+  const publicUrl = (id: string) => `${window.location.origin}/form/${id}`;
+
+  const copyLink = async (form: FormItem) => {
+    const url = publicUrl(form.id);
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = url;
+      document.body.append(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    setCopiedId(form.id);
+    window.setTimeout(() => setCopiedId((cur) => (cur === form.id ? null : cur)), 2000);
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -205,6 +272,22 @@ export const AdminFormsPage = () => {
             <label className="block text-sm font-semibold">Fee in naira (0 = free, Paystack required otherwise)
               <input value={amountNaira} onChange={(e) => setAmountNaira(e.target.value)} inputMode="decimal" placeholder="0" className={inputClass} />
             </label>
+            <div>
+              <p className="text-sm font-semibold">Banner image {coverUrl && <span className="text-emerald-700">✓ set</span>}</p>
+              <div className="mt-2 flex items-center gap-3">
+                {coverUrl ? (
+                  <img src={coverUrl} alt="Banner preview" className="h-16 w-28 rounded border border-line object-cover" />
+                ) : (
+                  <span className="flex h-16 w-28 items-center justify-center rounded border border-dashed border-line bg-cream text-xs font-bold text-muted">No banner</span>
+                )}
+                <div>
+                  <UploadButton endpoint="avatarUploader" label="Upload banner" onClientUploadComplete={(res) => setCoverUrl(res?.[0]?.ufsUrl ?? '')} onUploadError={(err) => setNotice(err.message)} />
+                  {coverUrl && (
+                    <button type="button" onClick={() => setCoverUrl('')} className="mt-1 block text-xs font-bold text-rose-700 hover:underline">Remove</button>
+                  )}
+                </div>
+              </div>
+            </div>
 
             <div>
               <p className="text-sm font-semibold">Add question</p>
@@ -243,6 +326,24 @@ export const AdminFormsPage = () => {
                             {bad && <p className="mt-1 text-xs font-bold text-rose-700">Add at least 2 options, one per line.</p>}
                           </>
                         )}
+                        {f.type === 'FILE' && (
+                          <div className="mt-2">
+                            <p className="text-xs font-semibold">Allowed file types <span className="font-normal text-muted">(unticked = all files)</span></p>
+                            <div className="mt-1.5 flex flex-wrap gap-2">
+                              {ACCEPT_OPTIONS.map((o) => (
+                                <label key={o.value} className={`inline-flex cursor-pointer items-center gap-1.5 rounded border px-2.5 py-1.5 text-xs font-bold ${f.accept.includes(o.value) ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-line text-muted'}`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={f.accept.includes(o.value)}
+                                    onChange={(e) => setFields((prev) => prev.map((x) => x.key === f.key ? { ...x, accept: e.target.checked ? [...x.accept, o.value] : x.accept.filter((a) => a !== o.value) } : x))}
+                                    className="h-3.5 w-3.5 accent-brand-700"
+                                  />
+                                  {o.label}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         <label className="mt-2 flex items-center gap-2 text-xs font-semibold">
                           <input type="checkbox" checked={f.required} onChange={(e) => setFields((prev) => prev.map((x) => x.key === f.key ? { ...x, required: e.target.checked } : x))} className="h-4 w-4 accent-brand-700" />
                           Required
@@ -260,6 +361,14 @@ export const AdminFormsPage = () => {
             <div className="flex flex-wrap gap-2">
               <button type="submit" disabled={busy} className="min-h-11 flex-1 rounded bg-brand-900 px-5 py-3 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
                 {busy ? 'Saving…' : editingId ? 'Save changes' : 'Create form'}
+              </button>
+              <button
+                type="button"
+                disabled={fields.length === 0}
+                onClick={openPreview}
+                className="inline-flex min-h-11 items-center rounded border border-line bg-white px-5 py-3 text-sm font-bold text-ink hover:border-brand-500 hover:text-brand-700 disabled:opacity-60"
+              >
+                <Eye aria-hidden="true" size={16} className="mr-2" /> Preview
               </button>
               {editingId && (
                 <button type="button" onClick={resetBuilder} className="min-h-11 rounded border border-line bg-white px-5 py-3 text-sm font-bold text-muted hover:text-ink">
@@ -308,12 +417,23 @@ export const AdminFormsPage = () => {
                     </div>
                     <h4 className="mt-2 font-display text-sm font-extrabold">{f.title}</h4>
                     {f.isPublished && (
-                      <Link to={ROUTES.formPublic.replace(':id', f.id)} className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-brand-700 hover:underline">
-                        <ExternalLink aria-hidden="true" size={12} /> Open public link
-                      </Link>
+                      <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <Link to={ROUTES.formPublic.replace(':id', f.id)} className="inline-flex items-center gap-1 text-xs font-bold text-brand-700 hover:underline">
+                          <ExternalLink aria-hidden="true" size={12} /> Open public link
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => copyLink(f)}
+                          className="inline-flex items-center gap-1 text-xs font-bold text-brand-700 hover:underline"
+                        >
+                          {copiedId === f.id ? <Check aria-hidden="true" size={12} /> : <Copy aria-hidden="true" size={12} />}
+                          {copiedId === f.id ? 'Copied!' : 'Copy link'}
+                        </button>
+                      </span>
                     )}
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button type="button" onClick={() => startEdit(f)} className="inline-flex items-center rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700"><Pencil aria-hidden="true" size={14} className="mr-1" /> Edit</button>
+                      <button type="button" onClick={() => navigate(ROUTES.adminFormPreview, { state: { formId: f.id } })} className="inline-flex items-center rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700"><Eye aria-hidden="true" size={14} className="mr-1" /> Preview</button>
                       <button type="button" onClick={() => toggle(f, { isPublished: !f.isPublished })} className="rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">{f.isPublished ? 'Unpublish' : 'Publish'}</button>
                       {f.isPublished && (
                         <button type="button" onClick={() => toggle(f, { isClosed: !f.isClosed })} className="rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">{f.isClosed ? 'Reopen' : 'Close'}</button>

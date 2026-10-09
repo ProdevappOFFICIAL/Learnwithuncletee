@@ -38,6 +38,7 @@ export const ROUTES = {
   adminNews: '/dashboard/admin/news',
   adminNewsPreview: '/dashboard/admin/news/preview',
   adminForms: '/dashboard/admin/forms',
+  adminFormPreview: '/dashboard/admin/forms/preview',
   adminFormResponses: '/dashboard/admin/forms/responses',
   formPublic: '/form/:id',
   adminExams: '/dashboard/admin/exams',

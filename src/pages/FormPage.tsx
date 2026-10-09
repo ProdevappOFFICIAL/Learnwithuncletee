@@ -1,20 +1,30 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Layout } from '@/components/layout/Layout';
 import { Container } from '@/components/ui/Container';
 import { PageMetadata } from '@/components/ui/PageMetadata';
-import { PageHero } from '@/components/ui/PageHero';
 import { apiGet, apiPost } from '@/lib/api';
 import { UploadButton } from '@/lib/uploadthing';
+import { FileBadge, toFileRefs } from '@/components/dashboard/FormFiles';
+import { acceptAttr } from '@/pages/dashboard/admin/AdminFormsPage';
 import { ROUTES } from '@/routes/paths';
-import type { FormFieldItem } from '@/data/dashboard';
+import { siteInfo } from '@/data/content';
 import { CheckCircle2, ChevronLeft } from 'lucide-react';
 
 interface PublicForm {
   id: string;
   title: string;
   description?: string | null;
+  coverUrl?: string | null;
   amountKobo: number;
-  fields: FormFieldItem[];
+  fields: Array<{
+    id: string;
+    type: string;
+    label: string;
+    required: boolean;
+    options?: string[] | null;
+    config?: { accept?: string[] } | null;
+  }>;
 }
 
 const inputClass = 'mt-2 min-h-12 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100';
@@ -96,46 +106,107 @@ export const FormPage = () => {
   };
 
   const paid = form ? form.amountKobo <= 0 || !!paymentRef : false;
+  const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
+  const banner = form?.coverUrl ?? '/school.JPG';
 
   return (
+    <Layout>
+      <PageMetadata
+        title={form ? form.title : 'Form'}
+        description={form?.description ?? `Fill and submit ${form?.title ?? 'this school form'} — ${siteInfo.name}.`}
+        image={banner}
+        type="article"
+        author="Learnwithuncletee"
+        robots="noindex, follow"
+        jsonLd={
+          form
+            ? [
+                {
+                  '@context': 'https://schema.org',
+                  '@type': 'WebPage',
+                  name: form.title,
+                  description: form.description ?? '',
+                  image: [banner],
+                  url: pageUrl,
+                  inLanguage: 'en-NG',
+                  isAccessibleForFree: form.amountKobo <= 0,
+                },
+                {
+                  '@context': 'https://schema.org',
+                  '@type': 'BreadcrumbList',
+                  itemListElement: [
+                    { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://learnwithuncletee.org' },
+                    { '@type': 'ListItem', position: 2, name: form.title, item: pageUrl },
+                  ],
+                },
+              ]
+            : []
+        }
+      />
 
-      <><PageMetadata
-      title={form ? form.title : 'Form'}
-      description={form?.description ?? 'Fill and submit this school form.'}
-      robots="noindex, nofollow" /><PageHero eyebrow="School form" title={form?.title ?? 'Form'} text={form?.description ?? ''} image="/school.JPG" /><section className="py-14">
+      {loading ? (
         <Container>
-          <div className="mx-auto w-full max-w-2xl">
-            {loading ? (
-              <div className="animate-pulse space-y-4" aria-label="Loading">
-                <div className="h-12 rounded bg-brand-50" />
-                <div className="h-12 rounded bg-brand-50" />
-                <div className="h-12 rounded bg-brand-500/40" />
-              </div>
-            ) : error || !form ? (
-              <div className="border border-line bg-white p-8 text-center">
-                <p className="text-xs font-bold uppercase tracking-widest text-brand-700">Unavailable</p>
-                <h2 className="mt-3 text-2xl font-extrabold">This form isn't open</h2>
-                <p className="mt-2 text-sm text-muted">{error ?? 'Check the link with the school.'}</p>
-                <Link to={ROUTES.home} className="mt-6 inline-flex min-h-11 items-center rounded bg-brand-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
-                  <ChevronLeft aria-hidden="true" size={16} className="mr-1" /> Back home
-                </Link>
-              </div>
-            ) : done ? (
-              <div className="border border-line bg-white p-8 text-center">
-                <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-brand-700">
-                  <CheckCircle2 size={26} aria-hidden="true" />
-                </span>
-                <p className="mt-6 text-xs font-bold uppercase tracking-widest text-brand-700">Response received</p>
-                <h2 className="mt-3 text-3xl font-extrabold">Thank you!</h2>
-                <p className="mt-3 text-sm leading-relaxed text-muted">
-                  Your response to “{form.title}” was recorded{paymentRef ? ' with payment confirmed' : ''}.
-                </p>
-                <Link to={ROUTES.home} className="mt-8 inline-flex min-h-11 items-center rounded bg-brand-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
-                  <ChevronLeft aria-hidden="true" size={16} className="mr-1" /> Back home
-                </Link>
-              </div>
-            ) : (
-              <form onSubmit={submit} className="space-y-5 border border-line bg-white p-6 sm:p-8">
+          <div className="animate-pulse py-14" aria-label="Loading">
+            <div className="h-8 w-2/3 bg-brand-50" />
+            <div className="mt-4 h-64 bg-brand-50" />
+          </div>
+        </Container>
+      ) : error || !form ? (
+        <Container>
+          <div className="mx-auto max-w-2xl py-20 text-center">
+            <p className="text-xs font-bold uppercase tracking-widest text-brand-700">Unavailable</p>
+            <h1 className="mt-3 text-3xl font-extrabold">This form isn't open</h1>
+            <p className="mt-3 text-muted">{error ?? 'Check the link with the school.'}</p>
+            <Link to={ROUTES.home} className="mt-6 inline-flex min-h-11 items-center rounded bg-brand-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
+              <ChevronLeft aria-hidden="true" size={16} className="mr-1" /> Back home
+            </Link>
+          </div>
+        </Container>
+      ) : done ? (
+        <Container>
+          <div className="mx-auto max-w-2xl py-16 text-center">
+            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-brand-700">
+              <CheckCircle2 size={26} aria-hidden="true" />
+            </span>
+            <p className="mt-6 text-xs font-bold uppercase tracking-widest text-brand-700">Response received</p>
+            <h1 className="mt-3 text-3xl font-extrabold">Thank you!</h1>
+            <p className="mt-3 text-sm leading-relaxed text-muted">
+              Your response to “{form.title}” was recorded{paymentRef ? ' with payment confirmed' : ''}.
+            </p>
+            <Link to={ROUTES.home} className="mt-8 inline-flex min-h-11 items-center rounded bg-brand-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
+              <ChevronLeft aria-hidden="true" size={16} className="mr-1" /> Back home
+            </Link>
+          </div>
+        </Container>
+      ) : (
+        <>
+          <section
+            className="relative isolate flex min-h-[280px] items-end overflow-hidden bg-brand-900 py-12 text-white sm:min-h-[340px]"
+            style={{
+              backgroundImage: `linear-gradient(90deg, rgba(4,58,33,.92), rgba(4,58,33,.52)), url(${banner})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}
+          >
+            <Container className="relative">
+              <nav aria-label="Breadcrumb" className="mb-6 text-sm text-white/70">
+                <Link to={ROUTES.home} className="hover:text-white">Home</Link>
+                <span className="px-2">/</span>
+                <span className="text-white" aria-current="page">{form.title}</span>
+              </nav>
+              <p className="text-xs font-bold uppercase tracking-[.18em] text-lime-accent">
+                School form{form.amountKobo > 0 ? ` · ₦${(form.amountKobo / 100).toLocaleString()} fee` : ' · Free'}
+              </p>
+              <h1 className="mt-3 max-w-3xl text-4xl font-extrabold leading-tight sm:text-5xl">{form.title}</h1>
+              {form.description && (
+                <p className="mt-4 max-w-3xl text-lg leading-relaxed text-white/85">{form.description}</p>
+              )}
+            </Container>
+          </section>
+
+          <section className="py-12">
+            <Container>
+              <form onSubmit={submit} className="mx-auto w-full max-w-2xl space-y-5 border border-line bg-white p-6 sm:p-8">
                 {form.amountKobo > 0 && (
                   <p role="status" className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">
                     This form costs <b>₦{(form.amountKobo / 100).toLocaleString()}</b>.
@@ -185,14 +256,23 @@ export const FormPage = () => {
                         <p className="text-sm font-semibold">
                           {f.label} {f.required && <span className="text-rose-700">*</span>}
                         </p>
+                        {((f.config as any)?.accept?.length ?? 0) > 0 && (
+                          <p className="mt-0.5 text-xs text-muted">Accepted: {(f.config as any).accept.join(', ').toUpperCase()}</p>
+                        )}
                         <div className="mt-2">
                           <UploadButton
                             endpoint="formResponseUploader"
                             formId={form.id}
+                            accept={acceptAttr(((f.config as any)?.accept ?? []) as string[])}
                             label={(values[f.id]?.length ?? 0) > 0 ? `✓ ${values[f.id].length} file(s) attached` : 'Choose file & upload'}
-                            onClientUploadComplete={(res) => set(f.id, [...(values[f.id] ?? []), ...res.map((r) => r.ufsUrl)])}
+                            onClientUploadComplete={(res) => set(f.id, [...(values[f.id] ?? []), ...res.map((r) => ({ name: r.name, url: r.ufsUrl }))])}
                             onUploadError={(err) => setNotice(err.message)} />
                         </div>
+                        {(values[f.id]?.length ?? 0) > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {toFileRefs(values[f.id]).map((file) => <FileBadge key={file.url} file={file} />)}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <label className="block text-sm font-semibold">
@@ -220,10 +300,10 @@ export const FormPage = () => {
                   {busy ? 'Submitting…' : form.amountKobo > 0 && !paymentRef ? 'Pay first to submit' : 'Submit response'}
                 </button>
               </form>
-            )}
-          </div>
-        </Container>
-      </section></>
-  
+            </Container>
+          </section>
+        </>
+      )}
+    </Layout>
   );
 };

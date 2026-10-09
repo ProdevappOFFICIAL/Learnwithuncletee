@@ -43,6 +43,7 @@ import { AdminVirtualClassPage } from '@/pages/dashboard/admin/AdminVirtualClass
 import { AdminNewsPage } from '@/pages/dashboard/admin/AdminNewsPage';
 import { AdminNewsPreviewPage } from '@/pages/dashboard/admin/AdminNewsPreviewPage';
 import { AdminFormsPage } from '@/pages/dashboard/admin/AdminFormsPage';
+import { AdminFormPreviewPage } from '@/pages/dashboard/admin/AdminFormPreviewPage';
 import { FormResponsesPage } from '@/pages/dashboard/admin/FormResponsesPage';
 import { FormPage } from '@/pages/FormPage';
 import { AdminMembersPage } from '@/pages/dashboard/admin/AdminMembersPage';
@@ -151,6 +152,7 @@ export const router = createBrowserRouter([
       { path: 'news', element: <AdminNewsPage /> },
   { path: 'news/preview', element: <AdminNewsPreviewPage /> },
   { path: 'forms', element: <AdminFormsPage /> },
+  { path: 'forms/preview', element: <AdminFormPreviewPage /> },
   { path: 'forms/responses', element: <FormResponsesPage /> },
   { path: 'exams', element: <ExamClassesPage /> },
   { path: 'exams/all', element: <AllExamsPage /> },
