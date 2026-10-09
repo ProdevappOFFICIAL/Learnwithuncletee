@@ -31,6 +31,7 @@ export const LoginPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [forceForm, setForceForm] = useState(false);
   const { login, logout, user, loading: sessionLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -55,6 +56,7 @@ export const LoginPage = () => {
     setBusy(true);
     try {
       const me = await login(identity, password, { remember, role: roleHint });
+      setForceForm(false);
       // Desktop connect flow: the app opened /login?source=desktop — hand off
       // to the exchange-code page instead of the role dashboard.
       navigate(fromDesktop ? ROUTES.connectDesktop : homeForRole(me.role));
@@ -168,7 +170,7 @@ export const LoginPage = () => {
                 <div className="h-12 rounded bg-brand-500/40" />
               </div>
 
-            ) : user && mode === 'login' ? (
+            ) : user && mode === 'login' && !forceForm ? (
               /* ── Already signed-in card ── */
               <div className="mt-8 space-y-4">
                 <button
@@ -188,7 +190,16 @@ export const LoginPage = () => {
                     <span className="block truncate text-xs text-muted">{user.user_name} · {user.role.charAt(0) + user.role.slice(1).toLowerCase()}</span>
                   </span>
                 </button>
-                <button type="button" onClick={() => logout()} className="w-full text-center text-sm font-semibold text-brand-700 underline underline-offset-4">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await logout();
+                    // Show the credential inputs immediately — don't wait for
+                    // any background session re-resolution.
+                    setForceForm(true);
+                  }}
+                  className="w-full text-center text-sm font-semibold text-brand-700 underline underline-offset-4"
+                >
                   Use a different account
                 </button>
               </div>

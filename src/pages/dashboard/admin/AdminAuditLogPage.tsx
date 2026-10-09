@@ -29,7 +29,7 @@ interface AuditLogRow {
   user: { user_name: string; user_email?: string; role: string } | null;
 }
 
-const ROLES = ['OWNER', 'ADMIN', 'TEACHER', 'BURSAR', 'STUDENT', 'PARENT'];
+const ROLES = ['OWNER', 'ADMIN', 'TEACHER', 'MEMBER', 'STUDENT', 'PARENT'];
 
 const roleTone = (role?: string) =>
   role === 'ADMIN' || role === 'OWNER'

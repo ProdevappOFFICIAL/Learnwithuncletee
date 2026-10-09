@@ -45,6 +45,9 @@ export const AuthCtx = createContext<AuthState>({
 export const useAuth = () => useContext(AuthCtx);
 
 async function fetchMe(): Promise<SessionUser | null> {
+  // Fast path: no tokens anywhere means logged out — skip the network
+  // entirely instead of firing me → refresh → 401 console spam.
+  if (!tokenStore.get() && !refreshTokenStore.get()) return null;
   // Always attempt: even with no stored access token, the HttpOnly refresh
   // cookie may still hold a session — the api layer attempts one silent
   // refresh on 401 before giving up.
@@ -91,6 +94,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const logout = useCallback(async () => {
+    // Instant UI first: drop the saved user synchronously so signed-in
+    // cards/buttons vanish immediately, then revoke + scrub storage.
+    queryClient.setQueryData(SESSION_KEY, null);
     try {
       // Send the stored refresh token too: the backend revokes by body token
       // when the HttpOnly cookie is unavailable.
@@ -100,6 +106,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
     tokenStore.clear();
     refreshTokenStore.clear();
+    await queryClient.cancelQueries({ queryKey: SESSION_KEY });
     queryClient.removeQueries({ queryKey: SESSION_KEY });
   }, []);
 

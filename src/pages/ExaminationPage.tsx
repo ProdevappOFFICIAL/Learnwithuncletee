@@ -62,7 +62,7 @@ export const ExaminationPage = () => {
   const [password, setPassword] = useState('');
 
   // result shown after redirect-back from exam room (via sessionStorage)
-  const [result] = useState<{ overallScore: number; attempted: number; total: number } | null>(() => {
+  const [result] = useState<{ attempted: number; total: number } | null>(() => {
     try {
       const raw = sessionStorage.getItem(`exam_result_${code}`);
       if (raw) { sessionStorage.removeItem(`exam_result_${code}`); return JSON.parse(raw); }
@@ -268,7 +268,7 @@ export const ExaminationPage = () => {
                 </>
               )}
 
-              {/* Done — result returned from exam room via sessionStorage */}
+              {/* Done — confirmation only. Scores stay hidden until the school releases them. */}
               {phase === 'done' && result && (
                 <div className="mt-8 text-center">
                   <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-50 text-brand-700">
@@ -276,9 +276,8 @@ export const ExaminationPage = () => {
                   </span>
                   <p className="mt-6 text-xs font-bold uppercase tracking-widest text-brand-700">Examination complete</p>
                   <h2 className="mt-3 text-3xl font-extrabold">Submitted!</h2>
-                  <p className="mt-4 font-display text-6xl font-extrabold text-brand-700">{result.overallScore}%</p>
                   <p className="mt-3 text-sm leading-relaxed text-muted">
-                    You attempted {result.attempted} of {result.total} questions. Your teacher can see this in test Results.
+                    You attempted {result.attempted} of {result.total} questions. Your score is hidden — the school will release results.
                   </p>
                   <Link
                     to={ROUTES.home}

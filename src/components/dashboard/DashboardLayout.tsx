@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LogOut, Menu, Search, X } from 'lucide-react';
 import { ROUTES } from '@/routes/paths';
-import { roleMeta, type DashboardNavItem, type DashboardRole } from '@/data/dashboard';
+import { memberNav, roleMeta, type DashboardNavItem, type DashboardRole } from '@/data/dashboard';
 import { siteInfo } from '@/data/content';
 import { avatarOf, useAuth } from '@/context/AuthContext';
 import { apiGet } from '@/lib/api';
@@ -48,7 +48,11 @@ export const DashboardLayout = ({ role, nav }: Props) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, can, logout } = useAuth();
-  const meta = roleMeta[role];
+
+  const isMember = user?.role === 'MEMBER';
+  const effectiveRole: DashboardRole = isMember ? 'member' : role;
+  const effectiveNav = isMember ? memberNav : nav;
+  const meta = roleMeta[effectiveRole] || roleMeta[role];
 
   // Admin-configurable visibility: items carrying `permission` are hidden
   // when the signed-in user lacks it. Signed-out preview shows everything.
@@ -63,7 +67,7 @@ export const DashboardLayout = ({ role, nav }: Props) => {
       if (!user || !item.permission || can(item.permission)) return [item];
       return [];
     });
-  const visibleNav = filterVisible(nav);
+  const visibleNav = filterVisible(effectiveNav);
 
   const isLeafActive = (to?: string) =>
     !!to &&

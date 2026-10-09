@@ -7,7 +7,7 @@ import { TERM_OPTIONS, sessionOptions, type GradeData, type ResultDocData } from
 import type { ClassItem } from '@/data/dashboard';
 import { ExternalLink, FileText } from 'lucide-react';
 
-interface OnlineAttempt {
+interface AttemptRow {
   id: string;
   overallScore: number;
   attempted_questions: number;
@@ -18,33 +18,47 @@ interface OnlineAttempt {
   subjectNames?: Record<string, string>;
 }
 
-/** Pupil's own online-exam sittings with per-subject marks (backend self-scopes). */
-const OnlineAttempts = () => {
-  const { data, loading, error, reload } = useResource<OnlineAttempt[]>('/results', { limit: 50 });
+interface SittingAttempt extends AttemptRow {
+  origin: 'ONLINE' | 'OFFLINE';
+}
+
+/** Pupil's own sittings from both stores, newest first (backend self-scopes each). */
+const SittingAttempts = () => {
+  const online = useResource<AttemptRow[]>('/results', { limit: 50 });
+  const offline = useResource<AttemptRow[]>('/offline-results', { limit: 50 });
   const [expanded, setExpanded] = useState<string | null>(null);
-  const list = data ?? [];
+  const loading = online.loading || offline.loading;
+  const error = online.error || offline.error;
+  const reload = () => {
+    online.reload();
+    offline.reload();
+  };
+  const list: SittingAttempt[] = [
+    ...(online.data ?? []).map((r) => ({ ...r, origin: 'ONLINE' as const })),
+    ...(offline.data ?? []).map((r) => ({ ...r, origin: 'OFFLINE' as const })),
+  ].sort((a, b) => +new Date(b.date) - +new Date(a.date));
 
   return (
     <Card>
-      <CardHead title="Online exam attempts" sub="Your sittings on the platform, newest first" />
+      <CardHead title="Exam attempts" sub="Your online and offline sittings, newest first" />
       {loading ? (
         <div className="px-5 py-5"><LoadingSkeleton rows={2} /></div>
-      ) : error || !data ? (
+      ) : error || (!online.data && !offline.data) ? (
         <div className="px-5 py-5"><ErrorState message={error ?? 'No data'} onRetry={reload} /></div>
       ) : list.length === 0 ? (
-        <div className="px-5 py-5"><EmptyState message="No online attempts yet — your scores appear here after you sit an exam." /></div>
+        <div className="px-5 py-5"><EmptyState message="No attempts yet — your scores appear here after you sit an exam." /></div>
       ) : (
         <ul className="divide-y divide-line">
           {list.map((r) => {
-            const open = expanded === r.id;
+            const open = expanded === `${r.origin}:${r.id}`;
             const parts = Object.entries(r.subjectScores ?? {})
               .map(([id, s]) => ({ id, name: r.subjectNames?.[id] ?? 'Subject', correct: s.correct, total: s.total }))
               .sort((a, b) => a.name.localeCompare(b.name));
             return (
-              <li key={r.id} className="px-5 py-4">
+              <li key={`${r.origin}:${r.id}`} className="px-5 py-4">
                 <button
                   type="button"
-                  onClick={() => setExpanded(open ? null : r.id)}
+                  onClick={() => setExpanded(open ? null : `${r.origin}:${r.id}`)}
                   aria-expanded={open}
                   className="flex w-full flex-wrap items-center justify-between gap-3 text-left"
                 >
@@ -55,6 +69,7 @@ const OnlineAttempts = () => {
                     </span>
                   </span>
                   <span className="flex items-center gap-2">
+                    <Pill tone={r.origin === 'OFFLINE' ? 'amber' : 'sky'}>{r.origin === 'OFFLINE' ? 'Offline' : 'Online'}</Pill>
                     <Pill tone={r.overallScore >= 75 ? 'emerald' : r.overallScore < 40 ? 'rose' : 'sky'}>{r.overallScore}%</Pill>
                     <span className="text-xs font-bold text-brand-700">{open ? 'Hide ▲' : 'Subjects ▼'}</span>
                   </span>
@@ -232,7 +247,7 @@ export const StudentResultsPage = () => {
         </>
       )}
 
-      <OnlineAttempts />
+      <SittingAttempts />
 
       <Card>
         <CardHead title="Result documents" sub="Class sheets plus report sheets addressed to you" />

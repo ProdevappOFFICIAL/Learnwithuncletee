@@ -1,11 +1,14 @@
 import {
   BookOpenCheck,
   ClipboardList,
+  Cloud,
+  CloudOff,
   Cog,
   FileBarChart2,
   FileQuestion,
   FileText,
   GraduationCap,
+  IdCard,
   Layers,
   LayoutDashboard,
   MapPin,
@@ -20,7 +23,7 @@ import {
 } from "lucide-react";
 import { ROUTES } from "@/routes/paths";
 
-export type DashboardRole = "student" | "teacher" | "admin";
+export type DashboardRole = "student" | "teacher" | "admin" | "member";
 
 export interface DashboardNavItem {
   /** Route path. Omitted for pure toggle groups that only expand/collapse. */
@@ -33,6 +36,22 @@ export interface DashboardNavItem {
   /** Nested children — rendered as a collapsible subgroup. */
   children?: DashboardNavItem[];
 }
+
+export const memberNav: DashboardNavItem[] = [
+  { to: ROUTES.adminDashboard, label: "Dashboard", icon: LayoutDashboard },
+  {
+    to: ROUTES.adminAttendance,
+    label: "Attendance",
+    icon: MapPin,
+    permission: "attendance.read",
+  },
+  {
+    to: ROUTES.adminNews,
+    label: "News & Events",
+    icon: Newspaper,
+    permission: "news.read",
+  },
+];
 
 export const studentNav: DashboardNavItem[] = [
   { to: ROUTES.studentDashboard, label: "Dashboard", icon: LayoutDashboard },
@@ -122,6 +141,12 @@ export const adminNav: DashboardNavItem[] = [
         label: "Teachers",
         icon: UserCog,
         permission: "teachers.read",
+      },
+      {
+        to: ROUTES.adminMembersList,
+        label: "Members",
+        icon: IdCard,
+        permission: "users.write",
       },
       // The add-student form + approvals queue live on the Students page.
       //    { to: ROUTES.adminStudents, label: 'Add Member', icon: UserPlus, permission: 'students.write' },
@@ -238,6 +263,20 @@ export const adminNav: DashboardNavItem[] = [
             label: "All Results",
             icon: FileBarChart2,
             permission: "results.read",
+            children: [
+              {
+                to: ROUTES.adminExamResults,
+                label: "Online",
+                icon: Cloud,
+                permission: "results.read",
+              },
+              {
+                to: ROUTES.adminExamResultsOffline,
+                label: "Offline",
+                icon: CloudOff,
+                permission: "results.read",
+              },
+            ],
           },
         ],
       },
@@ -323,6 +362,7 @@ export const roleMeta: Record<
   student: { title: "Student Portal", subtitle: "Learn · Grow · Excel" },
   teacher: { title: "Teacher Portal", subtitle: "Teach · Mentor · Inspire" },
   admin: { title: "Admin Portal", subtitle: "Manage the whole school" },
+  member: { title: "Member Portal", subtitle: "Attendance · News & Events" },
 };
 
 /* ── API response shapes (mirror the backend; no mock data lives here) ── */

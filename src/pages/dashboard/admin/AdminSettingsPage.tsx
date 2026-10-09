@@ -11,7 +11,7 @@ interface MatrixRow {
   roles: Record<string, boolean>;
 }
 
-const ROLES = ['BURSAR', 'TEACHER', 'STUDENT', 'PARENT'];
+const ROLES = ['MEMBER', 'TEACHER', 'STUDENT', 'PARENT'];
 
 const SETTINGS_KEY = ['admin-settings'];
 const MATRIX_KEY = ['permissions-matrix'];

@@ -47,6 +47,7 @@ import { AdminFormPreviewPage } from '@/pages/dashboard/admin/AdminFormPreviewPa
 import { FormResponsesPage } from '@/pages/dashboard/admin/FormResponsesPage';
 import { FormPage } from '@/pages/FormPage';
 import { AdminMembersPage } from '@/pages/dashboard/admin/AdminMembersPage';
+import { AdminMemberPage } from '@/pages/dashboard/admin/AdminMemberPage';
 import { AdminWebsitePage } from '@/pages/dashboard/admin/AdminWebsitePage';
 import { AdminWebsitePagesPage } from '@/pages/dashboard/admin/AdminWebsitePagesPage';
 import { ExamClassesPage } from '@/pages/dashboard/admin/ExamClassesPage';
@@ -133,13 +134,14 @@ export const router = createBrowserRouter([
     children: [
       {
         element: (
-          <RequireRole allow={['ADMIN', 'OWNER']}>
+          <RequireRole allow={['ADMIN', 'OWNER', 'MEMBER']}>
             <DashboardLayout role="admin" nav={adminNav} />
           </RequireRole>
         ),
         children: [
       { index: true, element: <AdminDashboardPage /> },
       { path: 'members', element: <AdminMembersPage /> },
+      { path: 'members/list', element: <AdminMemberPage /> },
       { path: 'students', element: <AdminStudentsPage /> },
       { path: 'teachers', element: <AdminTeachersPage /> },
       { path: 'admissions', element: <AdminAdmissionsPage /> },
@@ -160,7 +162,8 @@ export const router = createBrowserRouter([
   { path: 'exams/questions', element: <AllQuestionsPage /> },
   { path: 'exams/combinations', element: <AdminCombinationPage /> },
   { path: 'exams/deployments', element: <DeploymentsPage /> },
-  { path: 'exams/results', element: <ExamTestResultsPage /> },
+  { path: 'exams/results', element: <ExamTestResultsPage origin="ONLINE" /> },
+  { path: 'exams/results/offline', element: <ExamTestResultsPage origin="OFFLINE" /> },
   { path: 'exams/:classId', element: <ClassExamsPage /> },
   { path: 'exams/:classId/:examId', element: <ExamSubjectsPage /> },
   { path: 'exams/:classId/:examId/:subjectId', element: <SubjectQuestionsPage /> },

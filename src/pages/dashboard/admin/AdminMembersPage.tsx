@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { ROUTES } from '@/routes/paths';
 import { Card, CardHead, PageHeader, Pill, StatTile } from '@/components/dashboard/DashboardUI';
 import { useResource } from '@/context/AuthContext';
-import { UserCog, UserPlus, Users } from 'lucide-react';
+import { IdCard, UserCog, UserPlus, Users } from 'lucide-react';
 
 export const AdminMembersPage = () => {
   const students = useResource<unknown[]>('/students', { limit: 1 });
@@ -13,7 +13,8 @@ export const AdminMembersPage = () => {
   const cards = [
     { to: ROUTES.adminStudents, title: 'Students', text: 'Directory, enrolment, guardians and fee status.', icon: Users },
     { to: ROUTES.adminTeachers, title: 'Teachers', text: 'Staff directory, departments and subjects.', icon: UserCog },
-    { to: ROUTES.adminStudents, title: 'Add Member', text: 'Create a pupil account + login details, approve pending signups.', icon: UserPlus },
+    { to: ROUTES.adminMembersList, title: 'Members', text: 'General member accounts with email login.', icon: IdCard },
+    { to: ROUTES.adminMembersList, title: 'Add Member', text: 'Create a member account + login details.', icon: UserPlus },
   ];
 
   return (
@@ -21,7 +22,7 @@ export const AdminMembersPage = () => {
       <PageHeader
         eyebrow="Members"
         title="Members"
-        text="Everyone in the school — pupils, teachers and pending signups."
+        text="Everyone in the school — pupils, teachers, members and pending signups."
       />
 
       <div className="grid gap-4 sm:grid-cols-3">

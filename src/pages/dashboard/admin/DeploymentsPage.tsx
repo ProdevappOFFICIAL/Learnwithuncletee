@@ -334,7 +334,7 @@ export const DeploymentsPage = () => {
                       {d.mode === 'ONLINE' ? (
                         <Link to={`/examination/${d.code}`} className="font-bold text-brand-700 hover:underline">/examination/{d.code}</Link>
                       ) : (
-                        <span title="Enter this code in the desktop host app">Host app code — LAN server defaults to :1990</span>
+                        <span title="Enter this code in the desktop host app">Host app code — LAN server defaults to :8787</span>
                       )}
                     </p>
                     {d.mode === 'OFFLINE' && <p className="mt-1 text-xs text-muted">{scopeSummary(d)}</p>}

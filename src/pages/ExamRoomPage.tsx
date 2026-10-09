@@ -436,6 +436,7 @@ export const ExamRoomPage = () => {
       const res = await apiPost<{ overallScore: number; attempted_questions: number; total_questions: number }>('/results', {
         userId,
         examId: exam.id,
+        deploymentType: 'ONLINE',
         attempted_questions: questionAttempts.filter((a) => a.attempted).length,
         total_questions: questions.length,
         questionAttempts,
@@ -443,10 +444,10 @@ export const ExamRoomPage = () => {
       setSubmitted(true);
       sessionStorage.removeItem(sessionKey);
       sessionStorage.removeItem(progressKey);
-      // Store result for ExaminationPage to display on redirect
+      // Store counts only (never the score) for ExaminationPage to display on redirect
       sessionStorage.setItem(
         `exam_result_${code}`,
-        JSON.stringify({ overallScore: res.data.overallScore, attempted: res.data.attempted_questions, total: res.data.total_questions }),
+        JSON.stringify({ attempted: res.data.attempted_questions, total: res.data.total_questions }),
       );
       // Remove the beforeunload guard then navigate back to login/done page
       window.location.replace(ROUTES.examination.replace(':code', code));

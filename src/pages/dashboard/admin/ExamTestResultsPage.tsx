@@ -12,6 +12,7 @@ interface TestResultRow {
   attempted_questions: number;
   total_questions: number;
   date: string;
+  deploymentType?: string;
   user?: { user_name: string; user_email: string; class?: { name: string } | null };
   exam?: { exam_name: string };
   subjectScores?: Record<string, { correct: number; total: number }>;
@@ -23,7 +24,10 @@ const breakdownOf = (r: TestResultRow) =>
     .map(([id, s]) => ({ id, name: r.subjectNames?.[id] ?? 'Unknown subject', correct: s.correct, total: s.total }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
-export const ExamTestResultsPage = () => {
+export const ExamTestResultsPage = ({ origin }: { origin: 'ONLINE' | 'OFFLINE' }) => {
+  // Separate routes per origin (…/results vs …/results/offline) so the sidebar
+  // active indicator isolates exactly one child.
+  const mode = origin;
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [classFilter, setClassFilter] = useState('');
@@ -32,9 +36,9 @@ export const ExamTestResultsPage = () => {
   const classes = useResource<ClassItem[]>('/classes', { limit: 200 });
 
   const results = usePagedList<TestResultRow>(
-    ['test-results', query, classFilter],
+    ['test-results', query, classFilter, mode],
     (page, limit) =>
-      apiGet<TestResultRow[]>('/results', {
+      apiGet<TestResultRow[]>(mode === 'OFFLINE' ? '/offline-results' : '/results', {
         searchTerm: query || undefined,
         classId: classFilter || undefined,
         page,
@@ -45,7 +49,7 @@ export const ExamTestResultsPage = () => {
   const remove = async (row: TestResultRow) => {
     if (!confirm(`Delete the test result of ${row.user?.user_name ?? 'this pupil'} for "${row.exam?.exam_name ?? 'this exam'}"? This cannot be undone.`)) return;
     try {
-      await apiDelete(`/results/${row.id}`);
+      await apiDelete(mode === 'OFFLINE' ? `/offline-results/${row.id}` : `/results/${row.id}`);
       setNotice('Test result deleted.');
       results.invalidate();
     } catch (err: any) {
@@ -57,7 +61,7 @@ export const ExamTestResultsPage = () => {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Exam & Test"
-        title="Test Results"
+        title={mode === 'OFFLINE' ? 'Offline Results' : mode === 'ONLINE' ? 'Online Results' : 'Test Results'}
         text="Overall scores from pupils sitting exams on the platform. Expand a row for per-subject marks. Report-sheet PDFs live under Results."
       />
       {notice && <p role="status" className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
@@ -105,7 +109,7 @@ export const ExamTestResultsPage = () => {
           <>
             <TableWrap>
               <table className={`w-full min-w-[840px] text-left text-sm transition-opacity ${results.isFetching ? 'opacity-60' : ''}`}>
-                <thead><tr><Th>Pupil</Th><Th>Exam</Th><Th>Class</Th><Th>Score</Th><Th>Attempted</Th><Th>Submitted</Th><Th><span className="sr-only">Actions</span></Th></tr></thead>
+                <thead><tr><Th>Pupil</Th><Th>Exam</Th><Th>Class</Th><Th>Mode</Th><Th>Score</Th><Th>Attempted</Th><Th>Submitted</Th><Th><span className="sr-only">Actions</span></Th></tr></thead>
                 <tbody>
                   {results.rows.map((r) => {
                     const open = expanded === r.id;
@@ -116,6 +120,7 @@ export const ExamTestResultsPage = () => {
                           <Td><span className="font-bold">{r.user?.user_name ?? '—'}</span><span className="block text-xs text-muted">{r.user?.user_email ?? ''}</span></Td>
                           <Td>{r.exam?.exam_name ?? '—'}</Td>
                           <Td className="text-muted">{r.user?.class?.name ?? '—'}</Td>
+                          <Td><Pill tone={mode === 'OFFLINE' ? 'amber' : 'sky'}>{mode === 'OFFLINE' ? 'Offline' : 'Online'}</Pill></Td>
                           <Td><Pill tone={r.overallScore >= 75 ? 'emerald' : r.overallScore < 40 ? 'rose' : 'sky'}>{r.overallScore}%</Pill></Td>
                           <Td className="text-muted">{r.attempted_questions}/{r.total_questions}</Td>
                           <Td className="text-muted">{new Date(r.date).toLocaleString()}</Td>
@@ -138,7 +143,7 @@ export const ExamTestResultsPage = () => {
                         </tr>
                         {open && (
                           <tr>
-                            <td colSpan={7} className="border-t border-line bg-cream/60 px-5 py-4">
+                            <td colSpan={8} className="border-t border-line bg-cream/60 px-5 py-4">
                               {parts.length === 0 ? (
                                 <p className="text-xs text-muted">No per-subject data on this attempt.</p>
                               ) : (
