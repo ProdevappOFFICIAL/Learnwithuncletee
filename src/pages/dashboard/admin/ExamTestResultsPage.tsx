@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react';
 import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pagination, Pill, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
 import { useResource } from '@/context/AuthContext';
-import { apiDelete, apiGet } from '@/lib/api';
+import { apiDelete, apiGet, apiPatch } from '@/lib/api';
 import { usePagedList } from '@/lib/pagedQuery';
 import type { ClassItem } from '@/data/dashboard';
 import { ChevronDown, ChevronRight } from 'lucide-react';
@@ -12,6 +12,7 @@ interface TestResultRow {
   attempted_questions: number;
   total_questions: number;
   date: string;
+  submitted?: boolean;
   deploymentType?: string;
   user?: { user_name: string; user_email: string; class?: { name: string } | null };
   exam?: { exam_name: string };
@@ -54,6 +55,23 @@ export const ExamTestResultsPage = ({ origin }: { origin: 'ONLINE' | 'OFFLINE' }
       results.invalidate();
     } catch (err: any) {
       setNotice(err?.message ?? 'Delete failed');
+    }
+  };
+
+  // Online-only submission lock: on = pupil can't re-enter; off = re-allowed.
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
+
+  const flipSubmitted = async (row: TestResultRow) => {
+    setRowBusy(row.id);
+    try {
+      const next = !row.submitted;
+      await apiPatch(`/results/${row.id}`, { submitted: next });
+      setNotice(next ? `Locked — ${row.user?.user_name ?? 'pupil'} can't re-enter this exam.` : `Re-opened — ${row.user?.user_name ?? 'pupil'} can sit this exam again.`);
+      results.invalidate();
+    } catch (err: any) {
+      setNotice(err?.message ?? 'Update failed');
+    } finally {
+      setRowBusy(null);
     }
   };
 
@@ -125,7 +143,21 @@ export const ExamTestResultsPage = ({ origin }: { origin: 'ONLINE' | 'OFFLINE' }
                           <Td className="text-muted">{r.attempted_questions}/{r.total_questions}</Td>
                           <Td className="text-muted">{new Date(r.date).toLocaleString()}</Td>
                           <Td>
-                            <span className="flex gap-1.5">
+                            <span className="flex items-center gap-1.5">
+                              {mode === 'ONLINE' && (
+                                <button
+                                  type="button"
+                                  role="switch"
+                                  aria-checked={!!r.submitted}
+                                  aria-label={`Submission lock for ${r.user?.user_name ?? 'pupil'}`}
+                                  title={r.submitted ? 'Locked — pupil cannot re-enter (click to re-allow)' : 'Re-entry allowed (click to lock)'}
+                                  disabled={rowBusy === r.id}
+                                  onClick={() => flipSubmitted(r)}
+                                  className={`inline-flex h-6 w-11 shrink-0 items-center rounded-full px-1 transition-colors disabled:opacity-60 ${r.submitted ? 'bg-brand-500' : 'bg-line'}`}
+                                >
+                                  <span className={`h-4 w-4 rounded-full bg-white transition-transform ${r.submitted ? 'translate-x-5' : ''}`} />
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => setExpanded(open ? null : r.id)}

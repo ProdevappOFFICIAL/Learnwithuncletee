@@ -11,6 +11,8 @@ import {
   ChevronRight,
   Clock,
   Delete,
+  FileText,
+  Image as ImageIcon,
   Send,
   X,
 } from 'lucide-react';
@@ -249,6 +251,46 @@ const Kbd = ({ children }: { children: string }) => (
   <kbd className="rounded border border-line bg-white px-1.5 py-0.5 font-mono text-[11px] font-bold text-ink">{children}</kbd>
 );
 
+// ─── Attachment helpers ───────────────────────────────────────────────────────
+
+const isImageFile = (src: string) =>
+  /\.(png|jpe?g|gif|webp)(\?|#|$)/i.test(src) || /^data:image\//i.test(src);
+
+/** Browser-openable now (URL / data / blob / site-relative). Plain offline
+ * paths are shown as text — they resolve later on exam devices. */
+const isOpenableFile = (src: string) =>
+  /^(https?:|data:|blob:)/i.test(src) || src.startsWith('/');
+
+// ─── Attachment dialog (images render inside; other files open in browser) ───
+
+const AttachmentDialog = ({ src, onClose }: { src: string; onClose: () => void }) => {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Question attachment">
+      <button type="button" aria-label="Close attachment" onClick={onClose} className="absolute inset-0 bg-brand-900/70" />
+      <div className="relative max-h-[85vh] w-full max-w-2xl overflow-auto rounded-xl bg-white p-4 shadow-2xl">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="truncate font-mono text-xs text-muted">{src.split('?')[0].split('/').pop() || 'Attachment'}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close attachment"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-line text-brand-800 hover:bg-brand-50"
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+        <img src={src} alt="Question attachment" className="max-h-[70vh] w-full rounded border border-line object-contain" />
+      </div>
+    </div>
+  );
+};
+
 // ─── Session payload stored by ExaminationPage on login ───────────────────────
 
 interface ExamSession {
@@ -317,6 +359,7 @@ export const ExamRoomPage = () => {
   const [currentQ, setCurrentQ] = useState(() => readProgress(progressKey).currentQ);
   const [calcOpen, setCalcOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -419,6 +462,17 @@ export const ExamRoomPage = () => {
       ? (typed[q.id] ?? '').trim().length > 0
       : picked[q.id] !== undefined && picked[q.id] !== null;
 
+  // Palette grouped per subject (single flat list when there's one subject).
+  const paletteGroups = useMemo(() => {
+    const withIdx = questions.map((x, i) => ({ q: x, i }));
+    const names = [...new Set(questions.map((x) => x.subject?.name ?? '').filter(Boolean))];
+    if (names.length <= 1) return [{ subject: null as string | null, items: withIdx }];
+    return names.map((name) => ({
+      subject: name,
+      items: withIdx.filter(({ q }) => (q.subject?.name ?? '') === name),
+    }));
+  }, [questions]);
+
   // ── Submit ──────────────────────────────────────────────────────────────────
   const submit = useCallback(async () => {
     if (!exam || busy || !userId || submitted) return;
@@ -470,6 +524,7 @@ export const ExamRoomPage = () => {
 
   const goTo = (idx: number) => {
     if (!exam) return;
+    setAttachOpen(false);
     setCurrentQ(Math.max(0, Math.min(questions.length - 1, idx)));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -478,7 +533,7 @@ export const ExamRoomPage = () => {
   // Ignored while typing, while dialogs are open, or after submit.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (submitted || calcOpen || warnOpen || confirmOpen) return;
+      if (submitted || calcOpen || warnOpen || confirmOpen || attachOpen) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       // Typing targets keep their keys; focused radios/checkboxes don't block shortcuts.
       const t = e.target as HTMLElement | null;
@@ -494,6 +549,17 @@ export const ExamRoomPage = () => {
       const q = questions[Math.min(currentQ, total - 1)];
       if (!q) return;
       const k = e.key.toLowerCase();
+      // True/False questions answer directly off T/F (in addition to A/B).
+      if (q.type === 'TRUE_FALSE') {
+        if (k === 't' || k === 'f') {
+          const oi = (optionsByQ[q.id] ?? []).indexOf(k === 't' ? 'True' : 'False');
+          if (oi !== -1) {
+            setPicked((p) => ({ ...p, [q.id]: oi }));
+            e.preventDefault();
+          }
+        }
+        return;
+      }
       if (k >= 'a' && k <= 'z') {
         const idx = k.charCodeAt(0) - 97;
         const opts = optionsByQ[q.id] ?? [];
@@ -513,7 +579,7 @@ export const ExamRoomPage = () => {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [submitted, calcOpen, warnOpen, confirmOpen, questions, currentQ, optionsByQ, goTo]);
+  }, [submitted, calcOpen, warnOpen, confirmOpen, attachOpen, questions, currentQ, optionsByQ, goTo]);
 
   // ── Guard: no session ───────────────────────────────────────────────────────
   if (!exam || !userId) {
@@ -579,6 +645,10 @@ export const ExamRoomPage = () => {
         />
       )}
 
+      {attachOpen && q.question_file?.trim() && (
+        <AttachmentDialog src={q.question_file.trim()} onClose={() => setAttachOpen(false)} />
+      )}
+
       <div className="flex min-h-screen flex-col bg-cream font-sans text-ink">
 
         {/* ── Sticky header ── */}
@@ -630,32 +700,44 @@ export const ExamRoomPage = () => {
         <main className="flex-1 py-8 sm:py-10">
           <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
 
-            {/* ── Dot-nav progress bar ── */}
-            <nav aria-label="Question navigation" className="mb-6 flex flex-wrap items-center gap-1.5">
-              {questions.map((x, i) => {
-                const done = answered(x);
-                const active = i === safeCurrent;
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => goTo(i)}
-                    aria-label={`Go to question ${i + 1}${done ? ' (answered)' : ''}`}
-                    aria-current={active ? 'step' : undefined}
-                    className={[
-                      'flex h-8 min-w-[2rem] items-center justify-center rounded px-2 text-xs font-bold transition-all duration-150',
-                      active ? 'bg-brand-900 text-white shadow'
-                        : done ? 'bg-brand-500 text-white'
-                        : 'border border-line bg-white text-muted hover:border-brand-500 hover:text-brand-700',
-                    ].join(' ')}
-                  >
-                    {i + 1}
-                  </button>
-                );
-              })}
-              <span className="ml-auto text-xs text-muted">
+            {/* ── Dot-nav progress bar (grouped per subject) ── */}
+            <nav aria-label="Question navigation" className="mb-6 space-y-3">
+              {paletteGroups.map((group) => (
+                <div key={group.subject ?? 'all'}>
+                  {group.subject && (
+                    <p className="mb-1.5 flex items-center justify-between text-[11px] font-bold uppercase tracking-widest text-muted">
+                      <span>{group.subject}</span>
+                      <span>{group.items.filter(({ q }) => answered(q)).length}/{group.items.length}</span>
+                    </p>
+                  )}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {group.items.map(({ q: x, i }) => {
+                      const done = answered(x);
+                      const active = i === safeCurrent;
+                      return (
+                        <button
+                          key={x.id}
+                          type="button"
+                          onClick={() => goTo(i)}
+                          aria-label={`Go to question ${i + 1}${done ? ' (answered)' : ''}`}
+                          aria-current={active ? 'step' : undefined}
+                          className={[
+                            'flex h-8 min-w-[2rem] items-center justify-center rounded px-2 text-xs font-bold transition-all duration-150',
+                            active ? 'bg-brand-900 text-white shadow'
+                              : done ? 'bg-brand-500 text-white'
+                              : 'border border-line bg-white text-muted hover:border-brand-500 hover:text-brand-700',
+                          ].join(' ')}
+                        >
+                          {i + 1}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              <p className="text-right text-xs text-muted">
                 {questions.filter(answered).length}/{total} answered
-              </span>
+              </p>
             </nav>
 
             {/* ── Question card ── */}
@@ -669,6 +751,43 @@ export const ExamRoomPage = () => {
                 </Suspense>
               </div>
 
+              {q.question_file?.trim() ? (
+                <div className="mt-4 rounded border border-line bg-cream px-4 py-3">
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted">Attachment</p>
+                  {(() => {
+                    const file = q.question_file!.trim();
+                    if (!isOpenableFile(file)) {
+                      return (
+                        <p className="mt-1.5 font-mono text-xs text-muted">
+                          Offline file: {file} <span className="font-sans">(available on exam devices)</span>
+                        </p>
+                      );
+                    }
+                    if (isImageFile(file)) {
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => setAttachOpen(true)}
+                          className="mt-2 inline-flex min-h-10 items-center gap-2 rounded border border-line bg-white px-4 text-xs font-bold hover:border-brand-500 hover:text-brand-700"
+                        >
+                          <ImageIcon size={14} aria-hidden="true" /> View image
+                        </button>
+                      );
+                    }
+                    return (
+                      <a
+                        href={file}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex min-h-10 items-center gap-2 rounded border border-line bg-white px-4 text-xs font-bold hover:border-brand-500 hover:text-brand-700"
+                      >
+                        <FileText size={14} aria-hidden="true" /> Open file in browser
+                      </a>
+                    );
+                  })()}
+                </div>
+              ) : null}
+
               {q.type === 'FILL_IN_THE_BLANK' ? (
                 <input
                   value={typed[q.id] ?? ''}
@@ -677,6 +796,31 @@ export const ExamRoomPage = () => {
                   aria-label={`Answer for question ${safeCurrent + 1}`}
                   className="mt-5 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
                 />
+              ) : q.type === 'TRUE_FALSE' ? (
+                <div className="mt-5 grid grid-cols-2 gap-3" role="radiogroup" aria-label={`True or false for question ${safeCurrent + 1}`}>
+                  {(['True', 'False'] as const).map((label) => {
+                    const opts = optionsByQ[q.id] ?? [];
+                    const oi = opts.indexOf(label);
+                    const selected = oi !== -1 && picked[q.id] === oi;
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        disabled={oi === -1}
+                        onClick={() => setPicked({ ...picked, [q.id]: oi })}
+                        className={`min-h-[68px] rounded border px-4 py-3.5 text-base font-extrabold transition-colors disabled:opacity-40 ${
+                          selected
+                            ? 'border-brand-500 bg-brand-50 text-brand-800'
+                            : 'border-line hover:border-brand-500'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
               ) : (
                 <div className="mt-5 space-y-2.5" role="radiogroup" aria-label={`Options for question ${safeCurrent + 1}`}>
                   {(optionsByQ[q.id] ?? []).map((opt, oi) => (

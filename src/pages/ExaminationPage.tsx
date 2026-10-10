@@ -17,6 +17,8 @@ export interface ExamQuestion {
   subjectId?: string;
   subject?: { id: string; name: string } | null;
   options?: string[];
+  /** Attachment: online UploadThing URL or offline plain path (resolved later). */
+  question_file?: string | null;
   // Legacy sessions (stored before answer-stripping) may still carry these.
   correct_answer?: string;
   incorrect_answers?: string[];
@@ -100,6 +102,19 @@ export const ExaminationPage = () => {
     try {
       const me = await login(identity.trim(), password);
       if (!exam) return;
+      // Submission lock: a locked online row means this pupil already
+      // participated — block re-entry until the admin flips the switch off.
+      const lockCheck = await apiGet<Array<{ submitted?: boolean }>>('/results', {
+        userId: me.id,
+        examId: exam.id,
+        limit: 1,
+      });
+      if ((lockCheck.data ?? []).some((r) => r.submitted === true)) {
+        setError(
+          `You have already participated in ${exam.exam_name} — you can't log in again until the admin re-opens it. Contact your teacher.`,
+        );
+        return;
+      }
       // Post-login: pull this pupil's filtered question feed (class → exam →
       // combination → subject). 403 here means the exam isn't for their class.
       const feed = await apiGet<QuestionFeed>(`/exam-deployments/by-code/${code}/questions`);

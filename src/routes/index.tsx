@@ -63,8 +63,9 @@ import { ExamTestResultsPage } from '@/pages/dashboard/admin/ExamTestResultsPage
 import { WebsiteSectionPage } from '@/pages/dashboard/admin/AdminSectionPage';
 import { AdminSettingsPage } from '@/pages/dashboard/admin/AdminSettingsPage';
 import { AdminAuditLogPage } from '@/pages/dashboard/admin/AdminAuditLogPage';
+import { RouteError } from '@/components/ui/RouteError';
 
-export const router = createBrowserRouter([
+const appRoutes = [
   { path: ROUTES.home, element: <HomePage /> },
   { path: ROUTES.about, element: <AboutPage /> },
   { path: ROUTES.academics, element: <AcademicsPage /> },
@@ -179,4 +180,11 @@ export const router = createBrowserRouter([
   // Back-compat alias: /admin/student -> /dashboard/student
   { path: '/admin/student/*', element: <Navigate to={ROUTES.studentDashboard} replace /> },
   { path: ROUTES.notFound, element: <NotFoundPage /> },
-]);
+];
+
+// Every top-level route gets the branded error element; nested dashboard
+// pages inherit it by bubbling, so a crash in any page (e.g. a typo'd
+// variable) shows this dialog instead of the router's default error screen.
+export const router = createBrowserRouter(
+  appRoutes.map((r) => ({ errorElement: <RouteError />, ...r })),
+);

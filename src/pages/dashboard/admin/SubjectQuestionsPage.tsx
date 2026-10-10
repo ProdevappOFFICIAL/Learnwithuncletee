@@ -4,8 +4,9 @@ import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pa
 import { useAuth } from '@/context/AuthContext';
 import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api';
 import { usePagedList } from '@/lib/pagedQuery';
+import { UploadButton } from '@/lib/uploadthing';
 import { ROUTES } from '@/routes/paths';
-import { HelpCircle, Pencil, Trash2 } from 'lucide-react';
+import { HelpCircle, Paperclip, Pencil, Plus, Trash2, X } from 'lucide-react';
 
 const QuestionEditor = lazy(() => import('@/lib/mdxEditor').then((m) => ({ default: m.NewsEditor })));
 
@@ -25,11 +26,14 @@ interface QuestionItem {
   correct_answer: string;
   incorrect_answers: string[];
   explanation?: string | null;
+  question_file?: string | null;
 }
+
+type FileMode = 'none' | 'online' | 'offline';
 
 const inputClass = 'mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500';
 
-const EMPTY_FORM = { type: 'MULTIPLE_CHOICE' as QuestionType, question: '', correct_answer: '', incorrect: '', explanation: '', editingId: null as string | null };
+const EMPTY_FORM = { type: 'MULTIPLE_CHOICE' as QuestionType, question: '', correct_answer: '', incorrect: ['', '', ''] as string[], explanation: '', fileMode: 'none' as FileMode, question_file: '', editingId: null as string | null };
 
 export const SubjectQuestionsPage = () => {
   const { classId = '', examId = '', subjectId = '' } = useParams<{ classId: string; examId: string; subjectId: string }>();
@@ -59,11 +63,27 @@ export const SubjectQuestionsPage = () => {
   const set = (patch: Partial<typeof EMPTY_FORM>) => setForm((f) => ({ ...f, ...patch }));
   const editing = form.editingId !== null;
 
-  const incorrectAnswers = () =>
-    form.incorrect
-      .split('\n')
-      .map((s) => s.trim())
-      .filter(Boolean);
+  // Per-type switching: each type owns its answer UI, so reset the fields
+  // the new type doesn't use (a TF question never carries options).
+  const setType = (type: QuestionType) => {
+    if (type === 'MULTIPLE_CHOICE') {
+      setForm((f) => ({ ...f, type, incorrect: f.incorrect.length > 0 ? f.incorrect : ['', '', ''] }));
+    } else if (type === 'TRUE_FALSE') {
+      setForm((f) => ({ ...f, type, correct_answer: f.correct_answer === 'False' ? 'False' : 'True', incorrect: [] }));
+    } else {
+      setForm((f) => ({ ...f, type, incorrect: [] }));
+    }
+  };
+
+  const setIncorrectAt = (index: number, value: string) =>
+    setForm((f) => ({ ...f, incorrect: f.incorrect.map((v, i) => (i === index ? value : v)) }));
+
+  const addOption = () => setForm((f) => ({ ...f, incorrect: [...f.incorrect, ''] }));
+
+  const removeOption = (index: number) =>
+    setForm((f) => ({ ...f, incorrect: f.incorrect.filter((_, i) => i !== index) }));
+
+  const nonEmptyOptions = () => form.incorrect.map((s) => s.trim()).filter(Boolean);
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,12 +91,12 @@ export const SubjectQuestionsPage = () => {
       setNotice('Question text and the correct answer are required.');
       return;
     }
-    if (form.type === 'MULTIPLE_CHOICE' && incorrectAnswers().length < 1) {
-      setNotice('Add at least one incorrect option (one per line).');
+    if (form.type === 'MULTIPLE_CHOICE' && nonEmptyOptions().length < 1) {
+      setNotice('Add at least one incorrect option.');
       return;
     }
-    if (form.type === 'TRUE_FALSE' && incorrectAnswers().length !== 1) {
-      setNotice('True/False needs exactly one opposite answer.');
+    if (form.type === 'TRUE_FALSE' && form.correct_answer !== 'True' && form.correct_answer !== 'False') {
+      setNotice('Pick True or False as the correct answer.');
       return;
     }
     setBusy(true);
@@ -86,8 +106,11 @@ export const SubjectQuestionsPage = () => {
         type: form.type,
         question: form.question.trim(),
         correct_answer: form.correct_answer.trim(),
-        incorrect_answers: form.type === 'FILL_IN_THE_BLANK' ? [] : incorrectAnswers(),
+        // Only multiple-choice carries options — TF and FILL always send [].
+        incorrect_answers: form.type === 'MULTIPLE_CHOICE' ? nonEmptyOptions() : [],
         explanation: form.explanation.trim() || undefined,
+        // Online: UploadThing URL. Offline: plain path string, resolved later.
+        question_file: form.fileMode === 'none' ? null : form.question_file.trim() || null,
         examId,
         subjectId,
         classId,
@@ -111,12 +134,17 @@ export const SubjectQuestionsPage = () => {
   };
 
   const startEdit = (q: QuestionItem) => {
+    const stored = (q.question_file ?? '').trim();
     setForm({
       type: q.type,
       question: q.question,
-      correct_answer: q.correct_answer,
-      incorrect: (q.incorrect_answers ?? []).join('\n'),
+      correct_answer: q.type === 'TRUE_FALSE' ? (q.correct_answer === 'False' ? 'False' : 'True') : q.correct_answer,
+      // Legacy TF rows may carry a stale "opposite answer" — dropped, it's unused.
+      incorrect: q.type === 'MULTIPLE_CHOICE' && (q.incorrect_answers ?? []).length > 0 ? q.incorrect_answers : ['', '', ''],
       explanation: q.explanation ?? '',
+      // Stored http(s) links came from uploads; anything else is an offline path.
+      fileMode: !stored ? 'none' : /^https?:\/\//i.test(stored) ? 'online' : 'offline',
+      question_file: stored,
       editingId: q.id,
     });
     setNotice(null);
@@ -165,7 +193,7 @@ export const SubjectQuestionsPage = () => {
           <h3 className="mt-2 font-display text-lg font-extrabold">{editing ? 'Edit question' : 'New question'}</h3>
           <form className="mt-5 space-y-4" onSubmit={save}>
             <label className="block text-sm font-semibold">Question type
-              <select value={form.type} onChange={(e) => set({ type: e.target.value as QuestionType })} className={inputClass}>
+              <select value={form.type} onChange={(e) => setType(e.target.value as QuestionType)} className={inputClass}>
                 <option value="MULTIPLE_CHOICE">Multiple choice</option>
                 <option value="TRUE_FALSE">True / False</option>
                 <option value="FILL_IN_THE_BLANK">Fill in the blank</option>
@@ -179,18 +207,126 @@ export const SubjectQuestionsPage = () => {
                 </Suspense>
               </div>
             </div>
-            <label className="block text-sm font-semibold">Correct answer
-              <input value={form.correct_answer} onChange={(e) => set({ correct_answer: e.target.value })} required placeholder="The right answer" className={`${inputClass} text-sm`} />
-            </label>
-            {form.type !== 'FILL_IN_THE_BLANK' && (
-              <label className="block text-sm font-semibold">
-                {form.type === 'TRUE_FALSE' ? 'Opposite answer (exactly one)' : 'Incorrect options (one per line)'}
-                <textarea rows={3} value={form.incorrect} onChange={(e) => set({ incorrect: e.target.value })} placeholder={form.type === 'TRUE_FALSE' ? 'e.g. False' : 'e.g. Paris\nLondon\nBerlin'} className="mt-2 w-full rounded border border-line bg-white px-3 py-3 text-sm outline-none focus:border-brand-500" />
+            {form.type === 'TRUE_FALSE' ? (
+              <div>
+                <p className="text-sm font-semibold">Correct answer</p>
+                <div className="mt-2 flex gap-2" role="group" aria-label="True or false">
+                  {(['True', 'False'] as const).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => set({ correct_answer: v })}
+                      aria-pressed={form.correct_answer === v}
+                      className={`min-h-11 flex-1 rounded border px-4 text-sm font-bold transition-colors ${
+                        form.correct_answer === v
+                          ? 'border-brand-500 bg-brand-50 text-brand-700'
+                          : 'border-line bg-white text-muted hover:border-brand-500 hover:text-brand-700'
+                      }`}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <label className="block text-sm font-semibold">Correct answer
+                <input value={form.correct_answer} onChange={(e) => set({ correct_answer: e.target.value })} required placeholder="The right answer" className={`${inputClass} text-sm`} />
               </label>
+            )}
+            {form.type === 'MULTIPLE_CHOICE' && (
+              <div>
+                <p className="text-sm font-semibold">Incorrect options <span className="font-normal text-muted">(min. 1)</span></p>
+                <div className="mt-2 space-y-2">
+                  {form.incorrect.map((opt, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-50 text-xs font-extrabold text-brand-700">
+                        {String.fromCharCode(65 + idx)}
+                      </span>
+                      <input
+                        value={opt}
+                        onChange={(e) => setIncorrectAt(idx, e.target.value)}
+                        required={idx === 0}
+                        placeholder={`Option ${idx + 1}`}
+                        aria-label={`Incorrect option ${idx + 1}`}
+                        className="min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500"
+                      />
+                      <button
+                        type="button"
+                        disabled={form.incorrect.length <= 1}
+                        onClick={() => removeOption(idx)}
+                        aria-label={`Remove option ${idx + 1}`}
+                        title="Remove option"
+                        className="shrink-0 rounded border border-line px-2.5 py-2 text-xs font-bold text-rose-700 hover:border-rose-300 disabled:opacity-40"
+                      >
+                        <Trash2 aria-hidden="true" size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={addOption}
+                  className="mt-2 inline-flex min-h-10 items-center rounded border border-line bg-white px-4 text-xs font-bold hover:border-brand-500 hover:text-brand-700"
+                >
+                  <Plus aria-hidden="true" size={14} className="mr-1" /> Add option
+                </button>
+              </div>
             )}
             <label className="block text-sm font-semibold">Explanation (optional)
               <textarea rows={2} value={form.explanation} onChange={(e) => set({ explanation: e.target.value })} placeholder="Why is this the answer?" className="mt-2 w-full rounded border border-line bg-white px-3 py-3 text-sm outline-none focus:border-brand-500" />
             </label>
+            <div>
+              <p className="text-sm font-semibold">Attachment <span className="font-normal text-muted">(optional)</span></p>
+              <div className="mt-2 flex gap-2" role="group" aria-label="Attachment source">
+                {(['none', 'online', 'offline'] as FileMode[]).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => set({ fileMode: m, question_file: m === 'none' ? '' : form.question_file })}
+                    aria-pressed={form.fileMode === m}
+                    className={`min-h-10 flex-1 rounded border px-3 text-xs font-bold capitalize transition-colors ${
+                      form.fileMode === m
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-line bg-white text-muted hover:border-brand-500 hover:text-brand-700'
+                    }`}
+                  >
+                    {m === 'none' ? 'No file' : m}
+                  </button>
+                ))}
+              </div>
+              {form.fileMode === 'online' && (
+                <div className="mt-2">
+                  {form.question_file ? (
+                    <p className="flex items-center gap-2 rounded border border-line bg-cream px-3 py-2 text-xs">
+                      <Paperclip size={13} aria-hidden="true" className="shrink-0 text-brand-700" />
+                      <span className="min-w-0 flex-1 truncate font-mono">{form.question_file}</span>
+                      <button type="button" onClick={() => set({ question_file: '' })} aria-label="Remove uploaded file" className="shrink-0 font-bold text-rose-700 hover:underline">
+                        <X size={13} aria-hidden="true" />
+                      </button>
+                    </p>
+                  ) : (
+                    <UploadButton
+                      endpoint="assignmentUploader"
+                      label="Upload file (PDF / image)"
+                      onClientUploadComplete={(res) => set({ question_file: res?.[0]?.ufsUrl ?? '' })}
+                      onUploadError={(err) => setNotice(err.message)}
+                    />
+                  )}
+                </div>
+              )}
+              {form.fileMode === 'offline' && (
+                <input
+                  value={form.question_file}
+                  onChange={(e) => set({ question_file: e.target.value })}
+                  placeholder="e.g. files/biology/q12-diagram.png"
+                  aria-label="Offline file path"
+                  className={`${inputClass} font-mono text-sm`}
+                />
+              )}
+              {form.fileMode === 'offline' && (
+                <p className="mt-1 text-xs text-muted">Plain path string — resolved later when offline packs are built.</p>
+              )}
+            </div>
             <div className="flex flex-wrap gap-2">
               <button type="submit" disabled={busy} className="min-h-11 flex-1 rounded bg-brand-900 px-5 py-3 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
                 {busy ? 'Saving…' : editing ? 'Save changes' : 'Add question'}
@@ -260,6 +396,9 @@ export const SubjectQuestionsPage = () => {
                           <p className="mt-1 text-xs text-muted">
                             Answer: <b className="text-emerald-700">{q.correct_answer}</b>
                             {q.incorrect_answers?.length > 0 && <> · Options: {q.incorrect_answers.join(' / ')}</>}
+                            {q.question_file?.trim() ? (
+                              <> · <span className="inline-flex items-center gap-1 font-bold text-brand-700"><Paperclip size={11} aria-hidden="true" /> File attached</span></>
+                            ) : null}
                           </p>
                           {q.explanation && <p className="mt-1 text-xs italic text-muted">{q.explanation}</p>}
                         </div>
