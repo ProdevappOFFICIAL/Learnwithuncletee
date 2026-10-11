@@ -128,7 +128,7 @@ export const FormResponsesPage = () => {
                     >
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-bold">{r.email}</span>
-                        <span className="block text-xs text-muted">{new Date(r.createdAt).toLocaleString()}</span>
+                        <span className="block text-xs text-muted">{new Date(r.createdAt).toLocaleString()}{r.phone ? ` · ${r.phone}` : ''}</span>
                       </span>
                     </button>
                     <span className="flex shrink-0 items-center gap-2">

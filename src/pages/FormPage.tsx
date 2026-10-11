@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Container } from '@/components/ui/Container';
 import { PageMetadata } from '@/components/ui/PageMetadata';
@@ -32,17 +32,30 @@ const inputClass = 'mt-2 min-h-12 w-full rounded border border-line bg-white px-
 export const FormPage = () => {
   const { id = '' } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const [form, setForm] = useState<PublicForm | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [values, setValues] = useState<Record<string, any>>({});
   const [busy, setBusy] = useState(false);
   const [paying, setPaying] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [done, setDone] = useState(false);
-  // Paystack appends ?reference= (and ?trxref=) on return from checkout.
-  const [paymentRef] = useState<string | null>(() => searchParams.get('reference') || searchParams.get('trxref'));
+  // Paid ref resolution order: success-page handoff (route state) → persisted
+  // ref from a verified checkout → legacy ?reference= query param.
+  const [paymentRef] = useState<string | null>(() => {
+    const fromState = (location.state as any)?.paymentRef;
+    if (typeof fromState === 'string' && fromState) return fromState;
+    try {
+      const saved = localStorage.getItem(`frm_paid_${id}`);
+      if (saved) return saved;
+    } catch {
+      /* ignore */
+    }
+    return searchParams.get('reference') || searchParams.get('trxref');
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -73,10 +86,11 @@ export const FormPage = () => {
     setPaying(true);
     setNotice(null);
     try {
-      const res = await apiPost<{ authorization_url: string; reference: string }>('/billing/form-initialize', {
+      const res = await apiPost<{ authorization_url: string; reference: string; webhookUrl?: string }>('/forms/checkout/initialize', {
         email: email.trim(),
+        phone: phone.trim() || undefined,
         formId: form.id,
-        callbackUrl: window.location.origin + '/form/' + form.id,
+        callbackUrl: window.location.origin + ROUTES.formSuccess.replace(':id', form.id),
       });
       window.location.href = res.data.authorization_url;
     } catch (e: any) {
@@ -93,6 +107,7 @@ export const FormPage = () => {
     try {
       await apiPost(`/forms/${form.id}/responses`, {
         email: email.trim(),
+        phone: phone.trim() || undefined,
         answers: values,
         paymentRef: paymentRef || undefined,
       });
@@ -217,6 +232,12 @@ export const FormPage = () => {
                   Email address
                   <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" className={inputClass} />
                 </label>
+                {form.amountKobo > 0 && (
+                  <label className="block text-sm font-semibold">
+                    Phone number (optional — for payment receipt)
+                    <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. 0803…" inputMode="tel" autoComplete="tel" className={inputClass} />
+                  </label>
+                )}
 
                 {form.fields.map((f) => (
                   <div key={f.id}>

@@ -43,9 +43,10 @@ import { AdminVirtualClassPage } from '@/pages/dashboard/admin/AdminVirtualClass
 import { AdminNewsPage } from '@/pages/dashboard/admin/AdminNewsPage';
 import { AdminNewsPreviewPage } from '@/pages/dashboard/admin/AdminNewsPreviewPage';
 import { AdminFormsPage } from '@/pages/dashboard/admin/AdminFormsPage';
-import { AdminFormPreviewPage } from '@/pages/dashboard/admin/AdminFormPreviewPage';
-import { FormResponsesPage } from '@/pages/dashboard/admin/FormResponsesPage';
+import { AdminPaymentPage } from '@/pages/dashboard/admin/AdminPaymentPage';
+import { AdminFormPreviewPage } from '@/pages/dashboard/admin/AdminFormPreviewPage';import { FormResponsesPage } from '@/pages/dashboard/admin/FormResponsesPage';
 import { FormPage } from '@/pages/FormPage';
+import { FormSuccessPage } from '@/pages/FormSuccessPage';
 import { AdminMembersPage } from '@/pages/dashboard/admin/AdminMembersPage';
 import { AdminMemberPage } from '@/pages/dashboard/admin/AdminMemberPage';
 import { AdminWebsitePage } from '@/pages/dashboard/admin/AdminWebsitePage';
@@ -63,6 +64,7 @@ import { ExamTestResultsPage } from '@/pages/dashboard/admin/ExamTestResultsPage
 import { WebsiteSectionPage } from '@/pages/dashboard/admin/AdminSectionPage';
 import { AdminSettingsPage } from '@/pages/dashboard/admin/AdminSettingsPage';
 import { AdminAuditLogPage } from '@/pages/dashboard/admin/AdminAuditLogPage';
+import { AdminBillingPage } from '@/pages/dashboard/admin/AdminBillingPage';
 import { RouteError } from '@/components/ui/RouteError';
 
 const appRoutes = [
@@ -85,6 +87,7 @@ const appRoutes = [
   { path: ROUTES.examination, element: <ExaminationPage /> },
   { path: ROUTES.examinationRoom, element: <ExamRoomPage /> },
   { path: ROUTES.formPublic, element: <FormPage /> },
+  { path: ROUTES.formSuccess, element: <FormSuccessPage /> },
   { path: ROUTES.dashboard, element: <DashboardIndexPage /> },
   {
     path: ROUTES.studentDashboard,
@@ -173,6 +176,7 @@ const appRoutes = [
   { path: 'website/:section', element: <WebsiteSectionPage /> },
       { path: 'settings', element: <AdminSettingsPage /> },
       { path: 'audit-log', element: <AdminAuditLogPage /> },
+      { path: 'billing', element: <AdminBillingPage /> },
         ],
       },
     ],

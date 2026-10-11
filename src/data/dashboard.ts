@@ -4,6 +4,7 @@ import {
   Cloud,
   CloudOff,
   Cog,
+  CreditCard,
   FileBarChart2,
   FileQuestion,
   FileText,
@@ -299,6 +300,12 @@ export const adminNav: DashboardNavItem[] = [
         icon: ScrollText,
         permission: "settings.read",
       },
+      {
+        to: ROUTES.adminBilling,
+        label: "Billing",
+        icon: CreditCard,
+        permission: "fees.read",
+      },
       /*  {
         label: "Website Management",
         icon: Globe,
@@ -588,6 +595,7 @@ export interface FormItem {
 export interface FormResponseItem {
   id: string;
   email: string;
+  phone?: string | null;
   answers: Record<string, any>;
   paymentRef?: string | null;
   paymentStatus: string;
