@@ -24,6 +24,7 @@ import { StudentFeesPage } from '@/pages/dashboard/student/StudentFeesPage';
 import { StudentResultsPage } from '@/pages/dashboard/student/StudentResultsPage';
 import { StudentAssignmentsPage } from '@/pages/dashboard/student/StudentAssignmentsPage';
 import { StudentVirtualClassPage } from '@/pages/dashboard/student/StudentVirtualClassPage';
+import { StudentMaterialsPage } from '@/pages/dashboard/student/StudentMaterialsPage';
 import { StudentConductPage } from '@/pages/dashboard/student/StudentConductPage';
 import { TeacherDashboardPage } from '@/pages/dashboard/teacher/TeacherDashboardPage';
 import { TeacherAttendancePage } from '@/pages/dashboard/teacher/TeacherAttendancePage';
@@ -42,8 +43,10 @@ import { AdminAssignmentsPage } from '@/pages/dashboard/admin/AdminAssignmentsPa
 import { AdminVirtualClassPage } from '@/pages/dashboard/admin/AdminVirtualClassPage';
 import { AdminNewsPage } from '@/pages/dashboard/admin/AdminNewsPage';
 import { AdminNewsPreviewPage } from '@/pages/dashboard/admin/AdminNewsPreviewPage';
+import { AdminMaterialsPage } from '@/pages/dashboard/admin/AdminMaterialsPage';
 import { AdminFormsPage } from '@/pages/dashboard/admin/AdminFormsPage';
-import { AdminFormPreviewPage } from '@/pages/dashboard/admin/AdminFormPreviewPage';import { FormResponsesPage } from '@/pages/dashboard/admin/FormResponsesPage';
+import { AdminFormPreviewPage } from '@/pages/dashboard/admin/AdminFormPreviewPage';
+import { FormResponsesPage } from '@/pages/dashboard/admin/FormResponsesPage';
 import { FormPage } from '@/pages/FormPage';
 import { FormSuccessPage } from '@/pages/FormSuccessPage';
 import { AdminMembersPage } from '@/pages/dashboard/admin/AdminMembersPage';
@@ -104,6 +107,7 @@ const appRoutes = [
           { path: 'results', element: <StudentResultsPage /> },
           { path: 'assignments', element: <StudentAssignmentsPage /> },
           { path: 'virtual-class', element: <StudentVirtualClassPage /> },
+          { path: 'materials', element: <StudentMaterialsPage /> },
           { path: 'conduct', element: <StudentConductPage /> },
         ],
       },
@@ -142,40 +146,41 @@ const appRoutes = [
           </RequireRole>
         ),
         children: [
-      { index: true, element: <AdminDashboardPage /> },
-      { path: 'members', element: <AdminMembersPage /> },
-      { path: 'members/list', element: <AdminMemberPage /> },
-      { path: 'students', element: <AdminStudentsPage /> },
-      { path: 'teachers', element: <AdminTeachersPage /> },
-      { path: 'admissions', element: <AdminAdmissionsPage /> },
-      { path: 'attendance', element: <AdminAttendancePage /> },
-      { path: 'attendance', element: <AdminAttendancePage /> },
-      { path: 'fees', element: <AdminFeesPage /> },
-      { path: 'results', element: <AdminResultsPage /> },
-      { path: 'assignments', element: <AdminAssignmentsPage /> },
-      { path: 'virtual-class', element: <AdminVirtualClassPage /> },
-      { path: 'news', element: <AdminNewsPage /> },
-  { path: 'news/preview', element: <AdminNewsPreviewPage /> },
-  { path: 'forms', element: <AdminFormsPage /> },
-  { path: 'forms/preview', element: <AdminFormPreviewPage /> },
-  { path: 'forms/responses', element: <FormResponsesPage /> },
-  { path: 'exams', element: <ExamClassesPage /> },
-  { path: 'exams/all', element: <AllExamsPage /> },
-  { path: 'exams/subjects', element: <AllSubjectsPage /> },
-  { path: 'exams/questions', element: <AllQuestionsPage /> },
-  { path: 'exams/combinations', element: <AdminCombinationPage /> },
-  { path: 'exams/deployments', element: <DeploymentsPage /> },
-  { path: 'exams/results', element: <ExamTestResultsPage origin="ONLINE" /> },
-  { path: 'exams/results/offline', element: <ExamTestResultsPage origin="OFFLINE" /> },
-  { path: 'exams/:classId', element: <ClassExamsPage /> },
-  { path: 'exams/:classId/:examId', element: <ExamSubjectsPage /> },
-  { path: 'exams/:classId/:examId/:subjectId', element: <SubjectQuestionsPage /> },
-  { path: 'website', element: <AdminWebsitePage /> },
-  { path: 'website/pages', element: <AdminWebsitePagesPage /> },
-  { path: 'website/:section', element: <WebsiteSectionPage /> },
-      { path: 'settings', element: <AdminSettingsPage /> },
-      { path: 'audit-log', element: <AdminAuditLogPage /> },
-      { path: 'billing', element: <AdminBillingPage /> },
+          { index: true, element: <AdminDashboardPage /> },
+          { path: 'members', element: <AdminMembersPage /> },
+          { path: 'members/list', element: <AdminMemberPage /> },
+          { path: 'students', element: <AdminStudentsPage /> },
+          { path: 'teachers', element: <AdminTeachersPage /> },
+          { path: 'admissions', element: <AdminAdmissionsPage /> },
+          { path: 'attendance', element: <AdminAttendancePage /> },
+          { path: 'attendance', element: <AdminAttendancePage /> },
+          { path: 'fees', element: <AdminFeesPage /> },
+          { path: 'results', element: <AdminResultsPage /> },
+          { path: 'assignments', element: <AdminAssignmentsPage /> },
+          { path: 'virtual-class', element: <AdminVirtualClassPage /> },
+          { path: 'news', element: <AdminNewsPage /> },
+          { path: 'news/preview', element: <AdminNewsPreviewPage /> },
+          { path: 'materials', element: <AdminMaterialsPage /> },
+          { path: 'forms', element: <AdminFormsPage /> },
+          { path: 'forms/preview', element: <AdminFormPreviewPage /> },
+          { path: 'forms/responses', element: <FormResponsesPage /> },
+          { path: 'exams', element: <ExamClassesPage /> },
+          { path: 'exams/all', element: <AllExamsPage /> },
+          { path: 'exams/subjects', element: <AllSubjectsPage /> },
+          { path: 'exams/questions', element: <AllQuestionsPage /> },
+          { path: 'exams/combinations', element: <AdminCombinationPage /> },
+          { path: 'exams/deployments', element: <DeploymentsPage /> },
+          { path: 'exams/results', element: <ExamTestResultsPage origin="ONLINE" /> },
+          { path: 'exams/results/offline', element: <ExamTestResultsPage origin="OFFLINE" /> },
+          { path: 'exams/:classId', element: <ClassExamsPage /> },
+          { path: 'exams/:classId/:examId', element: <ExamSubjectsPage /> },
+          { path: 'exams/:classId/:examId/:subjectId', element: <SubjectQuestionsPage /> },
+          { path: 'website', element: <AdminWebsitePage /> },
+          { path: 'website/pages', element: <AdminWebsitePagesPage /> },
+          { path: 'website/:section', element: <WebsiteSectionPage /> },
+          { path: 'settings', element: <AdminSettingsPage /> },
+          { path: 'audit-log', element: <AdminAuditLogPage /> },
+          { path: 'billing', element: <AdminBillingPage /> },
         ],
       },
     ],

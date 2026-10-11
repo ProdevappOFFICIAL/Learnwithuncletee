@@ -1,0 +1,1658 @@
+[
+  {
+    "id": "5de38e66-397c-46e1-8443-69430506980a",
+    "user_name": " SAMUEL PRAISE",
+    "user_email": "UTSS/25/078",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T08:31:19.803Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "c6c4e2fb-3c69-4e0c-9d5d-8b62e4954219",
+    "user_name": "ABAYOMI PEACE",
+    "user_email": "UTSS/21/014",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "4b0558a7-5eb7-4c08-99c8-640801a98bc7",
+    "createdAt": "2026-05-18T09:05:06.601Z",
+    "class": {
+      "id": "4b0558a7-5eb7-4c08-99c8-640801a98bc7",
+      "name": "SSS 3"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "878c3df6-27c7-4aa6-922c-52ed69c165c8",
+    "user_name": "ABDULMALIK OLUWATOFUNMI",
+    "user_email": "UTSS/24/062",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "4b0558a7-5eb7-4c08-99c8-640801a98bc7",
+    "createdAt": "2026-05-18T09:03:41.899Z",
+    "class": {
+      "id": "4b0558a7-5eb7-4c08-99c8-640801a98bc7",
+      "name": "SSS 3"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "f4a3d619-998b-4c18-bb96-c0f695c760bf",
+    "user_name": "ABDULRAHMAN FARIDAH ATOKE",
+    "user_email": "UTSS/26/127",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+    "createdAt": "2026-09-08T07:30:20.639Z",
+    "class": {
+      "id": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+      "name": "JSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "d87eb786-da85-43b9-8599-9e8dd8fa0d93",
+    "user_name": "ADEALA ADEDOYIN",
+    "user_email": "UTSS/25/102",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T08:37:50.994Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "c2ed7452-626e-4e41-930b-ec1726320dcb",
+    "user_name": "ADEJAYAN PEACE",
+    "user_email": "UTSS/24/052",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "2036ff6b-2090-4bb6-a470-9044a5a584e2",
+    "createdAt": "2026-05-18T08:47:41.201Z",
+    "class": {
+      "id": "2036ff6b-2090-4bb6-a470-9044a5a584e2",
+      "name": "JSS 3"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "2bb19c6b-eb5b-406f-aa40-4841baa029c3",
+    "user_name": "ADEJAYAN PRAISE ",
+    "user_email": "UTSS/22/022",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "27821304-eca0-44c4-af63-3322ca7ab81b",
+    "createdAt": "2026-05-18T09:00:15.197Z",
+    "class": {
+      "id": "27821304-eca0-44c4-af63-3322ca7ab81b",
+      "name": "SSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "128b5594-68bc-42bc-8df8-2afc08125c24",
+    "user_name": "ADELUSI ERASTUS ",
+    "user_email": "UTSS/25/088",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T08:35:21.504Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "645baaac-8136-428d-aff2-8c508a500ec2",
+    "user_name": "ADENIYI ALIAT",
+    "user_email": "UTSS/23/048",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+    "createdAt": "2026-05-18T08:51:18.500Z",
+    "class": {
+      "id": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+      "name": "SSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "cd8a1294-88d9-403a-a18b-3fe8cdf2e9c2",
+    "user_name": "ADENIYI OMOWUMI",
+    "user_email": "UTSS/25/092",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+    "createdAt": "2026-09-29T12:18:49.831Z",
+    "class": {
+      "id": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+      "name": "JSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "865e17f5-c72e-4c8e-bc89-fb3044919948",
+    "user_name": "ADEOSUN TOBILOBA",
+    "user_email": "UTSS/25/117",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "27821304-eca0-44c4-af63-3322ca7ab81b",
+    "createdAt": "2026-05-18T09:01:03.100Z",
+    "class": {
+      "id": "27821304-eca0-44c4-af63-3322ca7ab81b",
+      "name": "SSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "d7baf645-8ee6-442c-887a-a7b741fd20d5",
+    "user_name": "ADEPOJU CLINTON  ",
+    "user_email": "UTSS/24/069",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "27821304-eca0-44c4-af63-3322ca7ab81b",
+    "createdAt": "2026-05-18T08:57:12.807Z",
+    "class": {
+      "id": "27821304-eca0-44c4-af63-3322ca7ab81b",
+      "name": "SSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "c3a553c3-f981-4713-8951-ed1163e6212e",
+    "user_name": "ADEPOJU GLORY ADEOLA",
+    "user_email": "UTSS/26/121",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+    "createdAt": "2026-09-08T07:37:07.738Z",
+    "class": {
+      "id": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+      "name": "SSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "87ff5958-2d85-442f-89c1-70f49b1b46c0",
+    "user_name": "ADEPOJU SAMUEL",
+    "user_email": "UTSS/25/095",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "4b0558a7-5eb7-4c08-99c8-640801a98bc7",
+    "createdAt": "2026-05-18T09:02:53.694Z",
+    "class": {
+      "id": "4b0558a7-5eb7-4c08-99c8-640801a98bc7",
+      "name": "SSS 3"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "05ad6aeb-c9de-40bc-b11f-d28084c9d201",
+    "user_name": "ADEYEMI MOFEOLUWA SAMUEL",
+    "user_email": "UTSS/26/133",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+    "createdAt": "2026-09-29T12:21:34.730Z",
+    "class": {
+      "id": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+      "name": "JSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "ce2941bb-9086-4fc8-a904-240d3c53fc4f",
+    "user_name": "AGUNLOYE ENIOLA",
+    "user_email": "UTSS/25/100",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "27821304-eca0-44c4-af63-3322ca7ab81b",
+    "createdAt": "2026-05-18T08:55:28.799Z",
+    "class": {
+      "id": "27821304-eca0-44c4-af63-3322ca7ab81b",
+      "name": "SSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "1a849388-90d5-410c-9205-79be91b14e78",
+    "user_name": "AKINBINU PRECIOUS",
+    "user_email": "UTSS/24/065",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "2036ff6b-2090-4bb6-a470-9044a5a584e2",
+    "createdAt": "2026-05-18T08:44:33.905Z",
+    "class": {
+      "id": "2036ff6b-2090-4bb6-a470-9044a5a584e2",
+      "name": "JSS 3"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "0bbe93e0-315a-4815-bf14-ddc33adfed2d",
+    "user_name": "AKINBODE BIDEMI ",
+    "user_email": "UTSS/25/077",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T08:30:44.594Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "423a0161-a648-4c88-8050-77db10646916",
+    "user_name": "AKINBODE ENOCH  ",
+    "user_email": "UTSS/24/070",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "27821304-eca0-44c4-af63-3322ca7ab81b",
+    "createdAt": "2026-05-18T08:56:50.497Z",
+    "class": {
+      "id": "27821304-eca0-44c4-af63-3322ca7ab81b",
+      "name": "SSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "c3825f15-52b6-4d66-9c73-5b7b4da9d295",
+    "user_name": "AKINDAPO COLLINS",
+    "user_email": "UTSS/25/116",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "27821304-eca0-44c4-af63-3322ca7ab81b",
+    "createdAt": "2026-05-18T09:00:37.801Z",
+    "class": {
+      "id": "27821304-eca0-44c4-af63-3322ca7ab81b",
+      "name": "SSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "9022f5c9-c0e8-4a5b-91be-8f5742141d2a",
+    "user_name": "AKINDURO SUSAN  ",
+    "user_email": "UTSS/24/071",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "27821304-eca0-44c4-af63-3322ca7ab81b",
+    "createdAt": "2026-05-18T08:56:29.097Z",
+    "class": {
+      "id": "27821304-eca0-44c4-af63-3322ca7ab81b",
+      "name": "SSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "db00f6b0-fb92-4036-9d8d-a5f18a1c92fc",
+    "user_name": "AKINGBULUGBE SALVATION",
+    "user_email": "UTSS/22/031",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "27821304-eca0-44c4-af63-3322ca7ab81b",
+    "createdAt": "2026-10-02T06:17:21.159Z",
+    "class": {
+      "id": "27821304-eca0-44c4-af63-3322ca7ab81b",
+      "name": "SSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "477a9131-6872-423d-8213-31f32b4e4422",
+    "user_name": "AKINGBULUGBE SAMUEL",
+    "user_email": "UTSS/25/115",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+    "createdAt": "2026-05-18T08:43:24.094Z",
+    "class": {
+      "id": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+      "name": "JSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "b1ca8f82-1fec-4696-911e-ceed66ba2979",
+    "user_name": "AKINLAJA AYOMIDE",
+    "user_email": "UTSS/25/076",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "27821304-eca0-44c4-af63-3322ca7ab81b",
+    "createdAt": "2026-05-18T08:56:09.495Z",
+    "class": {
+      "id": "27821304-eca0-44c4-af63-3322ca7ab81b",
+      "name": "SSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "e734f1f0-ebbd-49a3-b8c6-3ba85d0c0d16",
+    "user_name": "AKINLOLU DESTINY",
+    "user_email": "UTSS/24/056",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "2036ff6b-2090-4bb6-a470-9044a5a584e2",
+    "createdAt": "2026-05-18T08:44:55.401Z",
+    "class": {
+      "id": "2036ff6b-2090-4bb6-a470-9044a5a584e2",
+      "name": "JSS 3"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "2c7d6562-588b-454d-9002-5ed6d34aaedf",
+    "user_name": "AKINRINMADE OLUWATEMILORUN  ",
+    "user_email": "UTSS/25/118",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "27821304-eca0-44c4-af63-3322ca7ab81b",
+    "createdAt": "2026-05-18T09:01:23.193Z",
+    "class": {
+      "id": "27821304-eca0-44c4-af63-3322ca7ab81b",
+      "name": "SSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "43801c41-3356-4f63-a6c8-8dd84eb0bea6",
+    "user_name": "AKINRINMADE OLUWATOONI BRIDGET",
+    "user_email": "UTSS/26/123",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+    "createdAt": "2026-09-29T12:13:17.734Z",
+    "class": {
+      "id": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+      "name": "JSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "7422fc0b-3571-4f2e-baa4-dab8d832f02d",
+    "user_name": "AKINROYEJE TOLUWANIMI",
+    "user_email": "UTSS/25/087",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T08:35:00.704Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "45145d91-2aa9-4f8e-8efa-ad58160add27",
+    "user_name": "AKINSELURE PEACE  ",
+    "user_email": "UTSS/24/068",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "27821304-eca0-44c4-af63-3322ca7ab81b",
+    "createdAt": "2026-05-18T08:57:37.995Z",
+    "class": {
+      "id": "27821304-eca0-44c4-af63-3322ca7ab81b",
+      "name": "SSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "6f6a08d9-f2d3-4b29-be20-1ada78eb544d",
+    "user_name": "AKINSOWON MOYINOLUWA ESTHER",
+    "user_email": "UTSS/26/128",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+    "createdAt": "2026-09-08T07:31:42.635Z",
+    "class": {
+      "id": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+      "name": "JSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "8684503c-18bb-443e-a48b-a94563267c9a",
+    "user_name": "AKINSULIE KING",
+    "user_email": "UTSS/25/101",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "27821304-eca0-44c4-af63-3322ca7ab81b",
+    "createdAt": "2026-05-18T08:55:08.999Z",
+    "class": {
+      "id": "27821304-eca0-44c4-af63-3322ca7ab81b",
+      "name": "SSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "739cd081-9d64-450e-b8e4-574219a3e51e",
+    "user_name": "AKINSULIRE ERIAYO",
+    "user_email": "UTSS/25/083",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T08:33:35.496Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "6d44f212-318d-41b0-9a8e-2ad453030dec",
+    "user_name": "AKINSULIRE ERIIFE",
+    "user_email": "UTSS/25/080",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T08:32:02.993Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "cccae156-c194-481f-aadf-09348445c078",
+    "user_name": "AKINSULIRE ERIOLUWA ",
+    "user_email": "UTSS/25/081",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T08:32:44.498Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "986c2af0-1ad2-488b-bc46-03a3680ab078",
+    "user_name": "AKINSULIRE ERIOPE",
+    "user_email": "UTSS/25/082",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T08:33:11.204Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "f98dcc18-3ffd-47ff-99ed-d3d5864a6d90",
+    "user_name": "AKINWANDE FRANKLIN",
+    "user_email": "UTSS/23/037",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+    "createdAt": "2026-05-18T08:53:58.902Z",
+    "class": {
+      "id": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+      "name": "SSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "f5d05fa4-df2a-45ef-9196-e46688e87089",
+    "user_name": "ALALE HANNAH",
+    "user_email": "UTSS/23/046",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+    "createdAt": "2026-05-18T08:51:41.894Z",
+    "class": {
+      "id": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+      "name": "SSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "6b0a8396-d440-4c58-ad44-b2b2e77e6d54",
+    "user_name": "AREMU DOMINION",
+    "user_email": "UTSS/26/126",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+    "createdAt": "2026-09-08T07:28:51.638Z",
+    "class": {
+      "id": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+      "name": "JSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "fd51f057-c162-40dc-91cf-347facdc25c5",
+    "user_name": "AREMU JOY",
+    "user_email": "UTSS/23/040",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+    "createdAt": "2026-05-18T08:52:41.401Z",
+    "class": {
+      "id": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+      "name": "SSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "f816b070-b470-47e2-9c0b-7f2af8315c5c",
+    "user_name": "AROYEHUN DAVID MOTILADEOLUWA",
+    "user_email": "UTSS/26/132",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+    "createdAt": "2026-09-29T12:20:31.835Z",
+    "class": {
+      "id": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+      "name": "JSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "4b74c215-ff2c-488a-93a8-a1e3d668907b",
+    "user_name": "AYANDA TUNMISE",
+    "user_email": "UTSS/23/045",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+    "createdAt": "2026-05-18T08:52:01.292Z",
+    "class": {
+      "id": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+      "name": "SSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "2f4a0677-93dc-4bab-be27-981119192b1e",
+    "user_name": "AYODEJI DANIEL",
+    "user_email": "UTSS/25/094",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "27821304-eca0-44c4-af63-3322ca7ab81b",
+    "createdAt": "2026-05-18T08:55:48.797Z",
+    "class": {
+      "id": "27821304-eca0-44c4-af63-3322ca7ab81b",
+      "name": "SSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "3d3eb3ef-83fd-4528-ac1d-2804a5430825",
+    "user_name": "AYODEJI SARAH",
+    "user_email": "UTSS/25/093",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+    "createdAt": "2026-05-18T08:49:08.605Z",
+    "class": {
+      "id": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+      "name": "SSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "3ae4ff06-0338-47c9-bb3c-7c759113866d",
+    "user_name": "AYOOLA GOODLUCK ",
+    "user_email": "UTSS/25/107",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "4b0558a7-5eb7-4c08-99c8-640801a98bc7",
+    "createdAt": "2026-05-18T09:02:30.293Z",
+    "class": {
+      "id": "4b0558a7-5eb7-4c08-99c8-640801a98bc7",
+      "name": "SSS 3"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "03c62b65-4009-4cd1-9b35-75b93c50e899",
+    "user_name": "AYOOLA OLADIPUPO",
+    "user_email": "UTSS/25/109",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "27821304-eca0-44c4-af63-3322ca7ab81b",
+    "createdAt": "2026-05-18T08:54:27.193Z",
+    "class": {
+      "id": "27821304-eca0-44c4-af63-3322ca7ab81b",
+      "name": "SSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "296ed658-1778-4849-83a6-323757e6422c",
+    "user_name": "AYOOLA OLADUTI",
+    "user_email": "UTSS/25/106",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T08:40:59.900Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "f51a037e-c132-408d-8730-0a8669e135ea",
+    "user_name": "BELLO-THOMPSON DOMINION AYOKUNLE",
+    "user_email": "UTSS/26/131",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+    "createdAt": "2026-09-29T12:16:39.536Z",
+    "class": {
+      "id": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+      "name": "JSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "e88d2859-5bf1-4b88-9fc7-2eb04e8e7a54",
+    "user_name": "Balistreri Inc",
+    "user_email": "Camren.Mayert56",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "c44ce0ba-6ee5-4400-b64b-c9dfbb1a5b04",
+    "classId": "fc0f7fb9-c8dc-48b4-8ed8-845274195951",
+    "createdAt": "2026-08-29T07:14:21.259Z",
+    "class": {
+      "id": "fc0f7fb9-c8dc-48b4-8ed8-845274195951",
+      "name": "custom Class"
+    },
+    "workspace": {
+      "id": "c44ce0ba-6ee5-4400-b64b-c9dfbb1a5b04",
+      "name": "Christiansen - Hoeger"
+    }
+  },
+  {
+    "id": "936a5ed8-bc96-43f1-a1ea-32279d700c22",
+    "user_name": "Casper Group",
+    "user_email": "Favian_Pouros",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "335d2917-1d5d-461e-9ee2-45174454782e",
+    "classId": "b57c3659-1dea-4801-a037-338d6117e483",
+    "createdAt": "2026-08-29T06:17:02.175Z",
+    "class": {
+      "id": "b57c3659-1dea-4801-a037-338d6117e483",
+      "name": "mountain Class"
+    },
+    "workspace": {
+      "id": "335d2917-1d5d-461e-9ee2-45174454782e",
+      "name": "Stiedemann Inc"
+    }
+  },
+  {
+    "id": "67370a11-ac91-44a8-9017-e21956c03e23",
+    "user_name": "DAVID OLUWAFIKUNAYOMI ARALOLUWA\t\t",
+    "user_email": "UTSS/26/120",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "2036ff6b-2090-4bb6-a470-9044a5a584e2",
+    "createdAt": "2026-05-18T08:48:40.993Z",
+    "class": {
+      "id": "2036ff6b-2090-4bb6-a470-9044a5a584e2",
+      "name": "JSS 3"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "caa18f70-534a-4140-8165-0bc1b6902057",
+    "user_name": "EMMANUEL PRAISE",
+    "user_email": "UTSS/25/119",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "4b0558a7-5eb7-4c08-99c8-640801a98bc7",
+    "createdAt": "2026-05-18T09:05:50.400Z",
+    "class": {
+      "id": "4b0558a7-5eb7-4c08-99c8-640801a98bc7",
+      "name": "SSS 3"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "fa9c07c1-a455-4c07-ab40-46896f5f3dec",
+    "user_name": "FATUROTI ELIJAH",
+    "user_email": "UTSS/25/084",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T08:33:56.014Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "91652714-47b3-4988-8bd4-f69ef6ce4ec1",
+    "user_name": "Harber - Schultz",
+    "user_email": "Liza.Connelly",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "8620e164-d898-4360-8697-9663e8acf2fc",
+    "classId": "7ca167a4-c16c-41a2-9cf9-0baeecd7073f",
+    "createdAt": "2026-08-29T07:12:41.154Z",
+    "class": {
+      "id": "7ca167a4-c16c-41a2-9cf9-0baeecd7073f",
+      "name": "sauerkraut Class"
+    },
+    "workspace": {
+      "id": "8620e164-d898-4360-8697-9663e8acf2fc",
+      "name": "Krajcik - Botsford"
+    }
+  },
+  {
+    "id": "5c075a11-af8c-44b9-9cad-08459087e034",
+    "user_name": "IDOWU CHRISTIANAH",
+    "user_email": "UTSS/25/079",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T08:31:41.395Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "82110d8b-c626-4a49-b5ca-33c03ab6996c",
+    "user_name": "IFALOWO RALIAT MONISOLA",
+    "user_email": "UTSS/26/134",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+    "createdAt": "2026-09-29T12:17:56.539Z",
+    "class": {
+      "id": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+      "name": "JSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "ca2a2c58-2e70-4d1f-b37a-0d8bb2c546cb",
+    "user_name": "ISAAC-OYEGBULE OMOKOREDE HERITAGE",
+    "user_email": "UTSS/26/129",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+    "createdAt": "2026-09-08T07:33:19.332Z",
+    "class": {
+      "id": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+      "name": "JSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "743bf36c-9feb-4adb-b66e-13391bab65cb",
+    "user_name": "LAWAL GODLINESS ",
+    "user_email": "UTSS/24/075",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "4b0558a7-5eb7-4c08-99c8-640801a98bc7",
+    "createdAt": "2026-05-18T09:03:23.497Z",
+    "class": {
+      "id": "4b0558a7-5eb7-4c08-99c8-640801a98bc7",
+      "name": "SSS 3"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "42a7beb5-0a3d-47a1-a864-0e06c65d54d5",
+    "user_name": "MATTI FAITH",
+    "user_email": "UTSS/23/043",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "27821304-eca0-44c4-af63-3322ca7ab81b",
+    "createdAt": "2026-05-18T08:59:05.604Z",
+    "class": {
+      "id": "27821304-eca0-44c4-af63-3322ca7ab81b",
+      "name": "SSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "65b43c5b-528f-4e30-b231-f1adf9488a25",
+    "user_name": "MATTI PROGRESS",
+    "user_email": "UTSS/25/097",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T08:36:45.397Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "5c491a74-249e-45e4-bff7-6b17ff6e9511",
+    "user_name": "OBI CHIAMAKA PRECIOUS",
+    "user_email": "UTSS/26/122",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+    "createdAt": "2026-09-08T07:23:59.339Z",
+    "class": {
+      "id": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+      "name": "JSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "f2e0d538-0c86-4cff-9ad1-7ed1db584e75",
+    "user_name": "ODERINDE ISREAL OLAMIDE",
+    "user_email": "UTSS/26/130",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+    "createdAt": "2026-09-29T12:24:05.925Z",
+    "class": {
+      "id": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+      "name": "JSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "38470f11-28f2-4372-bdf6-597659e4fde8",
+    "user_name": "OJEKOLA DAVID",
+    "user_email": "UTSS/23/041",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+    "createdAt": "2026-05-18T08:52:21.195Z",
+    "class": {
+      "id": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+      "name": "SSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "e5bf376d-4f8e-4cd2-913e-3d4f348692b9",
+    "user_name": "OJEKOLA JOY OLUWAFOLAKEMI",
+    "user_email": "UTSS/26/124",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+    "createdAt": "2026-09-08T07:28:00.836Z",
+    "class": {
+      "id": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+      "name": "JSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "4cc7f659-5467-48fb-8f17-d58d43f1f92b",
+    "user_name": "OJO ENOCH",
+    "user_email": "UTSS/24/058",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+    "createdAt": "2026-05-18T08:51:00.394Z",
+    "class": {
+      "id": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+      "name": "SSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "86832b99-f3d7-4899-9a80-a1471ac7d86e",
+    "user_name": "OJO NIFEMI",
+    "user_email": "UTSS/25/098",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T08:37:04.998Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "e3e78caa-48f5-4a2b-8579-ce57f3307194",
+    "user_name": "OLADIPUPO ADEOLA",
+    "user_email": "UTSS/24/063",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "27821304-eca0-44c4-af63-3322ca7ab81b",
+    "createdAt": "2026-05-18T08:57:59.094Z",
+    "class": {
+      "id": "27821304-eca0-44c4-af63-3322ca7ab81b",
+      "name": "SSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "abf4fbb9-311f-4caf-b952-e51f0c1ec090",
+    "user_name": "OLADOKE ADEOLA",
+    "user_email": "UTSS/24/066",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+    "createdAt": "2026-05-18T08:50:38.997Z",
+    "class": {
+      "id": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+      "name": "SSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "06337ed5-46bd-4a11-b876-6982dd3a64c7",
+    "user_name": "OLAGODO SEMILORE",
+    "user_email": "UTSS/26/136",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "2036ff6b-2090-4bb6-a470-9044a5a584e2",
+    "createdAt": "2026-09-29T12:35:18.628Z",
+    "class": {
+      "id": "2036ff6b-2090-4bb6-a470-9044a5a584e2",
+      "name": "JSS 3"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "da06dc8c-3e86-433b-aede-03b1a01a1b00",
+    "user_name": "OLAJIDE GLORIA",
+    "user_email": "UTSS/25/091",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T08:36:04.092Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "809a3e67-6514-4d1b-9be3-911c2ed1a639",
+    "user_name": "OLAJIDE GLORY",
+    "user_email": "UTSS/25/089",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T08:35:43.106Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "ff0328a3-1be5-4bdc-9348-fae9178dfdf5",
+    "user_name": "OLAJIDE VICTORY",
+    "user_email": "UTSS/25/090",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+    "createdAt": "2026-05-18T08:43:49.094Z",
+    "class": {
+      "id": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+      "name": "SSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "4881a51c-50e6-43c6-a8a4-b53beb132a41",
+    "user_name": "OLANIPEKUN GRACE ",
+    "user_email": "UTSS/25/099",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T08:37:23.697Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "cb6ba92b-cbc9-49bd-8c36-d8dae1a6ad4f",
+    "user_name": "OLANISIMI ISRAEL MARVELLOUS ",
+    "user_email": "UTSS/25/113",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "27821304-eca0-44c4-af63-3322ca7ab81b",
+    "createdAt": "2026-05-18T09:02:09.404Z",
+    "class": {
+      "id": "27821304-eca0-44c4-af63-3322ca7ab81b",
+      "name": "SSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "6f1c3aee-ff4d-4bfa-bea1-27a0a0a6a3e4",
+    "user_name": "OLANISIMI RACHAEL",
+    "user_email": "UTSS/24/053",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "2036ff6b-2090-4bb6-a470-9044a5a584e2",
+    "createdAt": "2026-05-18T08:45:14.794Z",
+    "class": {
+      "id": "2036ff6b-2090-4bb6-a470-9044a5a584e2",
+      "name": "JSS 3"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "07b5db88-1a1b-465f-a164-e2caa2b29d28",
+    "user_name": "OLASEHINDE GABRIEL",
+    "user_email": "UTSS/25/104",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T08:40:13.692Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "fa04a852-4664-4003-9136-dfe97594c62c",
+    "user_name": "OLASOJI-AYENI DAVID ",
+    "user_email": "UTSS/21/011",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "4b0558a7-5eb7-4c08-99c8-640801a98bc7",
+    "createdAt": "2026-05-18T09:05:29.299Z",
+    "class": {
+      "id": "4b0558a7-5eb7-4c08-99c8-640801a98bc7",
+      "name": "SSS 3"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "46c4ab9b-2828-4630-b75a-33262fdbbec3",
+    "user_name": "OLUFOYE IRORUN",
+    "user_email": "UTSS/25/103",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T08:38:26.298Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "cf0f14c4-4afc-465d-a231-bddf730b8df5",
+    "user_name": "OLUFOYE KIKIOPE  ",
+    "user_email": "UTSS/22/025",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+    "createdAt": "2026-05-18T08:59:53.104Z",
+    "class": {
+      "id": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+      "name": "SSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "f8d7d0fe-b7cc-4eed-b86c-37aaa4f247a3",
+    "user_name": "OLUMIDE TOLUWANI EMMANUEL",
+    "user_email": "UTSS/26/137",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+    "createdAt": "2026-09-30T07:36:59.767Z",
+    "class": {
+      "id": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+      "name": "JSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "dc2fde3c-1eb9-4ef3-b392-1c4495131b07",
+    "user_name": "OLUWASOLA PROMISE",
+    "user_email": "UTSS/26/135",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "2036ff6b-2090-4bb6-a470-9044a5a584e2",
+    "createdAt": "2026-09-29T12:36:34.632Z",
+    "class": {
+      "id": "2036ff6b-2090-4bb6-a470-9044a5a584e2",
+      "name": "JSS 3"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "647233b7-f6d6-4b8e-ba5b-8984d99ad80c",
+    "user_name": "OMIYALE IMOLEAYO",
+    "user_email": "UTSS/24/061",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "27821304-eca0-44c4-af63-3322ca7ab81b",
+    "createdAt": "2026-05-18T08:58:22.495Z",
+    "class": {
+      "id": "27821304-eca0-44c4-af63-3322ca7ab81b",
+      "name": "SSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "0eab75df-142e-4ba9-9566-d9ee59460b53",
+    "user_name": "OMIYALE INIOLUWA ",
+    "user_email": "UTSS/24/060",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "4b0558a7-5eb7-4c08-99c8-640801a98bc7",
+    "createdAt": "2026-05-18T09:04:05.406Z",
+    "class": {
+      "id": "4b0558a7-5eb7-4c08-99c8-640801a98bc7",
+      "name": "SSS 3"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "048f389c-a44e-4412-95f1-cd29a751e15e",
+    "user_name": "OMOGBEHINMI FERANMI VICTOR",
+    "user_email": "UTSS/26/138",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "27821304-eca0-44c4-af63-3322ca7ab81b",
+    "createdAt": "2026-09-29T12:52:15.027Z",
+    "class": {
+      "id": "27821304-eca0-44c4-af63-3322ca7ab81b",
+      "name": "SSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "79bbc903-8a4a-4504-9430-f9c2206c7d65",
+    "user_name": "OMOJOWO DESMOND",
+    "user_email": "UTSS/26/125",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+    "createdAt": "2026-09-08T07:27:12.537Z",
+    "class": {
+      "id": "d554e28e-0cfb-41f6-abe5-cacbebd2d75d",
+      "name": "JSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "9b86a254-5e6a-4891-ad1b-70cf920ac216",
+    "user_name": "OMOJOWO ELIZABETH OLUWAJOMILOJU",
+    "user_email": "UTSS/23/036",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+    "createdAt": "2026-09-29T12:41:14.237Z",
+    "class": {
+      "id": "9c865f30-d201-4aa8-8bd8-6f3d0bcdda63",
+      "name": "SSS 1"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "595f75ec-a772-4f20-b254-cec0dc195016",
+    "user_name": "OWOLOYE SUCCESS",
+    "user_email": "UTSS/25/111",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T08:42:06.494Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "dbb79196-db1d-48cd-a0e4-daeb57de87dc",
+    "user_name": "OYEBAMIJI FATIMAH  ",
+    "user_email": "UTSS/24/059",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "4b0558a7-5eb7-4c08-99c8-640801a98bc7",
+    "createdAt": "2026-05-18T09:04:25.195Z",
+    "class": {
+      "id": "4b0558a7-5eb7-4c08-99c8-640801a98bc7",
+      "name": "SSS 3"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "32b0f607-e0f7-48f6-8dae-013cd4f40b7f",
+    "user_name": "Perry_Murphy26",
+    "user_email": "Horace.Witting29@gmail.com",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "85aabb33-461b-4a3d-97b7-1f5d5676532b",
+    "classId": "b6c4b37c-4831-468c-96b9-83bb939639db",
+    "createdAt": "2026-09-09T17:57:24.134Z",
+    "class": {
+      "id": "b6c4b37c-4831-468c-96b9-83bb939639db",
+      "name": "dredger Class"
+    },
+    "workspace": {
+      "id": "85aabb33-461b-4a3d-97b7-1f5d5676532b",
+      "name": "Windler - Zieme"
+    }
+  },
+  {
+    "id": "9ebe3ebb-de47-48da-b759-06f409b0ff9b",
+    "user_name": "Schiller Group",
+    "user_email": "Bulah70",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "218709c1-c49f-48cd-9715-d5dd81c0da4e",
+    "classId": "8f808d89-d29f-4ca5-939b-dcd7a1fb82a0",
+    "createdAt": "2026-08-28T22:59:06.417Z",
+    "class": {
+      "id": "8f808d89-d29f-4ca5-939b-dcd7a1fb82a0",
+      "name": "trolley Class"
+    },
+    "workspace": {
+      "id": "218709c1-c49f-48cd-9715-d5dd81c0da4e",
+      "name": "Hegmann - Zieme"
+    }
+  },
+  {
+    "id": "cadc1721-23f3-48b6-b875-7f339dd643db",
+    "user_name": "TEMITAYO KOYINDE",
+    "user_email": "UTSS/25/108",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "27821304-eca0-44c4-af63-3322ca7ab81b",
+    "createdAt": "2026-05-18T08:54:48.602Z",
+    "class": {
+      "id": "27821304-eca0-44c4-af63-3322ca7ab81b",
+      "name": "SSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "253f2bed-abfc-408e-bd97-766b495e2267",
+    "user_name": "UDUAK ANGELA",
+    "user_email": "UTSS/24/072",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "2036ff6b-2090-4bb6-a470-9044a5a584e2",
+    "createdAt": "2026-05-18T08:44:12.000Z",
+    "class": {
+      "id": "2036ff6b-2090-4bb6-a470-9044a5a584e2",
+      "name": "JSS 3"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  },
+  {
+    "id": "1d587d62-8dae-468f-a1f0-7fccfa05114b",
+    "user_name": "UNCLETEE",
+    "user_email": "uncletee",
+    "role": "STUDENT",
+    "active": true,
+    "workspaceId": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+    "classId": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+    "createdAt": "2026-05-18T09:06:26.002Z",
+    "class": {
+      "id": "dddb1dd2-dc56-4776-a1a8-5b4547cf949b",
+      "name": "JSS 2"
+    },
+    "workspace": {
+      "id": "3cd505d5-0608-48ba-9aec-edfc2798f3ad",
+      "name": "UNCLE TEE SCHOOLS AND COLLEGES LTD."
+    }
+  }
+]

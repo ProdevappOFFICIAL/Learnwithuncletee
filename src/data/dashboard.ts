@@ -83,6 +83,12 @@ export const studentNav: DashboardNavItem[] = [
     permission: "virtual.read",
   },
   {
+    to: ROUTES.studentMaterials,
+    label: "Materials",
+    icon: FileText,
+    permission: "materials.read",
+  },
+  {
     to: ROUTES.studentConduct,
     label: "Conduct",
     icon: ShieldAlert,
@@ -191,6 +197,12 @@ export const adminNav: DashboardNavItem[] = [
     label: "News & Events",
     icon: Newspaper,
     permission: "news.read",
+  },
+  {
+    to: ROUTES.adminMaterials,
+    label: "Materials",
+    icon: FileText,
+    permission: "materials.read",
   },
   {
     label: "Forms",
@@ -504,6 +516,22 @@ export interface NoticeData {
   dislikeCount: number;
   createdAt: string;
   updatedAt?: string;
+}
+
+export interface MaterialItem {
+  id: string;
+  name: string;
+  description?: string | null;
+  fileUrl: string;
+  fileName?: string | null;
+  mimeType?: string | null;
+  sizeBytes?: number | null;
+  isPublished: boolean;
+  classId?: string | null;
+  class?: { id: string; name: string } | null;
+  createdAt: string;
+  updatedAt?: string;
+  uploader?: { user_name: string };
 }
 
 export interface StudentRow {
