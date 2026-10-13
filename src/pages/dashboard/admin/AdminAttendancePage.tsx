@@ -6,6 +6,7 @@ import {
   EmptyState,
   ErrorState,
   LoadingSkeleton,
+  Modal,
   PageHeader,
   Pagination,
   Pill,
@@ -14,10 +15,10 @@ import {
   Th,
 } from '@/components/dashboard/DashboardUI';
 import { useResource } from '@/context/AuthContext';
-import { apiDelete, apiGet, apiPost } from '@/lib/api';
+import { API_BASE, apiDelete, apiGet, apiPost, tokenStore } from '@/lib/api';
 import { usePagedList } from '@/lib/pagedQuery';
 import type { ClassItem } from '@/data/dashboard';
-import { LogIn, LogOut, Undo2 } from 'lucide-react';
+import { Download, LogIn, LogOut, Undo2 } from 'lucide-react';
 
 interface RegisterRow {
   id: string;
@@ -65,6 +66,64 @@ export const AdminAttendancePage = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const [rowBusy, setRowBusy] = useState<string | null>(null);
+
+  // Excel export dialog (server-generated .xlsx).
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportMode, setExportMode] = useState<'month' | 'range'>('month');
+  const [exportMonth, setExportMonth] = useState(dayString(new Date()).slice(0, 7));
+  const [exportFrom, setExportFrom] = useState(dayString(new Date()));
+  const [exportTo, setExportTo] = useState(dayString(new Date()));
+  const [exportClass, setExportClass] = useState('');
+  const [exportBusy, setExportBusy] = useState(false);
+
+  const openExport = () => {
+    setExportClass(tab === 'STUDENT' ? classFilter : '');
+    setExportOpen(true);
+  };
+
+  const runExport = async () => {
+    setExportBusy(true);
+    try {
+      const params = new URLSearchParams({ role: tab });
+      if (exportMode === 'month') {
+        if (!exportMonth) throw new Error('Pick a month first.');
+        params.set('month', exportMonth);
+      } else {
+        if (!exportFrom || !exportTo) throw new Error('Pick both dates first.');
+        params.set('from', exportFrom);
+        params.set('to', exportTo);
+      }
+      if (tab === 'STUDENT' && exportClass) params.set('classId', exportClass);
+      const token = tokenStore.get();
+      const res = await fetch(`${API_BASE}/attendance/register/export?${params.toString()}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'include',
+      });
+      const contentType = res.headers.get('content-type') ?? '';
+      if (!res.ok || contentType.includes('application/json')) {
+        const payload = await res.json().catch(() => null);
+        throw new Error(payload?.message ?? `Export failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get('content-disposition') ?? '';
+      const filename = disposition.match(/filename="([^"]+)"/)?.[1]
+        ?? `attendance-${tab === 'STUDENT' ? 'pupils' : 'staff'}.xlsx`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setExportOpen(false);
+      setNotice('Excel file downloaded.');
+    } catch (err: any) {
+      setNotice(err?.message ?? 'Export failed');
+    } finally {
+      setExportBusy(false);
+    }
+  };
 
   const classes = useResource<ClassItem[]>('/classes', { limit: 200 });
   const qc = useQueryClient();
@@ -137,6 +196,11 @@ export const AdminAttendancePage = () => {
         eyebrow="Members"
         title="Attendance"
         text="Daily register — search a name, tap check-in, tap check-out later. Times are recorded automatically."
+        actions={
+          <button type="button" onClick={openExport} className="inline-flex min-h-11 items-center rounded bg-brand-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
+            <Download aria-hidden="true" size={16} className="mr-2" /> Export Excel
+          </button>
+        }
       />
       {notice && <p role="status" className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
 
@@ -279,6 +343,72 @@ export const AdminAttendancePage = () => {
           </>
         )}
       </Card>
+
+      <Modal open={exportOpen} onClose={() => setExportOpen(false)} title={`Export ${tab === 'STUDENT' ? 'pupil' : 'staff'} register`}>
+        <div className="space-y-4">
+          <p className="text-sm text-muted">The Excel file is generated on the server — one row per person, one column per day, plus present/absent totals.</p>
+          <div className="flex gap-1 rounded border border-line p-1" role="group" aria-label="Export range">
+            {(['month', 'range'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setExportMode(m)}
+                aria-pressed={exportMode === m}
+                className={`min-h-10 flex-1 rounded px-4 py-1.5 text-xs font-bold ${exportMode === m ? 'bg-brand-900 text-white' : 'text-muted hover:text-ink'}`}
+              >
+                {m === 'month' ? 'Whole month' : 'Date range'}
+              </button>
+            ))}
+          </div>
+          {exportMode === 'month' ? (
+            <label className="block text-sm font-semibold">Month
+              <input
+                type="month"
+                value={exportMonth}
+                onChange={(e) => setExportMonth(e.target.value)}
+                className="mt-2 block min-h-11 rounded border border-line bg-white px-3 text-sm font-semibold outline-none focus:border-brand-500"
+              />
+            </label>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-sm font-semibold">From
+                <input
+                  type="date"
+                  value={exportFrom}
+                  max={exportTo}
+                  onChange={(e) => setExportFrom(e.target.value)}
+                  className="mt-2 block min-h-11 w-full rounded border border-line bg-white px-3 text-sm font-semibold outline-none focus:border-brand-500"
+                />
+              </label>
+              <label className="block text-sm font-semibold">To (max 31 days)
+                <input
+                  type="date"
+                  value={exportTo}
+                  min={exportFrom}
+                  onChange={(e) => setExportTo(e.target.value)}
+                  className="mt-2 block min-h-11 w-full rounded border border-line bg-white px-3 text-sm font-semibold outline-none focus:border-brand-500"
+                />
+              </label>
+            </div>
+          )}
+          {tab === 'STUDENT' && (
+            <label className="block text-sm font-semibold">Class
+              <select value={exportClass} onChange={(e) => setExportClass(e.target.value)} className="mt-2 block min-h-11 w-full rounded border border-line bg-white px-3 text-sm font-semibold">
+                <option value="">All classes</option>
+                {(classes.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </label>
+          )}
+          <div className="flex gap-3">
+            <button type="button" onClick={() => setExportOpen(false)} className="min-h-11 flex-1 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">
+              Cancel
+            </button>
+            <button type="button" onClick={runExport} disabled={exportBusy} className="inline-flex min-h-11 flex-1 items-center justify-center rounded bg-brand-500 px-4 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
+              <Download aria-hidden="true" size={16} className="mr-2" />{exportBusy ? 'Preparing…' : 'Download Excel'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
