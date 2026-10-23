@@ -3,12 +3,6 @@ import { Card, PageHeader, Pill } from '@/components/dashboard/DashboardUI';
 import { ROUTES } from '@/routes/paths';
 import { ChevronLeft, Presentation } from 'lucide-react';
 
-const PLANNED = [
-  'Collect PowerPoint submissions',
-  'Score against a rubric',
-  'Publish marks to results',
-];
-
 export const AdminPPTMarkerPage = () => (
   <div className="space-y-6">
     <PageHeader
