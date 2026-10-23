@@ -12,6 +12,28 @@ const waitForImages = async (root: HTMLElement) => {
   await Promise.all(images.map((img) => img.decode().catch(() => undefined)));
 };
 
+/**
+ * html-to-image crashes with a SecurityError when it tries to read cssRules
+ * from cross-origin stylesheets (e.g. Google Fonts).  We work around this by:
+ *   1. Passing a `filter` that skips <link> elements pointing to remote URLs.
+ *   2. Injecting an inline <style> that re-declares the font-family stacks so
+ *      the captured image still renders with the correct typefaces (the fonts
+ *      themselves are already downloaded into the browser's font cache by the
+ *      time the user opens the ID-card modal).
+ */
+function buildInlineFontStyle(): HTMLStyleElement {
+  // Declare the same font stacks used by the card.  The browser already has
+  // the actual font files in memory; this just ensures the cloned document
+  // knows which family names to use for the text nodes.
+  const css = `
+    @font-face { font-family: 'Open Sans'; font-weight: 500 800; src: local('Open Sans'); }
+    @font-face { font-family: 'Lilita One'; font-weight: 400; src: local('Lilita One'); }
+  `;
+  const style = document.createElement('style');
+  style.textContent = css;
+  return style;
+}
+
 export async function downloadStudentIdCard(
   node: HTMLElement,
   { fileName, pixelRatio = 3 }: { fileName: string; pixelRatio?: number },
@@ -30,6 +52,10 @@ export async function downloadStudentIdCard(
   node.style.overflow = 'visible';
   node.style.maxWidth = 'none';
 
+  // Inject inline font declarations so the cloned DOM has the right families.
+  const inlineStyle = buildInlineFontStyle();
+  node.prepend(inlineStyle);
+
   let dataUrl: string;
   try {
     dataUrl = await toPng(node, {
@@ -37,8 +63,20 @@ export async function downloadStudentIdCard(
       pixelRatio,
       width,
       height,
+      // Skip cloning <link rel="stylesheet"> nodes that point to external
+      // origins — reading their cssRules throws a SecurityError (CORS).
+      filter: (domNode: Node) => {
+        if (domNode instanceof HTMLLinkElement && domNode.rel === 'stylesheet') {
+          const href = domNode.getAttribute('href') ?? '';
+          if (href.startsWith('http://') || href.startsWith('https://')) {
+            return false; // drop this node from the clone
+          }
+        }
+        return true;
+      },
     });
   } finally {
+    inlineStyle.remove();
     node.style.overflow = prevOverflow;
     node.style.maxWidth = prevMaxWidth;
   }
@@ -50,3 +88,4 @@ export async function downloadStudentIdCard(
   link.click();
   link.remove();
 }
+
