@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   MapPin,
   Newspaper,
+  Presentation,
   Rocket,
   ScrollText,
   Settings,
@@ -228,6 +229,12 @@ export const adminNav: DashboardNavItem[] = [
     to: ROUTES.adminResults,
     label: "Results",
     icon: FileBarChart2,
+    permission: "results.read",
+  },
+  {
+    to: ROUTES.adminPPTMarker,
+    label: "PPT Marker",
+    icon: Presentation,
     permission: "results.read",
   },
   {

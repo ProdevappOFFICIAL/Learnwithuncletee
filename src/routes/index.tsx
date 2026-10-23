@@ -39,6 +39,7 @@ import { AdminAdmissionsPage } from '@/pages/dashboard/admin/AdminAdmissionsPage
 import { AdminAttendancePage } from '@/pages/dashboard/admin/AdminAttendancePage';
 import { AdminFeesPage } from '@/pages/dashboard/admin/AdminFeesPage';
 import { AdminResultsPage } from '@/pages/dashboard/admin/AdminResultsPage';
+import { AdminPPTMarkerPage } from '@/pages/dashboard/admin/AdminPPTMarkerPage';
 import { AdminAssignmentsPage } from '@/pages/dashboard/admin/AdminAssignmentsPage';
 import { AdminVirtualClassPage } from '@/pages/dashboard/admin/AdminVirtualClassPage';
 import { AdminNewsPage } from '@/pages/dashboard/admin/AdminNewsPage';
@@ -156,6 +157,7 @@ const appRoutes = [
           { path: 'attendance', element: <AdminAttendancePage /> },
           { path: 'fees', element: <AdminFeesPage /> },
           { path: 'results', element: <AdminResultsPage /> },
+          { path: 'ppt-marker', element: <AdminPPTMarkerPage /> },
           { path: 'assignments', element: <AdminAssignmentsPage /> },
           { path: 'virtual-class', element: <AdminVirtualClassPage /> },
           { path: 'news', element: <AdminNewsPage /> },

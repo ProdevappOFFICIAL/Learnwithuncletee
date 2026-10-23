@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, Modal, PageHeader, Pill, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
+import StudentIDCard from '@/components/ui/StudentIDCard';
 import { useAuth, useResource } from '@/context/AuthContext';
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
+import { downloadStudentIdCard } from '@/lib/studentIdCard';
 import { UploadButton } from '@/lib/uploadthing';
 import type { ClassItem, CombinationItem, DisciplineActionItem, ResultDocItem, StudentRow } from '@/data/dashboard';
-import { FileText, Gavel, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Download, FileText, Gavel, IdCard, Pencil, Plus, Trash2 } from 'lucide-react';
 
 interface PendingUser {
   id: string;
@@ -95,6 +97,69 @@ export const PupilPhoto = ({ row, size = 'h-10 w-10' }: { row: Pick<StudentRow, 
     <span className={`flex ${size} shrink-0 items-center justify-center rounded-full bg-brand-900 text-xs font-extrabold text-lime-accent`}>
       {initialsOf(row.user_name)}
     </span>
+  );
+};
+
+const splitStudentName = (name: string) => {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return { surname: parts[0] ?? '', otherNames: parts.slice(1).join(' ') };
+};
+
+/** Printable ID card preview with a PNG download. */
+const PupilIDCard = ({ row, onClose }: { row: StudentRow; onClose: () => void }) => {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { surname, otherNames } = splitStudentName(row.user_name);
+  const admissionNumber = row.student?.studentCode ?? row.user_email;
+
+  const download = async () => {
+    if (!cardRef.current) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await downloadStudentIdCard(cardRef.current, { fileName: `student-id-${admissionNumber}` });
+    } catch (err: any) {
+      setError(err?.message ?? 'Could not download the ID card.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title={`ID Card — ${row.user_name}`} size="xl">
+      <div className="mx-auto w-full max-w-3xl p-6">
+        <div ref={cardRef}>
+          <StudentIDCard
+            schoolLogo="/logo.png"
+            studentImage={row.student?.photoUrl || row.img || ''}
+            surname={surname}
+            otherNames={otherNames}
+            studentClass={row.student?.className ?? '—'}
+            admissionNumber={admissionNumber}
+          />
+        </div>
+      </div>
+      {error && (
+        <p role="alert" className="mt-4 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          {error}
+        </p>
+      )}
+      <div className="mt-4 flex flex-wrap justify-end gap-2">
+        <button type="button" onClick={onClose} className="min-h-11 rounded border border-line px-5 text-sm font-bold text-muted hover:text-ink">
+          Close
+        </button>
+        <button
+          type="button"
+          onClick={download}
+          disabled={busy}
+          className="inline-flex min-h-11 items-center rounded bg-brand-500 px-5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60"
+        >
+          <Download aria-hidden="true" size={16} className="mr-2" />
+          {busy ? 'Preparing…' : 'Download ID Card'}
+        </button>
+      </div>
+    </Modal>
   );
 };
 
@@ -351,6 +416,7 @@ export const AdminStudentsPage = () => {
   const [rowBusy, setRowBusy] = useState<string | null>(null);
   const [resultsRow, setResultsRow] = useState<StudentRow | null>(null);
   const [disciplineRow, setDisciplineRow] = useState<StudentRow | null>(null);
+  const [idCardRow, setIdCardRow] = useState<StudentRow | null>(null);
 
   const openCreate = () => {
     setEditing(null);
@@ -369,7 +435,7 @@ export const AdminStudentsPage = () => {
       classId: row.classId ?? '',
       combinationId: row.student?.combinationId ?? '',
       active: row.active,
-      photoUrl: '',
+      photoUrl: row.student?.photoUrl || row.img || '',
     });
     setCreated(null);
     setNotice(null);
@@ -392,6 +458,7 @@ export const AdminStudentsPage = () => {
           classId: form.classId,
           combinationId: form.combinationId || null,
           active: form.active,
+          photoUrl: form.photoUrl || null,
         });
         setNotice(`"${form.user_name.trim()}" updated.`);
       } else {
@@ -487,8 +554,8 @@ export const AdminStudentsPage = () => {
         ) : (
           <>
             <TableWrap>
-              <table className={`w-full min-w-[960px] text-left text-sm transition-opacity ${list.isFetching ? 'opacity-60' : ''}`}>
-                <thead><tr><Th>Photo</Th><Th>Pupil</Th><Th>Class</Th><Th>Combination</Th><Th>Results</Th><Th>Discipline</Th><Th>Status</Th><Th><span className="sr-only">Actions</span></Th></tr></thead>
+              <table className={`w-full min-w-[1080px] text-left text-sm transition-opacity ${list.isFetching ? 'opacity-60' : ''}`}>
+                <thead><tr><Th>Photo</Th><Th>Pupil</Th><Th>Class</Th><Th>Combination</Th><Th>Results</Th><Th>Discipline</Th><Th>ID Card</Th><Th>Status</Th><Th><span className="sr-only">Actions</span></Th></tr></thead>
                 <tbody>
                   {rows.map((r) => (
                     <tr key={r.id}>
@@ -504,6 +571,11 @@ export const AdminStudentsPage = () => {
                       <Td>
                         <button type="button" onClick={() => setDisciplineRow(r)} title="Record or review discipline actions" className="inline-flex items-center gap-1.5 rounded border border-line px-2.5 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">
                           <Gavel aria-hidden="true" size={14} /> Manage
+                        </button>
+                      </Td>
+                      <Td>
+                        <button type="button" onClick={() => setIdCardRow(r)} title="Preview and download the student ID card" className="inline-flex items-center gap-1.5 rounded border border-line px-2.5 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">
+                          <IdCard aria-hidden="true" size={14} /> View
                         </button>
                       </Td>
                       <Td><Pill tone={r.active ? 'emerald' : 'rose'}>{r.active ? 'Active' : 'Inactive'}</Pill></Td>
@@ -601,21 +673,36 @@ export const AdminStudentsPage = () => {
               <span className={`h-4 w-4 rounded-full bg-white transition-transform ${form.active ? 'translate-x-5' : ''}`} />
             </button>
           </div>
-          {!editing && (
-            <div className="flex items-center gap-3">
-              {form.photoUrl ? (
-                <img src={form.photoUrl} alt="Avatar preview" className="h-11 w-11 rounded-full border border-line object-cover" />
-              ) : (
-                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-sm font-extrabold text-brand-700">?</span>
-              )}
-              <div>
-                <p className="text-sm font-semibold">Avatar {form.photoUrl && <span className="text-emerald-700">✓ set</span>}</p>
-                <div className="mt-1">
-                  <UploadButton endpoint="avatarUploader" label="Upload avatar" onClientUploadComplete={(res) => setForm({ ...form, photoUrl: res?.[0]?.ufsUrl ?? '' })} onUploadError={(err) => setNotice(err.message)} />
-                </div>
+          <div className="flex flex-wrap items-center gap-4 rounded border border-line bg-cream px-4 py-3">
+            {form.photoUrl ? (
+              <img src={form.photoUrl} alt="Avatar preview" className="h-14 w-14 shrink-0 rounded-full border border-line object-cover" />
+            ) : (
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-50 text-sm font-extrabold text-brand-700">
+                {initialsOf(form.user_name)}
+              </span>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold">Student photo {form.photoUrl && <span className="text-emerald-700">✓ set</span>}</p>
+              <p className="mt-0.5 text-xs text-muted">Shown on the ID card and class lists. JPG or PNG, up to 4 MB.</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <UploadButton
+                  endpoint="avatarUploader"
+                  label={form.photoUrl ? 'Replace avatar' : 'Upload avatar'}
+                  onClientUploadComplete={(res) => setForm((prev) => ({ ...prev, photoUrl: res?.[0]?.ufsUrl ?? '' }))}
+                  onUploadError={(err) => setNotice(err.message)}
+                />
+                {form.photoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, photoUrl: '' }))}
+                    className="inline-flex min-h-9 items-center rounded border border-line px-3 text-xs font-bold text-rose-700 hover:border-rose-300"
+                  >
+                    <Trash2 aria-hidden="true" size={14} className="mr-1.5" /> Remove
+                  </button>
+                )}
               </div>
             </div>
-          )}
+          </div>
           {notice && <p role={editing ? 'status' : 'alert'} className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
           <div className="flex gap-3">
             <button type="button" onClick={() => setModalOpen(false)} className="min-h-11 flex-1 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">
@@ -639,6 +726,7 @@ export const AdminStudentsPage = () => {
       )}
       {resultsRow && <PupilResults row={resultsRow} onClose={() => setResultsRow(null)} />}
       {disciplineRow && <PupilDiscipline row={disciplineRow} onClose={() => setDisciplineRow(null)} />}
+      {idCardRow && <PupilIDCard row={idCardRow} onClose={() => setIdCardRow(null)} />}
     </div>
   );
 };

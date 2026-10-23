@@ -145,16 +145,24 @@ export const EmptyState = ({ message }: { message: string }) => (
   <p className="border border-dashed border-line bg-cream px-5 py-6 text-center text-sm text-muted">{message}</p>
 );
 
+const MODAL_WIDTHS = {
+  md: 'max-w-md',
+  lg: 'max-w-2xl',
+  xl: 'max-w-4xl',
+} as const;
+
 export const Modal = ({
   open,
   onClose,
   title,
   children,
+  size = 'md',
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
+  size?: keyof typeof MODAL_WIDTHS;
 }) => {
   useEffect(() => {
     if (!open) return;
@@ -169,7 +177,7 @@ export const Modal = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={title}>
       <button type="button" aria-label="Close dialog" onClick={onClose} className="absolute inset-0 bg-brand-900/60" />
-      <div className="relative w-full max-w-md border border-line bg-white shadow-xl">
+      <div className={`relative max-h-[calc(100vh-2rem)] w-full overflow-y-auto border border-line bg-white shadow-xl ${MODAL_WIDTHS[size]}`}>
         <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
           <h3 className="font-display text-base font-extrabold text-ink">{title}</h3>
           <button

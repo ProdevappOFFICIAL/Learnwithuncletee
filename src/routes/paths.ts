@@ -35,6 +35,7 @@ export const ROUTES = {
   adminAttendance: '/dashboard/admin/attendance',
   adminFees: '/dashboard/admin/fees',
   adminResults: '/dashboard/admin/results',
+  adminPPTMarker: '/dashboard/admin/ppt-marker',
   adminAssignments: '/dashboard/admin/assignments',
   adminVirtualClass: '/dashboard/admin/virtual-class',
   adminNews: '/dashboard/admin/news',
