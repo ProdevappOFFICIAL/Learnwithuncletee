@@ -21,6 +21,8 @@ interface SubjectItem {
   code?: string | null;
   description?: string | null;
   classes?: Array<{ id: string; name: string }>;
+  // Exams in the same class that share this subject (returned when classId filter is set)
+  exams?: Array<{ id: string; exam_name: string; combination: { name: string } | null }>;
   _count?: { questions?: number };
 }
 
@@ -455,7 +457,7 @@ export const ExamSubjectsPage = () => {
 
   const subjects = usePagedList<SubjectItem>(
     ['exam-subjects', examId, query],
-    (page, limit) => apiGet<SubjectItem[]>('/subjects', { examId, searchTerm: query || undefined, page, limit }),
+    (page, limit) => apiGet<SubjectItem[]>('/subjects', { examId, classId, searchTerm: query || undefined, page, limit }),
   );
 
   // ── Create / Edit modal ────────────────────────────────────────────────────
@@ -600,6 +602,22 @@ export const ExamSubjectsPage = () => {
                         {subject.name}
                         {subject.code && <span className="ml-2 text-xs font-bold text-muted">{subject.code}</span>}
                       </span>
+                      {/* Shared-subject chip: shown when this subject exists in >1 exam in this class */}
+                      {subject.exams && subject.exams.length > 1 && (() => {
+                        const siblings = subject.exams.filter((e) => e.id !== examId);
+                        const labels = siblings.map((e) =>
+                          e.combination?.name ?? 'General'
+                        );
+                        return (
+                          <span
+                            title={`Also in: ${labels.join(', ')}`}
+                            className="mt-1 inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-700"
+                          >
+                            <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" aria-hidden="true"><circle cx="4" cy="4" r="4"/></svg>
+                            Shared · {labels.join(' & ')}
+                          </span>
+                        );
+                      })()}
                       <span className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted">
                         {subject.description && <span className="truncate">{subject.description}</span>}
                         {subject.description && <span>·</span>}

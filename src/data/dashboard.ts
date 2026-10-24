@@ -237,6 +237,12 @@ export const adminNav: DashboardNavItem[] = [
     icon: Presentation,
     permission: "results.read",
   },
+    {
+    to: ROUTES.adminResultGenerator,
+    label: "Result Generator",
+    icon: Presentation,
+    permission: "results.read",
+  },
   {
     label: "Exam & Test",
     icon: GraduationCap,

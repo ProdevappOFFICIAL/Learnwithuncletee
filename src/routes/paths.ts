@@ -60,7 +60,9 @@ export const ROUTES = {
   adminBilling: '/dashboard/admin/billing',
   adminSettings: '/dashboard/admin/settings',
   adminAuditLog: '/dashboard/admin/audit-log',
+  adminResultGenerator: '/dashboard/admin/result-generator',
   notFound: '*',
+  
 } as const;
 
 export type AppRouteKey = keyof typeof ROUTES;

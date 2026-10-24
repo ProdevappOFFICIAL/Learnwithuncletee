@@ -69,6 +69,7 @@ import { AdminSettingsPage } from '@/pages/dashboard/admin/AdminSettingsPage';
 import { AdminAuditLogPage } from '@/pages/dashboard/admin/AdminAuditLogPage';
 import { AdminBillingPage } from '@/pages/dashboard/admin/AdminBillingPage';
 import { RouteError } from '@/components/ui/RouteError';
+import AdminResultGeneratorPage from '@/pages/dashboard/admin/AdminResultGeneratorPage';
 
 const appRoutes = [
   { path: ROUTES.home, element: <HomePage /> },
@@ -183,6 +184,7 @@ const appRoutes = [
           { path: 'settings', element: <AdminSettingsPage /> },
           { path: 'audit-log', element: <AdminAuditLogPage /> },
           { path: 'billing', element: <AdminBillingPage /> },
+          { path: 'result-generator', element: <AdminResultGeneratorPage /> },
         ],
       },
     ],
