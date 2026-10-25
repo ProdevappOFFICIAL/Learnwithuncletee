@@ -104,6 +104,11 @@ export const NewsEditor = ({
 /** Read-only renderer for announcement bodies on the public site. */
 export const NewsContent = ({ markdown }: { markdown: string }) => (
   <MDXEditor
+    // MDXEditor only reads `markdown` on mount (same initial-only contract as
+    // `NewsEditor`). Keying by the content remounts the viewer whenever the
+    // markdown changes — without this, swapping the prop (next exam question,
+    // next result row) keeps showing the previously rendered text.
+    key={markdown}
     markdown={markdown}
     readOnly
     className="mdx-news-viewer"

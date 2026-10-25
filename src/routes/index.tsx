@@ -15,6 +15,7 @@ import { LoginPage } from '@/pages/LoginPage';
 import { ConnectDesktopPage } from '@/pages/ConnectDesktopPage';
 import { ExaminationPage } from '@/pages/ExaminationPage';
 import { ExamRoomPage } from '@/pages/ExamRoomPage';
+import { ExamDashboardPage } from '@/pages/ExamDashboardPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { adminNav, studentNav, teacherNav } from '@/data/dashboard';
@@ -22,6 +23,7 @@ import { DashboardIndexPage } from '@/pages/dashboard/DashboardIndexPage';
 import { StudentDashboardPage } from '@/pages/dashboard/student/StudentDashboardPage';
 import { StudentFeesPage } from '@/pages/dashboard/student/StudentFeesPage';
 import { StudentResultsPage } from '@/pages/dashboard/student/StudentResultsPage';
+import { StudentResultDetailPage } from '@/pages/dashboard/student/StudentResultDetailPage';
 import { StudentAssignmentsPage } from '@/pages/dashboard/student/StudentAssignmentsPage';
 import { StudentVirtualClassPage } from '@/pages/dashboard/student/StudentVirtualClassPage';
 import { StudentMaterialsPage } from '@/pages/dashboard/student/StudentMaterialsPage';
@@ -88,6 +90,7 @@ const appRoutes = [
     element: <RequireAuth />,
     children: [{ index: true, element: <ConnectDesktopPage /> }],
   },
+  { path: ROUTES.examDashboard, element: <ExamDashboardPage /> },
   { path: ROUTES.examination, element: <ExaminationPage /> },
   { path: ROUTES.examinationRoom, element: <ExamRoomPage /> },
   { path: ROUTES.formPublic, element: <FormPage /> },
@@ -107,6 +110,7 @@ const appRoutes = [
           { index: true, element: <StudentDashboardPage /> },
           { path: 'fees', element: <StudentFeesPage /> },
           { path: 'results', element: <StudentResultsPage /> },
+          { path: 'results/:origin/:id', element: <StudentResultDetailPage /> },
           { path: 'assignments', element: <StudentAssignmentsPage /> },
           { path: 'virtual-class', element: <StudentVirtualClassPage /> },
           { path: 'materials', element: <StudentMaterialsPage /> },

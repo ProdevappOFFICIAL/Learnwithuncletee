@@ -52,7 +52,7 @@ const inputClass =
 
 export const ExaminationPage = () => {
   const { code = '' } = useParams<{ code: string }>();
-  const { login } = useAuth();
+  const { login, user } = useAuth();
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [exam, setExam] = useState<LiveExam['exam'] | null>(null);
@@ -95,46 +95,69 @@ export const ExaminationPage = () => {
     return () => { cancelled = true; };
   }, [code]);
 
+  /**
+   * Everything after identity is settled: submission lock → filtered question
+   * feed → hand off to the exam room. Shared by the sign-in form and the
+   * "continue as…" shortcut shown to an already-signed-in pupil.
+   */
+  const beginSitting = async (me: { id: string; user_name: string }) => {
+    if (!exam) return;
+    // Submission lock: a locked online row means this pupil already
+    // participated — block re-entry until the admin flips the switch off.
+    const lockCheck = await apiGet<Array<{ submitted?: boolean }>>('/results', {
+      userId: me.id,
+      examId: exam.id,
+      limit: 1,
+    });
+    if ((lockCheck.data ?? []).some((r) => r.submitted === true)) {
+      setError(
+        `You have already participated in ${exam.exam_name} — you can't log in again until the admin re-opens it. Contact your teacher.`,
+      );
+      return;
+    }
+    // Post-login: pull this pupil's filtered question feed (class → exam →
+    // combination → subject). 403 here means the exam isn't for their class.
+    const feed = await apiGet<QuestionFeed>(`/exam-deployments/by-code/${code}/questions`);
+    if (feed.data.questions.length === 0) {
+      setError(
+        `Signed in as ${me.user_name}, but no questions are assigned to you in ${feed.data.exam.exam_name}` +
+        (feed.data.gate?.combinationName ? ` for combination ${feed.data.gate.combinationName}` : '') +
+        '. Check with your teacher.',
+      );
+      return;
+    }
+    // Store exam payload + userId in sessionStorage so ExamRoomPage can pick it up
+    sessionStorage.setItem(
+      `exam_session_${code}`,
+      JSON.stringify({ exam: feed.data.exam, questions: feed.data.questions, subjects: feed.data.subjects, gate: feed.data.gate, userId: me.id, startedAt: Date.now() }),
+    );
+    // Hard navigate so ExamRoomPage mounts fresh (prevents back-button to login mid-exam)
+    window.location.href = ROUTES.examinationRoom.replace(':code', code);
+  };
+
   const doLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
       const me = await login(identity.trim(), password);
-      if (!exam) return;
-      // Submission lock: a locked online row means this pupil already
-      // participated — block re-entry until the admin flips the switch off.
-      const lockCheck = await apiGet<Array<{ submitted?: boolean }>>('/results', {
-        userId: me.id,
-        examId: exam.id,
-        limit: 1,
-      });
-      if ((lockCheck.data ?? []).some((r) => r.submitted === true)) {
-        setError(
-          `You have already participated in ${exam.exam_name} — you can't log in again until the admin re-opens it. Contact your teacher.`,
-        );
-        return;
-      }
-      // Post-login: pull this pupil's filtered question feed (class → exam →
-      // combination → subject). 403 here means the exam isn't for their class.
-      const feed = await apiGet<QuestionFeed>(`/exam-deployments/by-code/${code}/questions`);
-      if (feed.data.questions.length === 0) {
-        setError(
-          `Signed in as ${me.user_name}, but no questions are assigned to you in ${feed.data.exam.exam_name}` +
-          (feed.data.gate?.combinationName ? ` for combination ${feed.data.gate.combinationName}` : '') +
-          '. Check with your teacher.',
-        );
-        return;
-      }
-      // Store exam payload + userId in sessionStorage so ExamRoomPage can pick it up
-      sessionStorage.setItem(
-        `exam_session_${code}`,
-        JSON.stringify({ exam: feed.data.exam, questions: feed.data.questions, subjects: feed.data.subjects, gate: feed.data.gate, userId: me.id, startedAt: Date.now() }),
-      );
-      // Hard navigate so ExamRoomPage mounts fresh (prevents back-button to login mid-exam)
-      window.location.href = ROUTES.examinationRoom.replace(':code', code);
+      await beginSitting(me);
     } catch (err: any) {
       setError(err?.message ?? 'Sign-in failed. Use your email or admission no.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Already signed in (arrived from the exam dashboard) — skip the form. */
+  const doContinue = async () => {
+    if (!user) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await beginSitting(user);
+    } catch (err: any) {
+      setError(err?.message ?? 'Could not open this examination.');
     } finally {
       setBusy(false);
     }
@@ -193,13 +216,18 @@ export const ExaminationPage = () => {
         <section className="flex items-center justify-center px-5 py-12 sm:px-10">
           <div className="w-full max-w-md">
 
-            <Link
-              to={ROUTES.home}
-              className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-500"
-            >
-              <ChevronLeft aria-hidden="true" size={16} />
-              Back to website
-            </Link>
+            <div className="flex items-center justify-between gap-2">
+              <Link
+                to={ROUTES.examDashboard}
+                className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-500"
+              >
+                <ChevronLeft aria-hidden="true" size={16} />
+                Exam dashboard
+              </Link>
+              <Link to={ROUTES.home} className="text-xs font-semibold text-muted hover:text-brand-700">
+                Back to website
+              </Link>
+            </div>
 
             <div className="mt-10 w-full max-w-md rounded border border-line bg-cream px-4 pb-10">
 
@@ -225,10 +253,10 @@ export const ExaminationPage = () => {
                     {error ?? 'Check the code with your teacher.'}
                   </p>
                   <Link
-                    to={ROUTES.home}
+                    to={ROUTES.examDashboard}
                     className="mt-8 inline-flex min-h-12 w-full items-center justify-center rounded bg-brand-900 px-5 py-3 text-sm font-bold text-white hover:bg-brand-700"
                   >
-                    <ChevronLeft aria-hidden="true" size={16} className="mr-1" /> Back home
+                    <ChevronLeft aria-hidden="true" size={16} className="mr-1" /> Exam dashboard
                   </Link>
                 </>
               )}
@@ -241,6 +269,26 @@ export const ExaminationPage = () => {
                   <p className="mt-2 text-sm leading-relaxed text-muted">
                     Sign in with the credentials provided by your school.
                   </p>
+
+                  {user && (
+                    <>
+                      <div className="mt-6 rounded border border-brand-200 bg-brand-50 p-4">
+                        <p className="text-xs font-bold uppercase tracking-widest text-brand-700">Already signed in</p>
+                        <p className="mt-1 text-sm font-semibold text-ink">{user.user_name}</p>
+                        <button
+                          type="button"
+                          onClick={doContinue}
+                          disabled={busy}
+                          className="mt-3 min-h-12 w-full rounded bg-brand-900 px-5 py-3 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60"
+                        >
+                          {busy ? 'Opening…' : 'Continue to examination'}
+                        </button>
+                      </div>
+                      <p className="mt-6 flex items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-muted">
+                        <span className="h-px flex-1 bg-line" /> or use another account <span className="h-px flex-1 bg-line" />
+                      </p>
+                    </>
+                  )}
 
                   <form onSubmit={doLogin} className="mt-8 space-y-5">
                     <label className="block text-sm font-semibold">
@@ -295,10 +343,10 @@ export const ExaminationPage = () => {
                     You attempted {result.attempted} of {result.total} questions. Your score is hidden — the school will release results.
                   </p>
                   <Link
-                    to={ROUTES.home}
+                    to={ROUTES.examDashboard}
                     className="mt-8 inline-flex min-h-12 w-full items-center justify-center rounded bg-brand-900 px-5 py-3 text-sm font-bold text-white hover:bg-brand-700"
                   >
-                    <ChevronLeft aria-hidden="true" size={16} className="mr-1" /> Back home
+                    <ChevronLeft aria-hidden="true" size={16} className="mr-1" /> Exam dashboard
                   </Link>
                 </div>
               )}

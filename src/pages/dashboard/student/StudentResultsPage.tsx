@@ -1,11 +1,13 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pill, StatTile, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
 import { useAuth, useResource } from '@/context/AuthContext';
 import { apiGet } from '@/lib/api';
 import { printReportCard } from '@/lib/reportCard';
+import { ROUTES } from '@/routes/paths';
 import { TERM_OPTIONS, sessionOptions, type GradeData, type ResultDocData } from '@/data/dashboard';
 import type { ClassItem } from '@/data/dashboard';
-import { ExternalLink, FileText } from 'lucide-react';
+import { ExternalLink, Eye, FileText } from 'lucide-react';
 
 interface AttemptRow {
   id: string;
@@ -56,24 +58,34 @@ const SittingAttempts = () => {
               .sort((a, b) => a.name.localeCompare(b.name));
             return (
               <li key={`${r.origin}:${r.id}`} className="px-5 py-4">
-                <button
-                  type="button"
-                  onClick={() => setExpanded(open ? null : `${r.origin}:${r.id}`)}
-                  aria-expanded={open}
-                  className="flex w-full flex-wrap items-center justify-between gap-3 text-left"
-                >
-                  <span>
-                    <span className="block text-sm font-bold">{r.exam?.exam_name ?? 'Exam'}</span>
-                    <span className="mt-0.5 block text-xs text-muted">
-                      {new Date(r.date).toLocaleString()} · attempted {r.attempted_questions}/{r.total_questions}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setExpanded(open ? null : `${r.origin}:${r.id}`)}
+                    aria-expanded={open}
+                    className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-3 text-left"
+                  >
+                    <span>
+                      <span className="block text-sm font-bold">{r.exam?.exam_name ?? 'Exam'}</span>
+                      <span className="mt-0.5 block text-xs text-muted">
+                        {new Date(r.date).toLocaleString()} · attempted {r.attempted_questions}/{r.total_questions}
+                      </span>
                     </span>
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <Pill tone={r.origin === 'OFFLINE' ? 'amber' : 'sky'}>{r.origin === 'OFFLINE' ? 'Offline' : 'Online'}</Pill>
-                    <Pill tone={r.overallScore >= 75 ? 'emerald' : r.overallScore < 40 ? 'rose' : 'sky'}>{r.overallScore}%</Pill>
-                    <span className="text-xs font-bold text-brand-700">{open ? 'Hide ▲' : 'Subjects ▼'}</span>
-                  </span>
-                </button>
+                    <span className="flex items-center gap-2">
+                      <Pill tone={r.origin === 'OFFLINE' ? 'amber' : 'sky'}>{r.origin === 'OFFLINE' ? 'Offline' : 'Online'}</Pill>
+                      <Pill tone={r.overallScore >= 75 ? 'emerald' : r.overallScore < 40 ? 'rose' : 'sky'}>{r.overallScore}%</Pill>
+                      <span className="text-xs font-bold text-brand-700">{open ? 'Hide ▲' : 'Subjects ▼'}</span>
+                    </span>
+                  </button>
+                  <Link
+                    to={ROUTES.studentResultDetail
+                      .replace(':origin', r.origin === 'OFFLINE' ? 'offline' : 'online')
+                      .replace(':id', r.id)}
+                    className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded border border-line bg-white px-3 py-1.5 text-xs font-bold text-brand-700 hover:border-brand-500 hover:bg-brand-50"
+                  >
+                    <Eye size={14} aria-hidden="true" /> Full result
+                  </Link>
+                </div>
                 {open && (
                   parts.length === 0 ? (
                     <p className="mt-3 text-xs text-muted">No per-subject data on this attempt.</p>

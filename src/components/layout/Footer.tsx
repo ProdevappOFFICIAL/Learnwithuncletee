@@ -21,7 +21,11 @@ export const Footer = () => (
       <div>
         <h2 className="mb-4 text-xs font-bold uppercase tracking-widest text-lime-accent">Explore</h2>
         <ul className="space-y-2 text-sm text-white/75">
-          {[...primaryNavLinks.slice(5), { to: ROUTES.login, label: 'Portal Login' }].map((link) => <li key={link.to}><Link className="hover:text-white" to={link.to}>{link.label}</Link></li>)}
+          {[
+            ...primaryNavLinks.slice(5),
+            { to: ROUTES.examDashboard, label: 'Examination Portal' },
+            { to: ROUTES.login, label: 'Portal Login' },
+          ].map((link) => <li key={link.to}><Link className="hover:text-white" to={link.to}>{link.label}</Link></li>)}
         </ul>
       </div>
       <div>

@@ -130,6 +130,29 @@ h4 {
 .mdx-news-content img { max-width: 100%; border-radius: 0.5rem; margin: 1em 0; }
 .mdx-news-content [data-lexical-decorator] { max-width: 100%; }
 
+/* Question bank rows: same viewer, compact enough for a list item. */
+.mdx-question-bank .mdx-news-content {
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+.mdx-question-bank .mdx-news-content p { margin: 0; }
+.mdx-question-bank .mdx-news-content h1,
+.mdx-question-bank .mdx-news-content h2,
+.mdx-question-bank .mdx-news-content h3 {
+  margin: 0 0 0.15em;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+}
+.mdx-question-bank .mdx-news-content ul,
+.mdx-question-bank .mdx-news-content ol { margin: 0.25em 0; padding-left: 1.25rem; }
+.mdx-question-bank .mdx-news-content blockquote { margin: 0.35em 0; padding: 0.35em 0.65em; }
+.mdx-question-bank .mdx-news-content img { margin: 0.35em 0; }
+.mdx-question-bank .mdx-news-content pre,
+.mdx-question-bank .mdx-news-content table { margin: 0.35em 0; }
+
 /* ── Custom slim scrollbar (dashboard sidebar + drawers) ──────────── */
 .scroll-slim {
   scrollbar-width: thin;

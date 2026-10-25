@@ -26,7 +26,10 @@ export const StudentDashboardPage = () => {
         text="Here is your school day at a glance — classes, assignments and fees."
         actions={
           <>
-            <Link to={ROUTES.studentVirtualClass} className="inline-flex min-h-11 items-center rounded bg-brand-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
+            <Link to={ROUTES.examDashboard} className="inline-flex min-h-11 items-center rounded bg-brand-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
+              Open examinations
+            </Link>
+            <Link to={ROUTES.studentVirtualClass} className="inline-flex min-h-11 items-center rounded border border-line bg-white px-5 py-2.5 text-sm font-bold text-ink hover:border-brand-500 hover:text-brand-700">
               Join live class
             </Link>
             <Link to={ROUTES.studentAssignments} className="inline-flex min-h-11 items-center rounded border border-line bg-white px-5 py-2.5 text-sm font-bold text-ink hover:border-brand-500 hover:text-brand-700">

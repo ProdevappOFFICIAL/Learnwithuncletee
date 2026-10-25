@@ -7,6 +7,7 @@ import { siteInfo } from '@/data/content';
 import {
   AlertTriangle,
   Calculator,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -34,7 +35,7 @@ const shuffle = <T,>(arr: T[]): T[] => {
 const fmtTime = (secs: number) => {
   const m = Math.floor(Math.max(0, secs) / 60);
   const s = Math.max(0, secs) % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 };
 
 // ─── Calculator Dialog ────────────────────────────────────────────────────────
@@ -473,6 +474,12 @@ export const ExamRoomPage = () => {
     }));
   }, [questions]);
 
+  // Subject strip above the question (only when the paper spans subjects).
+  const subjectNames = useMemo(
+    () => paletteGroups.map((g) => g.subject).filter(Boolean) as string[],
+    [paletteGroups],
+  );
+
   // ── Submit ──────────────────────────────────────────────────────────────────
   const submit = useCallback(async () => {
     if (!exam || busy || !userId || submitted) return;
@@ -522,11 +529,15 @@ export const ExamRoomPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [secondsLeft]);
 
-  const goTo = (idx: number) => {
-    if (!exam) return;
+  const goTo = useCallback((idx: number) => {
     setAttachOpen(false);
     setCurrentQ(Math.max(0, Math.min(questions.length - 1, idx)));
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [questions.length]);
+
+  const goToSubject = (name: string) => {
+    const idx = questions.findIndex((x) => (x.subject?.name ?? '') === name);
+    if (idx !== -1) goTo(idx);
   };
 
   // ── Keyboard shortcuts: A… selects options, P previous, N next ─────────────
@@ -607,8 +618,8 @@ export const ExamRoomPage = () => {
             Your class/combination has no questions in this exam. Check with your teacher —
             they may need to link your subjects to this exam.
           </p>
-          <Link to={ROUTES.examination.replace(':code', code)} className="mt-6 inline-flex min-h-11 items-center rounded bg-brand-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
-            Back
+          <Link to={ROUTES.examDashboard} className="mt-6 inline-flex min-h-11 items-center rounded bg-brand-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
+            Back to exam dashboard
           </Link>
         </div>
       </div>
@@ -617,6 +628,7 @@ export const ExamRoomPage = () => {
   const isFirst = safeCurrent === 0;
   const isLast = safeCurrent === total - 1;
   const answeredCount = questions.filter(answered).length;
+  const activeSubject = q?.subject?.name ?? '';
 
   return (
     <>
@@ -649,110 +661,129 @@ export const ExamRoomPage = () => {
         <AttachmentDialog src={q.question_file.trim()} onClose={() => setAttachOpen(false)} />
       )}
 
-      <div className="flex min-h-screen flex-col bg-cream font-sans text-ink">
+      <div className="flex min-h-screen flex-col bg-cream font-sans text-sm text-ink select-none">
 
-        {/* ── Sticky header ── */}
-        <header className="sticky top-0 z-40 border-b border-line bg-white/95 backdrop-blur">
-          <div className="mx-auto flex min-h-[64px] w-full max-w-3xl items-center gap-3 px-4 sm:px-6">
-            <Link to={ROUTES.home} className="shrink-0" aria-label="Home">
-              <img src="/logo.png" alt={siteInfo.name} className="h-9 w-9 rounded-full object-cover" />
-            </Link>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-display text-sm font-extrabold">{exam.exam_name}</p>
-              <p className="text-xs text-muted">Question {safeCurrent + 1} of {total}</p>
+        {/* ── Hall header ── */}
+        <header className="sticky top-0 z-40 border-b border-line bg-white/90 px-4 py-4 backdrop-blur-sm sm:px-6">
+          <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+              <Link to={ROUTES.home} aria-label="Home" className="shrink-0">
+                <img src="/logo.png" alt={siteInfo.name} className="h-9 w-9 rounded-full border border-line object-cover" />
+              </Link>
+              <div className="min-w-0">
+                <h1 className="truncate text-base font-semibold leading-tight text-ink">{exam.exam_name}</h1>
+                <p className="mt-0.5 truncate text-xs text-muted">
+                  Student: {sitter?.user_name ?? '—'}
+                  {exam.minutes ? ` · ${exam.minutes} minutes` : ''}
+                </p>
+              </div>
             </div>
 
-            {/* Calculator */}
-            <button
-              type="button"
-              onClick={() => setCalcOpen(true)}
-              aria-label="Open calculator"
-              title="Calculator"
-              className="flex h-9 w-9 items-center justify-center rounded border border-line text-brand-800 transition-colors hover:bg-brand-50"
-            >
-              <Calculator size={16} aria-hidden="true" />
-            </button>
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setCalcOpen(true)}
+                aria-label="Open calculator"
+                title="Calculator"
+                className="flex h-9 w-9 items-center justify-center rounded border border-line text-brand-800 transition-colors hover:bg-brand-50"
+              >
+                <Calculator size={16} aria-hidden="true" />
+              </button>
 
-            {/* Sitter avatar */}
-            {sitter && (
-              <span title={sitter.user_name} className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-900 text-xs font-extrabold text-lime-accent ring-1 ring-line">
-                {sitter.student?.photoUrl || sitter.img ? (
-                  <img src={(sitter.student?.photoUrl || sitter.img) as string} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  sitter.user_name.split(' ').map((p) => p.replace('.', '')[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'LW'
-                )}
-              </span>
-            )}
+              {sitter && (
+                <span
+                  title={sitter.user_name}
+                  className="hidden h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-900 text-xs font-extrabold text-lime-accent ring-1 ring-line sm:flex"
+                >
+                  {sitter.student?.photoUrl || sitter.img ? (
+                    <img src={(sitter.student?.photoUrl || sitter.img) as string} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    sitter.user_name.split(' ').map((p) => p.replace('.', '')[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'LW'
+                  )}
+                </span>
+              )}
 
-            {/* Timer */}
-            <p
-              className={`inline-flex items-center gap-1.5 rounded px-3 py-2 font-mono text-sm font-bold ${
-                secondsLeft < 300 ? 'bg-rose-50 text-rose-700' : 'bg-brand-50 text-brand-700'
-              }`}
-              role="timer"
-              aria-label="Time remaining"
-            >
-              <Clock size={14} aria-hidden="true" /> {fmtTime(secondsLeft)}
-            </p>
+              <p
+                className={`inline-flex items-center gap-2 rounded px-4 py-1.5 font-mono text-sm font-bold ${
+                  secondsLeft < 300
+                    ? 'animate-pulse bg-rose-50 text-rose-600 ring-1 ring-rose-400'
+                    : 'bg-brand-50 text-brand-700 ring-1 ring-brand-100'
+                }`}
+                role="timer"
+                aria-label="Time remaining"
+              >
+                <Clock size={15} aria-hidden="true" /> {fmtTime(secondsLeft)}
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setConfirmOpen(true)}
+                disabled={busy}
+                className="w-full rounded bg-brand-500 px-6 py-2 font-medium text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-gray-300 sm:w-auto"
+              >
+                {busy ? 'Submitting…' : 'Submit Exam'}
+              </button>
+            </div>
           </div>
         </header>
 
-        <main className="flex-1 py-8 sm:py-10">
-          <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
+        <main className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-6 p-4 sm:p-6 lg:flex-row">
 
-            {/* ── Dot-nav progress bar (grouped per subject) ── */}
-            <nav aria-label="Question navigation" className="mb-6 space-y-3">
-              {paletteGroups.map((group) => (
-                <div key={group.subject ?? 'all'}>
-                  {group.subject && (
-                    <p className="mb-1.5 flex items-center justify-between text-[11px] font-bold uppercase tracking-widest text-muted">
-                      <span>{group.subject}</span>
-                      <span>{group.items.filter(({ q }) => answered(q)).length}/{group.items.length}</span>
-                    </p>
-                  )}
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {group.items.map(({ q: x, i }) => {
-                      const done = answered(x);
-                      const active = i === safeCurrent;
+          {/* ── Left: question + controls ── */}
+          <div className="flex min-w-0 flex-1 flex-col gap-4">
+
+            <article className="flex min-h-[400px] flex-col rounded border border-line bg-white p-5 sm:p-8" aria-label={`Question ${safeCurrent + 1}`}>
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                <span className="inline-flex items-center rounded bg-brand-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-brand-700">
+                  Question {safeCurrent + 1} of {total}
+                </span>
+
+                {subjectNames.length > 1 && (
+                  <div className="scroll-slim -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+                    {subjectNames.map((name) => {
+                      const items = paletteGroups.find((g) => g.subject === name)?.items ?? [];
+                      const done = items.filter(({ q: x }) => answered(x)).length;
+                      const active = activeSubject === name;
                       return (
                         <button
-                          key={x.id}
+                          key={name}
                           type="button"
-                          onClick={() => goTo(i)}
-                          aria-label={`Go to question ${i + 1}${done ? ' (answered)' : ''}`}
-                          aria-current={active ? 'step' : undefined}
-                          className={[
-                            'flex h-8 min-w-[2rem] items-center justify-center rounded px-2 text-xs font-bold transition-all duration-150',
-                            active ? 'bg-brand-900 text-white shadow'
-                              : done ? 'bg-brand-500 text-white'
-                              : 'border border-line bg-white text-muted hover:border-brand-500 hover:text-brand-700',
-                          ].join(' ')}
+                          onClick={() => goToSubject(name)}
+                          aria-pressed={active}
+                          className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-4 py-2 text-xs uppercase tracking-wider transition-colors ${
+                            active
+                              ? 'bg-brand-50 text-brand-700'
+                              : 'text-muted hover:bg-cream hover:text-brand-700'
+                          }`}
                         >
-                          {i + 1}
+                          {name}
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                              active ? 'bg-white text-brand-700' : 'bg-brand-50 text-muted'
+                            }`}
+                          >
+                            {done} / {items.length}
+                          </span>
                         </button>
                       );
                     })}
                   </div>
-                </div>
-              ))}
-              <p className="text-right text-xs text-muted">
-                {questions.filter(answered).length}/{total} answered
-              </p>
-            </nav>
+                )}
+              </div>
 
-            {/* ── Question card ── */}
-            <article className="border border-line bg-white p-5 sm:p-8" aria-label={`Question ${safeCurrent + 1}`}>
-              <p className="text-xs font-bold uppercase tracking-widest text-brand-700">
-                Question {safeCurrent + 1} of {total} · {q.type.replace(/_/g, ' ')}{q.subject?.name ? ` · ${q.subject.name}` : ''}
-              </p>
-              <div className="mt-3 font-display text-base font-extrabold leading-relaxed sm:text-lg">
-                <Suspense fallback={<div className="h-6 animate-pulse rounded bg-brand-50" />}>
-                  <NewsContent markdown={q.question} />
+              <div className="text-base font-medium leading-relaxed text-ink">
+                <Suspense
+                  fallback={<p className="whitespace-pre-wrap break-words">{q.question}</p>}
+                >
+                  {/* `NewsContent` mounts MDXEditor, which only reads its
+                      markdown on mount — key it per question so navigating
+                      the paper actually swaps the rendered question text. */}
+                  <NewsContent key={q.id} markdown={q.question} />
                 </Suspense>
               </div>
 
               {q.question_file?.trim() ? (
-                <div className="mt-4 rounded border border-line bg-cream px-4 py-3">
+                <div className="mt-5 rounded border border-line bg-cream px-4 py-3">
                   <p className="text-xs font-bold uppercase tracking-widest text-muted">Attachment</p>
                   {(() => {
                     const file = q.question_file!.trim();
@@ -788,74 +819,104 @@ export const ExamRoomPage = () => {
                 </div>
               ) : null}
 
-              {q.type === 'FILL_IN_THE_BLANK' ? (
-                <input
-                  value={typed[q.id] ?? ''}
-                  onChange={(e) => setTyped({ ...typed, [q.id]: e.target.value })}
-                  placeholder="Type your answer…"
-                  aria-label={`Answer for question ${safeCurrent + 1}`}
-                  className="mt-5 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-                />
-              ) : q.type === 'TRUE_FALSE' ? (
-                <div className="mt-5 grid grid-cols-2 gap-3" role="radiogroup" aria-label={`True or false for question ${safeCurrent + 1}`}>
-                  {(['True', 'False'] as const).map((label) => {
-                    const opts = optionsByQ[q.id] ?? [];
-                    const oi = opts.indexOf(label);
-                    const selected = oi !== -1 && picked[q.id] === oi;
-                    return (
-                      <button
-                        key={label}
-                        type="button"
-                        role="radio"
-                        aria-checked={selected}
-                        disabled={oi === -1}
-                        onClick={() => setPicked({ ...picked, [q.id]: oi })}
-                        className={`min-h-[68px] rounded border px-4 py-3.5 text-base font-extrabold transition-colors disabled:opacity-40 ${
-                          selected
-                            ? 'border-brand-500 bg-brand-50 text-brand-800'
-                            : 'border-line hover:border-brand-500'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="mt-5 space-y-2.5" role="radiogroup" aria-label={`Options for question ${safeCurrent + 1}`}>
-                  {(optionsByQ[q.id] ?? []).map((opt, oi) => (
-                    <label
-                      key={oi}
-                      className={`flex cursor-pointer items-center gap-3 rounded border px-4 py-3.5 text-sm transition-colors ${
-                        picked[q.id] === oi
-                          ? 'border-brand-500 bg-brand-50 font-bold text-brand-800'
-                          : 'border-line hover:border-brand-500'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name={`q-${q.id}`}
-                        checked={picked[q.id] === oi}
-                        onChange={() => setPicked({ ...picked, [q.id]: oi })}
-                        className="h-4 w-4 accent-brand-700"
-                      />
-                      {opt}
-                    </label>
-                  ))}
-                </div>
-              )}
+              <div className="mt-6 space-y-3">
+                {q.type === 'FILL_IN_THE_BLANK' ? (
+                  <div>
+                    <input
+                      value={typed[q.id] ?? ''}
+                      onChange={(e) => setTyped({ ...typed, [q.id]: e.target.value })}
+                      placeholder="Type your answer here…"
+                      aria-label={`Answer for question ${safeCurrent + 1}`}
+                      className="w-full rounded border border-line bg-white p-4 text-sm outline-none transition-colors focus:border-brand-500 focus:bg-brand-50/40 focus:ring-1 focus:ring-brand-500"
+                    />
+                    <p className="mt-2 text-xs text-muted">Note: please ensure correct spelling for your answer.</p>
+                  </div>
+                ) : q.type === 'TRUE_FALSE' ? (
+                  <div className="space-y-3" role="radiogroup" aria-label={`True or false for question ${safeCurrent + 1}`}>
+                    {(['True', 'False'] as const).map((label) => {
+                      const opts = optionsByQ[q.id] ?? [];
+                      const oi = opts.indexOf(label);
+                      const selected = oi !== -1 && picked[q.id] === oi;
+                      const available = oi !== -1;
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          disabled={!available}
+                          onClick={() => setPicked({ ...picked, [q.id]: oi })}
+                          className={`group flex w-full items-center gap-4 rounded border p-4 text-left transition-colors disabled:opacity-40 ${
+                            selected
+                              ? 'border-brand-500 bg-brand-50 text-brand-800'
+                              : 'border-line bg-white text-ink hover:border-brand-500'
+                          }`}
+                        >
+                          <span
+                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${
+                              selected
+                                ? 'border-brand-500 bg-brand-500 text-white'
+                                : 'border-line bg-cream text-muted group-hover:border-brand-500 group-hover:text-brand-700'
+                            }`}
+                          >
+                            {label[0]}
+                          </span>
+                          <span className="text-sm">{label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="space-y-3" role="radiogroup" aria-label={`Options for question ${safeCurrent + 1}`}>
+                    {(optionsByQ[q.id] ?? []).map((opt, oi) => {
+                      const selected = picked[q.id] === oi;
+                      return (
+                        <button
+                          key={oi}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          onClick={() => setPicked({ ...picked, [q.id]: oi })}
+                          className={`group flex w-full items-center gap-4 rounded border p-4 text-left transition-colors ${
+                            selected
+                              ? 'border-brand-500 bg-brand-50 text-brand-800'
+                              : 'border-line bg-white text-ink hover:border-brand-500'
+                          }`}
+                        >
+                          <span
+                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${
+                              selected
+                                ? 'border-brand-500 bg-brand-500 text-white'
+                                : 'border-line bg-cream text-muted group-hover:border-brand-500 group-hover:text-brand-700'
+                            }`}
+                          >
+                            {String.fromCharCode(65 + oi)}
+                          </span>
+                          <span className="text-sm">{opt}</span>
+                        </button>
+                      );
+                    })}
+                    {(optionsByQ[q.id] ?? []).length === 0 && (
+                      <p className="rounded border border-dashed border-line bg-cream px-4 py-3 text-xs text-muted">
+                        No options were served for this question. Tell an invigilator.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
             </article>
 
             {/* ── Prev / Next ── */}
-            <div className="mt-5 flex items-center justify-between gap-3">
+            <div className="flex flex-col gap-3 py-1 sm:flex-row sm:justify-between">
               <button
                 type="button"
                 onClick={() => goTo(safeCurrent - 1)}
                 disabled={isFirst}
                 title="Previous (P)"
-                className="inline-flex min-h-11 items-center gap-2 rounded border border-line bg-white px-5 py-2.5 text-sm font-semibold text-ink transition-colors hover:border-brand-500 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex items-center justify-center gap-2 rounded border border-line bg-white px-6 py-2.5 font-medium text-ink transition-colors hover:bg-cream disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
               >
-                <ChevronLeft size={16} aria-hidden="true" /> Previous
+                <ChevronLeft size={18} aria-hidden="true" /> Previous
+                <kbd className="hidden rounded border border-line bg-cream px-1.5 py-0.5 text-[10px] text-muted sm:inline">P</kbd>
               </button>
 
               {isLast ? (
@@ -864,9 +925,9 @@ export const ExamRoomPage = () => {
                   onClick={() => setConfirmOpen(true)}
                   disabled={busy}
                   title="Review and submit"
-                  className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded bg-brand-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60"
+                  className="flex items-center justify-center gap-2 rounded bg-brand-500 px-6 py-2.5 font-bold text-white transition-colors hover:bg-brand-700 disabled:opacity-60 sm:w-auto"
                 >
-                  <Send size={15} aria-hidden="true" />
+                  <Send size={16} aria-hidden="true" />
                   {busy ? 'Submitting…' : 'Submit answers'}
                 </button>
               ) : (
@@ -874,39 +935,92 @@ export const ExamRoomPage = () => {
                   type="button"
                   onClick={() => goTo(safeCurrent + 1)}
                   title="Next (N)"
-                  className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded bg-brand-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700"
+                  className="flex items-center justify-center gap-2 rounded bg-brand-500 px-6 py-2.5 font-medium text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
-                  Next <ChevronRight size={16} aria-hidden="true" />
+                  Next <ChevronRight size={18} aria-hidden="true" />
+                  <kbd className="hidden rounded border border-white/30 bg-white/20 px-1.5 py-0.5 text-[10px] text-white sm:inline">N</kbd>
                 </button>
               )}
             </div>
 
-            {/* Secondary early-submit on any question */}
-            {!isLast && (
-              <button
-                type="button"
-                onClick={() => setConfirmOpen(true)}
-                disabled={busy}
-                className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded border border-line bg-white px-5 py-2 text-sm font-semibold text-muted hover:border-brand-500 hover:text-brand-700 disabled:opacity-60"
-              >
-                <Send size={14} aria-hidden="true" />
-                {busy ? 'Submitting…' : 'Submit now (finish early)'}
-              </button>
-            )}
-
-            {/* Keyboard hints */}
-            <p className="mt-3 text-center text-xs text-muted">
-              Shortcuts: <Kbd>A</Kbd>–<Kbd>{String.fromCharCode(64 + Math.min((optionsByQ[q.id] ?? []).length, 26))}</Kbd> answer
-              {' · '}<Kbd>P</Kbd> previous {' · '}<Kbd>N</Kbd> next
-            </p>
-
             {error && (
-              <p role="alert" className="mt-4 border-l-2 border-rose-400 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+              <p role="alert" className="border-l-2 border-rose-400 bg-rose-50 px-4 py-3 text-sm text-rose-800">
                 {error}
               </p>
             )}
 
+            <p className="pb-2 text-center text-xs text-muted lg:text-left">
+              Shortcuts: <Kbd>A</Kbd>–<Kbd>{String.fromCharCode(64 + Math.min((optionsByQ[q.id] ?? []).length, 26))}</Kbd> answer
+              {' · '}<Kbd>P</Kbd> previous {' · '}<Kbd>N</Kbd> next
+            </p>
           </div>
+
+          {/* ── Right: palette ── */}
+          <aside className="w-full shrink-0 lg:w-[320px]">
+            <div className="scroll-slim rounded border border-line bg-white p-6 lg:sticky lg:top-24 lg:max-h-[calc(100vh-9rem)] lg:overflow-y-auto">
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-ink">
+                <CheckCircle2 className="text-brand-700" size={16} aria-hidden="true" /> Question palette
+              </h2>
+
+              <div className="flex flex-col gap-5">
+                {paletteGroups.map((group) => (
+                  <div key={group.subject ?? 'all'}>
+                    {group.subject && (
+                      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted">
+                        {group.subject}
+                        <span className="ml-1 text-muted/70">
+                          {group.items.filter(({ q: x }) => answered(x)).length}/{group.items.length}
+                        </span>
+                      </p>
+                    )}
+                    <div className="grid grid-cols-5 gap-2 sm:grid-cols-6 lg:grid-cols-5">
+                      {group.items.map(({ q: x, i }) => {
+                        const done = answered(x);
+                        const active = i === safeCurrent;
+                        return (
+                          <button
+                            key={x.id}
+                            type="button"
+                            onClick={() => goTo(i)}
+                            aria-label={`Go to question ${i + 1}${done ? ' (answered)' : ''}`}
+                            aria-current={active ? 'step' : undefined}
+                            className={`flex aspect-square w-full items-center justify-center rounded text-xs font-medium transition-colors ${
+                              active
+                                ? 'z-10 bg-brand-900 text-white ring-2 ring-brand-500'
+                                : done
+                                  ? 'bg-brand-500 text-white hover:bg-brand-700'
+                                  : 'border border-line bg-white text-muted hover:border-brand-500 hover:text-brand-700'
+                            }`}
+                          >
+                            {i + 1}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-8 space-y-3 border-t border-line pt-6">
+                <div className="flex items-center gap-3 text-xs font-medium text-muted">
+                  <span className="h-3 w-3 rounded-sm bg-brand-500" />
+                  Answered ({answeredCount})
+                </div>
+                <div className="flex items-center gap-3 text-xs font-medium text-muted">
+                  <span className="h-3 w-3 rounded-sm border border-line bg-white" />
+                  Not answered ({total - answeredCount})
+                </div>
+                <div className="flex items-center gap-3 text-xs font-medium text-muted">
+                  <span className="h-3 w-3 rounded-sm bg-brand-900 ring-2 ring-brand-500/40" />
+                  Current
+                </div>
+              </div>
+
+              <div className="mt-6 border-t border-line pt-4 text-[11px] leading-relaxed text-muted">
+                <span className="font-semibold text-ink">Keyboard:</span> A–D to answer, P for previous, N for next.
+              </div>
+            </div>
+          </aside>
         </main>
       </div>
     </>

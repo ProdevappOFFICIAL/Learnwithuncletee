@@ -65,6 +65,11 @@ export const studentNav: DashboardNavItem[] = [
     permission: "fees.read",
   },*/
   {
+    to: ROUTES.examDashboard,
+    label: "Examinations",
+    icon: ScrollText,
+  },
+  {
     to: ROUTES.studentResults,
     label: "Results",
     icon: FileBarChart2,
