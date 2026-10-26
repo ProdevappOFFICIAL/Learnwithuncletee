@@ -1,4 +1,6 @@
 import { PageHeader } from "@/components/dashboard/DashboardUI"
+import JuniorReportSheet from "@/components/ui/JuniorReport"
+import SeniorReportSheet from "@/components/ui/SeniorReport"
 
 export default function AdminResultGeneratorPage() {
     return (
@@ -8,7 +10,7 @@ export default function AdminResultGeneratorPage() {
                 title="Result Generator"
                 text="Configure subject weighting, grading scales, and header layouts to generate class and student result slips."
             />
-            Coming soon
+            <SeniorReportSheet /> <JuniorReportSheet />
         </div>
     )
 }

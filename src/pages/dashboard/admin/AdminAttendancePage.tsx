@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Card,
@@ -57,6 +57,14 @@ const statusTone = (s: RegisterRow['status']) => (s === 'OUT' ? 'emerald' : s ==
 
 type Tab = 'STUDENT' | 'STAFF';
 
+/** Shape of every cached register page, so optimistic edits can touch them all. */
+interface RegisterPage {
+  data: RegisterRow[];
+  meta?: { total: number; page: number; limit: number };
+}
+
+type Notice = { text: string; tone: 'ok' | 'error' };
+
 export const AdminAttendancePage = () => {
   const [tab, setTab] = useState<Tab>('STUDENT');
   const [date, setDate] = useState(dayString(new Date()));
@@ -64,8 +72,8 @@ export const AdminAttendancePage = () => {
   const [query, setQuery] = useState('');
   const [classFilter, setClassFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [notice, setNotice] = useState<string | null>(null);
-  const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [pendingIds, setPendingIds] = useState<string[]>([]);
 
   // Excel export dialog (server-generated .xlsx).
   const [exportOpen, setExportOpen] = useState(false);
@@ -117,9 +125,9 @@ export const AdminAttendancePage = () => {
       a.remove();
       URL.revokeObjectURL(url);
       setExportOpen(false);
-      setNotice('Excel file downloaded.');
+      setNotice({ text: 'Excel file downloaded.', tone: 'ok' });
     } catch (err: any) {
-      setNotice(err?.message ?? 'Export failed');
+      setNotice({ text: err?.message ?? 'Export failed', tone: 'error' });
     } finally {
       setExportBusy(false);
     }
@@ -146,40 +154,90 @@ export const AdminAttendancePage = () => {
     { staleTime: 60 * 1000, gcTime: 10 * 60 * 1000 },
   );
 
+  // Typing searches as you type — the request runs in the background while the
+  // current rows stay on screen (keepPreviousData), so the page never blanks.
+  const debouncedSearch = search.trim();
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setQuery(debouncedSearch);
+      register.setPage(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
+
+  // Auto-dismiss confirmations; errors stay a little longer so they can be read.
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(null), notice.tone === 'error' ? 7000 : 4000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
   const act = async (row: RegisterRow, kind: 'in' | 'out' | 'unmark') => {
+    if (pendingIds.includes(row.id)) return;
     if (kind === 'unmark' && !confirm(`Clear ${row.user_name}'s attendance for ${date}?`)) return;
-    // Optimistic: flip the row instantly, roll back only if the server refuses.
-    const pageKey = ['attendance-register', date, query, classFilter, tab, statusFilter, register.page, register.limit];
-    const now = new Date().toISOString();
+
+    // Optimistic: write the new row into every cached page for this date, so the
+    // change is already visible when the user navigates or switches filters.
+    const prefix = ['attendance-register', date];
+    const snapshots = qc.getQueriesData<RegisterPage>({ queryKey: prefix });
+    const now = new Date();
     const optimisticRow: RegisterRow =
       kind === 'in'
-        ? { ...row, status: 'IN', record: { checkInAt: now, checkOutAt: null } }
+        ? { ...row, status: 'IN', record: { checkInAt: now.toISOString(), checkOutAt: null } }
         : kind === 'out'
-          ? { ...row, status: 'OUT', record: { checkInAt: row.record?.checkInAt ?? now, checkOutAt: now } }
+          ? { ...row, status: 'OUT', record: { checkInAt: row.record?.checkInAt ?? now.toISOString(), checkOutAt: now.toISOString() } }
           : { ...row, status: 'ABSENT', record: null };
-    const snapshot = qc.getQueryData<{ data: RegisterRow[] }>(pageKey);
-    qc.setQueryData<{ data: RegisterRow[] }>(pageKey, (old) =>
-      old ? { ...old, data: old.data.map((r) => (r.id === row.id ? optimisticRow : r)) } : old,
-    );
-    setRowBusy(row.id);
+
+    for (const [key, page] of snapshots) {
+      if (!page || !page.data.some((r) => r.id === row.id)) continue;
+      // If this cached page is filtered by status, and the new status no longer
+      // matches, drop the row now instead of waiting for the refetch.
+      const pageStatus = String(key[5] ?? '');
+      const leavesFilter = pageStatus !== '' && pageStatus !== optimisticRow.status;
+      const data = leavesFilter
+        ? page.data.filter((r) => r.id !== row.id)
+        : page.data.map((r) => (r.id === row.id ? optimisticRow : r));
+      qc.setQueryData<RegisterPage>(key, {
+        ...page,
+        data,
+        meta: leavesFilter && page.meta
+          ? { ...page.meta, total: Math.max(0, page.meta.total - 1) }
+          : page.meta,
+      });
+    }
+
+    setPendingIds((prev) => [...prev, row.id]);
     setNotice(null);
+    const clock = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setNotice({
+      text: kind === 'in'
+        ? `${row.user_name} checked in at ${clock}.`
+        : kind === 'out'
+          ? `${row.user_name} checked out at ${clock}.`
+          : `Cleared ${row.user_name}'s attendance for ${date}.`,
+      tone: 'ok',
+    });
+
     try {
       if (kind === 'in') {
         await apiPost('/attendance/register/check-in', { userId: row.id, date });
-        setNotice(`${row.user_name} checked in at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`);
       } else if (kind === 'out') {
         await apiPost('/attendance/register/check-out', { userId: row.id, date });
-        setNotice(`${row.user_name} checked out.`);
       } else {
         await apiDelete(`/attendance/register/${row.id}?date=${date}`);
       }
-      register.invalidate();
+      // Confirm with the server in the background — no blocking spinner, no
+      // dimming; the optimistic rows stay interactive while this runs.
+      void qc.invalidateQueries({ queryKey: prefix, refetchType: 'active' });
     } catch (err: any) {
-      // Roll back the optimistic flip so the row shows the server truth.
-      qc.setQueryData(pageKey, snapshot);
-      setNotice(err?.message ?? 'Action failed');
+      // Roll back every optimistic page so the UI matches the server again.
+      for (const [key, page] of snapshots) {
+        if (page) qc.setQueryData(key, page);
+      }
+      setNotice({ text: err?.message ?? 'Action failed', tone: 'error' });
     } finally {
-      setRowBusy(null);
+      setPendingIds((prev) => prev.filter((id) => id !== row.id));
     }
   };
 
@@ -202,10 +260,25 @@ export const AdminAttendancePage = () => {
           </button>
         }
       />
-      {notice && <p role="status" className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
+      {notice && (
+        <p
+          role="status"
+          aria-live="polite"
+          className={`border-l-2 px-4 py-3 text-sm ${
+            notice.tone === 'error'
+              ? 'border-rose-400 bg-rose-50 text-rose-800'
+              : 'border-lime-accent bg-brand-50 text-brand-800'
+          }`}
+        >
+          {notice.text}
+        </p>
+      )}
 
       <Card>
-        <CardHead title={`${tab === 'STUDENT' ? 'Pupil' : 'Staff'} register`} sub={`${register.total} shown · ${date}`} />
+        <CardHead
+          title={`${tab === 'STUDENT' ? 'Pupil' : 'Staff'} register`}
+          sub={`${register.total} shown · ${date}${register.isFetching && !register.isPending ? ' · updating…' : ''}`}
+        />
         <div className="flex flex-wrap items-end gap-2 border-b border-line px-5 py-4">
           <div className="flex gap-1 rounded border border-line p-1" role="group" aria-label="Register tab">
             {(['STUDENT', 'STAFF'] as Tab[]).map((t) => (
@@ -258,7 +331,7 @@ export const AdminAttendancePage = () => {
           </label>
           <button
             type="button"
-            onClick={() => { setQuery(search); register.resetPage(); }}
+            onClick={() => { setQuery(search.trim()); register.resetPage(); }}
             className="min-h-11 rounded bg-brand-900 px-4 text-sm font-bold text-white hover:bg-brand-700"
           >
             Search
@@ -279,7 +352,7 @@ export const AdminAttendancePage = () => {
         ) : (
           <>
             <TableWrap>
-              <table className={`w-full min-w-[760px] text-left text-sm transition-opacity ${register.isFetching ? 'opacity-60' : ''}`}>
+              <table className="w-full min-w-[760px] text-left text-sm">
                 <thead>
                   <tr>
                     <Th>Name</Th>
@@ -292,7 +365,7 @@ export const AdminAttendancePage = () => {
                 </thead>
                 <tbody>
                   {register.rows.map((r) => (
-                    <tr key={r.id}>
+                    <tr key={r.id} aria-busy={pendingIds.includes(r.id)}>
                       <Td>
                         <span className="flex items-center gap-2.5">
                           <PersonPhoto row={r} />
@@ -309,17 +382,17 @@ export const AdminAttendancePage = () => {
                       <Td>
                         <span className="flex gap-1.5">
                           {r.status === 'ABSENT' && (
-                            <button type="button" disabled={rowBusy === r.id} onClick={() => act(r, 'in')} className="inline-flex items-center gap-1.5 rounded bg-brand-500 px-3.5 py-2 text-xs font-bold text-white hover:bg-brand-700 disabled:opacity-60">
+                            <button type="button" disabled={pendingIds.includes(r.id)} onClick={() => act(r, 'in')} className="inline-flex items-center gap-1.5 rounded bg-brand-500 px-3.5 py-2 text-xs font-bold text-white hover:bg-brand-700 disabled:opacity-60">
                               <LogIn aria-hidden="true" size={14} /> Check in
                             </button>
                           )}
                           {r.status === 'IN' && (
-                            <button type="button" disabled={rowBusy === r.id} onClick={() => act(r, 'out')} className="inline-flex items-center gap-1.5 rounded bg-brand-900 px-3.5 py-2 text-xs font-bold text-white hover:bg-brand-700 disabled:opacity-60">
+                            <button type="button" disabled={pendingIds.includes(r.id)} onClick={() => act(r, 'out')} className="inline-flex items-center gap-1.5 rounded bg-brand-900 px-3.5 py-2 text-xs font-bold text-white hover:bg-brand-700 disabled:opacity-60">
                               <LogOut aria-hidden="true" size={14} /> Check out
                             </button>
                           )}
                           {r.status !== 'ABSENT' && (
-                            <button type="button" disabled={rowBusy === r.id} onClick={() => act(r, 'unmark')} title="Clear this day" aria-label={`Clear ${r.user_name}'s attendance`} className="rounded border border-line px-2.5 py-2 text-xs font-bold text-muted hover:border-rose-300 hover:text-rose-700 disabled:opacity-60">
+                            <button type="button" disabled={pendingIds.includes(r.id)} onClick={() => act(r, 'unmark')} title="Clear this day" aria-label={`Clear ${r.user_name}'s attendance`} className="rounded border border-line px-2.5 py-2 text-xs font-bold text-muted hover:border-rose-300 hover:text-rose-700 disabled:opacity-60">
                               <Undo2 aria-hidden="true" size={14} />
                             </button>
                           )}
@@ -337,7 +410,7 @@ export const AdminAttendancePage = () => {
               limit={register.limit}
               onPage={register.setPage}
               onLimit={register.setLimit}
-              disabled={register.isFetching}
+              disabled={register.isPending}
               noun="people"
             />
           </>
