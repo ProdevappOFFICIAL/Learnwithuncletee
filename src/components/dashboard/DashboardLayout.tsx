@@ -284,7 +284,9 @@ export const DashboardLayout = ({ role, nav }: Props) => {
       ? `${user.student.className} · ${user.student.studentCode}`
       : user?.role === 'TEACHER' && user.teacher
         ? `${user.teacher.department ?? 'Teacher'} · ${user.teacher.staffCode}`
-        : (user?.role ?? 'Guest');
+        : user?.admin
+          ? `${user.admin.department ?? user.role} · ${user.admin.staffCode}`
+          : (user?.role ?? 'Guest');
   const initials = user ? initialsOf(user.user_name) : meta.title.slice(0, 2).toUpperCase();
   const avatar = avatarOf(user);
 

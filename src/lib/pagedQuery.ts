@@ -86,6 +86,8 @@ export function usePagedList<T>(
     isPending: query.isPending,
     isError: query.isError,
     isFetching: query.isFetching,
+    /** True while the visible rows still belong to the previous page/filter. */
+    isPlaceholderData: query.isPlaceholderData,
     refetch: query.refetch,
     invalidate: () => qc.invalidateQueries({ queryKey: JSON.parse(keyJson) as Array<string | number> }),
   };

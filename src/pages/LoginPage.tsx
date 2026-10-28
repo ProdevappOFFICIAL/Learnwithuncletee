@@ -1,27 +1,28 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ROUTES } from '@/routes/paths';
 import { siteInfo } from '@/data/content';
 import { PageMetadata } from '@/components/ui/PageMetadata';
 import { ChevronLeft } from 'lucide-react';
-import { useAuth, avatarOf } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 import { apiPost } from '@/lib/api';
 
 const inputClass = 'mt-2 min-h-12 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100';
 
-const homeForRole = (role: string) =>
-  role === 'STUDENT' || role === 'PARENT'
-    ? ROUTES.studentDashboard
-    : role === 'TEACHER'
-      ? ROUTES.teacherDashboard
-      : ROUTES.adminDashboard;
+const homeForRole = (role: string) => {
+  if (role === 'STUDENT' || role === 'PARENT') return ROUTES.studentDashboard;
+  if (role === 'TEACHER') return ROUTES.teacherDashboard;
+  // ADMIN, OWNER and MEMBER all use the admin dashboard shell.
+  return ROUTES.adminDashboard;
+};
 
 type Mode = 'login' | 'signup' | 'recovery';
-type RoleHint = 'STUDENT' | 'TEACHER' | 'ADMIN';
+type RoleHint = 'STUDENT' | 'TEACHER' | 'MEMBER' | 'ADMIN';
 
 const ROLES: { value: RoleHint; label: string; placeholder: string; fieldLabel: string }[] = [
   { value: 'STUDENT', label: 'Student', placeholder: 'Admission no or email',  fieldLabel: 'Admission No / Email' },
   { value: 'TEACHER', label: 'Teacher', placeholder: 'Staff code or email',    fieldLabel: 'Staff Code / Email'   },
+  { value: 'MEMBER',  label: 'Member',  placeholder: 'Staff code or email',    fieldLabel: 'Staff Code / Email'   },
   { value: 'ADMIN',   label: 'Admin',   placeholder: 'Staff code or email',    fieldLabel: 'Staff Code / Email'   },
 ];
 
@@ -31,8 +32,7 @@ export const LoginPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [forceForm, setForceForm] = useState(false);
-  const { login, logout, user, loading: sessionLoading } = useAuth();
+  const { login, user, loading: sessionLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const fromDesktop = searchParams.get('source') === 'desktop';
@@ -40,6 +40,19 @@ export const LoginPage = () => {
   const switchMode = (m: Mode) => { setMode(m); setError(null); setSuccess(null); };
 
   const currentRole = ROLES.find((r) => r.value === roleHint) ?? ROLES[0];
+
+  // Already signed in? Never show the credential form again — send the account
+  // to the dashboard for its actual role (or the desktop hand-off page).
+  const redirectTo = user
+    ? fromDesktop
+      ? ROUTES.connectDesktop
+      : homeForRole(user.role)
+    : null;
+
+  useEffect(() => {
+    if (sessionLoading || !redirectTo || mode !== 'login') return;
+    navigate(redirectTo, { replace: true });
+  }, [sessionLoading, redirectTo, mode, navigate]);
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -56,7 +69,6 @@ export const LoginPage = () => {
     setBusy(true);
     try {
       const me = await login(identity, password, { remember, role: roleHint });
-      setForceForm(false);
       // Desktop connect flow: the app opened /login?source=desktop — hand off
       // to the exchange-code page instead of the role dashboard.
       navigate(fromDesktop ? ROUTES.connectDesktop : homeForRole(me.role));
@@ -137,9 +149,9 @@ export const LoginPage = () => {
             </p>
 
             {/* ── Role picker (login + recovery only) ── */}
-            {(mode === 'login' || mode === 'recovery') && (
+            {(mode === 'login' || mode === 'recovery') && !(user && mode === 'login') && (
               <div
-                className="mt-6 grid grid-cols-3 gap-1 rounded-lg border border-line bg-white p-1"
+                className="mt-6 grid grid-cols-2 gap-1 rounded-lg border border-line bg-white p-1 sm:grid-cols-4"
                 role="group"
                 aria-label="Select your role"
               >
@@ -149,7 +161,10 @@ export const LoginPage = () => {
                     id={`role-btn-${r.value.toLowerCase()}`}
                     type="button"
                     aria-pressed={roleHint === r.value}
-                    onClick={() => setRoleHint(r.value)}
+                    onClick={() => {
+                      setRoleHint(r.value);
+                      setError(null);
+                    }}
                     className={`rounded-md py-2.5 text-sm font-bold transition-all duration-150 ${
                       roleHint === r.value
                         ? 'bg-brand-900 text-white shadow-sm'
@@ -170,38 +185,12 @@ export const LoginPage = () => {
                 <div className="h-12 rounded bg-brand-500/40" />
               </div>
 
-            ) : user && mode === 'login' && !forceForm ? (
-              /* ── Already signed-in card ── */
-              <div className="mt-8 space-y-4">
-                <button
-                  type="button"
-                  onClick={() => navigate(fromDesktop ? ROUTES.connectDesktop : homeForRole(user.role))}
-                  className="flex w-full items-center gap-4 rounded border border-line bg-white p-4 text-left transition-colors hover:border-brand-500"
-                >
-                  {avatarOf(user) ? (
-                    <img src={avatarOf(user) as string} alt="" className="h-12 w-12 rounded-full object-cover" />
-                  ) : (
-                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-900 text-sm font-extrabold text-lime-accent">
-                      {user.user_name.split(' ').map((p) => p.replace('.', '')[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'LW'}
-                    </span>
-                  )}
-                  <span className="min-w-0">
-                    <span className="block text-sm font-bold text-brand-700">Continue as {user.user_email}</span>
-                    <span className="block truncate text-xs text-muted">{user.user_name} · {user.role.charAt(0) + user.role.slice(1).toLowerCase()}</span>
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await logout();
-                    // Show the credential inputs immediately — don't wait for
-                    // any background session re-resolution.
-                    setForceForm(true);
-                  }}
-                  className="w-full text-center text-sm font-semibold text-brand-700 underline underline-offset-4"
-                >
-                  Use a different account
-                </button>
+            ) : user && mode === 'login' ? (
+              /* ── Session already active: the effect above is redirecting ── */
+              <div className="mt-8 animate-pulse space-y-5" aria-label="Redirecting to your dashboard">
+                <div className="h-12 rounded bg-brand-50" />
+                <div className="h-12 rounded bg-brand-50" />
+                <p className="text-sm font-semibold text-muted">Taking you to your dashboard…</p>
               </div>
 
             ) : mode === 'signup' ? (

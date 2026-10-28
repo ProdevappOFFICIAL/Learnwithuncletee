@@ -177,9 +177,16 @@ export const AdminAttendancePage = () => {
     if (pendingIds.includes(row.id)) return;
     if (kind === 'unmark' && !confirm(`Clear ${row.user_name}'s attendance for ${date}?`)) return;
 
+    const prefix = ['attendance-register', date];
+    setPendingIds((prev) => [...prev, row.id]);
+    setNotice(null);
+
+    // Stop any background refresh for this date before editing the cache, so a
+    // slow response can't overwrite the optimistic row while the write is in flight.
+    await qc.cancelQueries({ queryKey: prefix });
+
     // Optimistic: write the new row into every cached page for this date, so the
     // change is already visible when the user navigates or switches filters.
-    const prefix = ['attendance-register', date];
     const snapshots = qc.getQueriesData<RegisterPage>({ queryKey: prefix });
     const now = new Date();
     const optimisticRow: RegisterRow =
@@ -207,8 +214,6 @@ export const AdminAttendancePage = () => {
       });
     }
 
-    setPendingIds((prev) => [...prev, row.id]);
-    setNotice(null);
     const clock = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setNotice({
       text: kind === 'in'
@@ -246,6 +251,23 @@ export const AdminAttendancePage = () => {
     setClassFilter('');
     setStatusFilter('');
     register.resetPage();
+  };
+
+  // Hovering a tab warms its first page, so the switch paints instantly.
+  const prefetchTab = (next: Tab) => {
+    if (next === tab) return;
+    void qc.prefetchQuery({
+      queryKey: ['attendance-register', date, query, '', next, '', 1, register.limit],
+      queryFn: () =>
+        apiGet<RegisterRow[]>('/attendance/register', {
+          date,
+          search: query || undefined,
+          role: next,
+          page: 1,
+          limit: register.limit,
+        }),
+      staleTime: 60 * 1000,
+    });
   };
 
   return (
@@ -286,6 +308,8 @@ export const AdminAttendancePage = () => {
                 key={t}
                 type="button"
                 onClick={() => switchTab(t)}
+                onMouseEnter={() => prefetchTab(t)}
+                onFocus={() => prefetchTab(t)}
                 aria-pressed={tab === t}
                 className={`min-h-10 rounded px-4 py-1.5 text-xs font-bold ${tab === t ? 'bg-brand-900 text-white' : 'text-muted hover:text-ink'}`}
               >
@@ -307,6 +331,13 @@ export const AdminAttendancePage = () => {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  setQuery(search.trim());
+                  register.setPage(1);
+                }
+              }}
               placeholder="Search name or email…"
               className="mt-1 block min-h-11 w-full min-w-44 rounded border border-line px-3 text-sm font-semibold outline-none focus:border-brand-500"
             />
@@ -343,9 +374,22 @@ export const AdminAttendancePage = () => {
           )}
         </div>
 
+        {register.isError && register.rows.length > 0 && (
+          <div role="alert" className="flex flex-wrap items-center gap-2 border-b border-rose-200 bg-rose-50 px-5 py-2.5 text-xs text-rose-800">
+            <span>Couldn't refresh the register — showing the last known rows.</span>
+            <button
+              type="button"
+              onClick={() => register.refetch()}
+              className="font-bold underline underline-offset-2 hover:text-rose-900"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {register.isPending ? (
           <div className="px-5 py-5"><LoadingSkeleton rows={5} /></div>
-        ) : register.isError ? (
+        ) : register.isError && register.rows.length === 0 ? (
           <div className="px-5 py-5"><ErrorState message="Could not load register" onRetry={() => register.refetch()} /></div>
         ) : register.rows.length === 0 ? (
           <div className="px-5 py-5"><EmptyState message={query ? 'Nobody matches your search.' : 'Nobody on the register yet.'} /></div>
@@ -365,7 +409,7 @@ export const AdminAttendancePage = () => {
                 </thead>
                 <tbody>
                   {register.rows.map((r) => (
-                    <tr key={r.id} aria-busy={pendingIds.includes(r.id)}>
+                    <tr key={r.id} aria-busy={register.isPlaceholderData || pendingIds.includes(r.id)}>
                       <Td>
                         <span className="flex items-center gap-2.5">
                           <PersonPhoto row={r} />
@@ -382,17 +426,17 @@ export const AdminAttendancePage = () => {
                       <Td>
                         <span className="flex gap-1.5">
                           {r.status === 'ABSENT' && (
-                            <button type="button" disabled={pendingIds.includes(r.id)} onClick={() => act(r, 'in')} className="inline-flex items-center gap-1.5 rounded bg-brand-500 px-3.5 py-2 text-xs font-bold text-white hover:bg-brand-700 disabled:opacity-60">
+                            <button type="button" disabled={register.isPlaceholderData || pendingIds.includes(r.id)} onClick={() => act(r, 'in')} className="inline-flex items-center gap-1.5 rounded bg-brand-500 px-3.5 py-2 text-xs font-bold text-white hover:bg-brand-700 disabled:opacity-60">
                               <LogIn aria-hidden="true" size={14} /> Check in
                             </button>
                           )}
                           {r.status === 'IN' && (
-                            <button type="button" disabled={pendingIds.includes(r.id)} onClick={() => act(r, 'out')} className="inline-flex items-center gap-1.5 rounded bg-brand-900 px-3.5 py-2 text-xs font-bold text-white hover:bg-brand-700 disabled:opacity-60">
+                            <button type="button" disabled={register.isPlaceholderData || pendingIds.includes(r.id)} onClick={() => act(r, 'out')} className="inline-flex items-center gap-1.5 rounded bg-brand-900 px-3.5 py-2 text-xs font-bold text-white hover:bg-brand-700 disabled:opacity-60">
                               <LogOut aria-hidden="true" size={14} /> Check out
                             </button>
                           )}
                           {r.status !== 'ABSENT' && (
-                            <button type="button" disabled={pendingIds.includes(r.id)} onClick={() => act(r, 'unmark')} title="Clear this day" aria-label={`Clear ${r.user_name}'s attendance`} className="rounded border border-line px-2.5 py-2 text-xs font-bold text-muted hover:border-rose-300 hover:text-rose-700 disabled:opacity-60">
+                            <button type="button" disabled={register.isPlaceholderData || pendingIds.includes(r.id)} onClick={() => act(r, 'unmark')} title="Clear this day" aria-label={`Clear ${r.user_name}'s attendance`} className="rounded border border-line px-2.5 py-2 text-xs font-bold text-muted hover:border-rose-300 hover:text-rose-700 disabled:opacity-60">
                               <Undo2 aria-hidden="true" size={14} />
                             </button>
                           )}

@@ -5,8 +5,14 @@ import { queryClient } from '@/lib/queryClient';
 
 
 /** Preferred avatar: role profile photo first, then account image. */
-export const avatarOf = (user: Pick<SessionUser, 'img' | 'student' | 'teacher'> | null | undefined) =>
-  user?.student?.photoUrl || user?.teacher?.photoUrl || user?.img || null;
+export const avatarOf = (
+  user: Pick<SessionUser, 'img' | 'student' | 'teacher' | 'admin'> | null | undefined,
+) =>
+  user?.student?.photoUrl ||
+  user?.teacher?.photoUrl ||
+  user?.admin?.photoUrl ||
+  user?.img ||
+  null;
 
 export interface SessionUser {
   id: string;
@@ -17,8 +23,25 @@ export interface SessionUser {
   workspaceId?: string;
   student?: { studentCode: string; className: string; photoUrl?: string | null } | null;
   teacher?: { staffCode: string; department?: string; photoUrl?: string | null } | null;
+  admin?: { staffCode: string; department?: string; photoUrl?: string | null } | null;
   permissions: string[];
 }
+
+/**
+ * Role hint → role-scoped login route. The server enforces the scope, so a
+ * student ID cannot sign in through the admin/member/teacher tabs.
+ */
+const LOGIN_ENDPOINTS: Record<string, string> = {
+  STUDENT: '/auth/login/student',
+  PARENT: '/auth/login/student',
+  TEACHER: '/auth/login/teacher',
+  MEMBER: '/auth/login/member',
+  ADMIN: '/auth/login/admin',
+  OWNER: '/auth/login/admin',
+};
+
+const loginEndpointFor = (role?: string) =>
+  LOGIN_ENDPOINTS[String(role ?? '').trim().toUpperCase()] ?? '/auth/login';
 
 interface AuthState {
   user: SessionUser | null;
@@ -76,17 +99,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   });
 
   const login = useCallback(async (identity: string, password: string, opts?: { remember?: boolean; role?: string }) => {
-    const { data } = await apiPost<{ user: any; accessToken: string; refreshToken?: string }>('/auth/login', {
-      user_email: identity,
-      user_password: password,
-      ...(opts?.role ? { role: opts.role } : {}),
-    });
+    // Scoped route: the selected tab determines which role model is searched.
+    const { data } = await apiPost<{ user: any; accessToken: string; refreshToken?: string }>(
+      loginEndpointFor(opts?.role),
+      {
+        user_email: identity,
+        user_password: password,
+        ...(opts?.role ? { role: opts.role } : {}),
+      },
+    );
     const persistent = opts?.remember ?? true;
     tokenStore.set(data.accessToken, persistent);
     // Stored refresh token keeps silent refresh working even where the
     // HttpOnly cookie is blocked (plain-http dev, 3P-cookie blocking).
     if (data.refreshToken) refreshTokenStore.set(data.refreshToken, persistent);
-    const me = await fetchMe();
+    // The login response already carries the role profile + permissions, so
+    // seed the session cache without a second round trip. Fall back to
+    // /dashboard/me for older servers that omit the permission list.
+    const me: SessionUser | null = data.user?.permissions
+      ? (data.user as SessionUser)
+      : await fetchMe();
     if (!me) throw new Error('Sign-in succeeded but the session could not be verified.');
     // Instant UI: seed the cache so protected routes render without a flash.
     queryClient.setQueryData(SESSION_KEY, me);

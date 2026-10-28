@@ -3,12 +3,12 @@ import type { ReactNode } from 'react';
 import { ROUTES } from './paths';
 import { useAuth } from '@/context/AuthContext';
 
-const homeForRole = (role: string) =>
-  role === 'STUDENT' || role === 'PARENT'
-    ? ROUTES.studentDashboard
-    : role === 'TEACHER'
-      ? ROUTES.teacherDashboard
-      : ROUTES.adminDashboard;
+const homeForRole = (role: string) => {
+  if (role === 'STUDENT' || role === 'PARENT') return ROUTES.studentDashboard;
+  if (role === 'TEACHER') return ROUTES.teacherDashboard;
+  // ADMIN, OWNER and MEMBER all use the admin dashboard shell.
+  return ROUTES.adminDashboard;
+};
 
 /**
  * Blocks guests from protected areas. While the session is being resolved,
