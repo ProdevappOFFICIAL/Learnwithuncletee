@@ -322,8 +322,12 @@ export const DashboardLayout = ({ role, nav }: Props) => {
   };
 
   const handleLogout = async () => {
-    await logout();
-    navigate(ROUTES.login);
+    try {
+      await logout();
+    } finally {
+      // `replace` keeps the back button from returning to the old dashboard.
+      navigate(ROUTES.login, { replace: true });
+    }
   };
 
   const sidebar = (isCollapsed: boolean) => (

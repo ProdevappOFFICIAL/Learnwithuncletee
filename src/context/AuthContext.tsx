@@ -98,6 +98,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     refetchOnWindowFocus: false,
   });
 
+  // Hard local switch. React Query can briefly retain the previous user while
+  // queries are removed/refetched, and an in-flight /dashboard/me can resolve
+  // after logout. This flag makes every consumer see "signed out" immediately,
+  // so /login never bounces a just-logged-out user back to their old dashboard.
+  const [signedOut, setSignedOut] = useState(false);
+
   const login = useCallback(async (identity: string, password: string, opts?: { remember?: boolean; role?: string }) => {
     // Scoped route: the selected tab determines which role model is searched.
     const { data } = await apiPost<{ user: any; accessToken: string; refreshToken?: string }>(
@@ -120,44 +126,64 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       ? (data.user as SessionUser)
       : await fetchMe();
     if (!me) throw new Error('Sign-in succeeded but the session could not be verified.');
-    // Instant UI: seed the cache so protected routes render without a flash.
+    // Instant UI: seed the cache so protected routes render without a flash,
+    // and only now lift the logout barrier.
     queryClient.setQueryData(SESSION_KEY, me);
+    setSignedOut(false);
     return me;
   }, []);
 
   const logout = useCallback(async () => {
-    // Instant UI first: drop the saved user synchronously so signed-in
-    // cards/buttons vanish immediately, then revoke + scrub storage.
-    queryClient.setQueryData(SESSION_KEY, null);
-    try {
-      // Send the stored refresh token too: the backend revokes by body token
-      // when the HttpOnly cookie is unavailable.
-      await apiPost('/auth/logout', { refreshToken: refreshTokenStore.get() ?? undefined });
-    } catch {
-      /* still clear locally */
-    }
+    // Local logout first: block every consumer immediately, scrub the stored
+    // credentials, and stop in-flight session checks. A late /dashboard/me
+    // response must never restore the account we just left.
+    setSignedOut(true);
+    const refreshToken = refreshTokenStore.get() ?? undefined;
     tokenStore.clear();
     refreshTokenStore.clear();
-    await queryClient.cancelQueries({ queryKey: SESSION_KEY });
-    queryClient.removeQueries({ queryKey: SESSION_KEY });
+    await queryClient.cancelQueries();
+    queryClient.setQueryData(SESSION_KEY, null);
+    // Drop every cached query (dashboard lists, notifications, …) so the next
+    // account can never see the previous user's data. Re-seed the session as
+    // logged out afterwards; the AuthProvider observes that key.
+    queryClient.removeQueries();
+    queryClient.setQueryData(SESSION_KEY, null);
+    // Revoke the server session in the background — local logout must not
+    // wait on the network, and the captured token still identifies the old
+    // session even though it is gone from storage.
+    void apiPost('/auth/logout', { refreshToken }).catch(() => {
+      /* best effort — local session is already gone */
+    });
   }, []);
 
   const refresh = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: SESSION_KEY });
   }, []);
 
+  // Consumers never see a user while the local logout barrier is up, even if
+  // an old query result is still lingering in memory.
+  const currentUser = signedOut ? null : user;
+
   const can = useCallback(
     (permission: string) => {
-      if (!user) return false;
-      if (user.role === 'ADMIN' || user.role === 'OWNER') return true;
-      return user.permissions.includes(permission);
+      if (!currentUser) return false;
+      if (currentUser.role === 'ADMIN' || currentUser.role === 'OWNER') return true;
+      return currentUser.permissions.includes(permission);
     },
-    [user],
+    [currentUser],
   );
 
   const value = useMemo(
-    () => ({ user, loading, error: queryError ? 'Session expired' : null, login, logout, refresh, can }),
-    [user, loading, queryError, login, logout, refresh, can],
+    () => ({
+      user: currentUser,
+      loading: signedOut ? false : loading,
+      error: queryError && !signedOut ? 'Session expired' : null,
+      login,
+      logout,
+      refresh,
+      can,
+    }),
+    [currentUser, signedOut, loading, queryError, login, logout, refresh, can],
   );
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
