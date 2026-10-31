@@ -206,8 +206,8 @@ export default function StudentIDCard({
 
                 {/* ---------- Contact lines ---------- */}
                 <div className="absolute left-[18.2%] top-[28.3%] whitespace-nowrap font-medium leading-[2.88cqw] text-[#111] text-[length:2cqw]">
-                    <div>Facebook: UNCLE TEE Secondary school || YouTube: LearnWithUncletee</div>
-                    <div>Gmail: uncleteesecondaryschoolondo@gmail.com || Tel: 07039131494</div>
+                    <div>Facebook: LearnWithUncleTee || YouTube: LearnWithUncletee</div>
+                    <div>Gmail: info@learnwithuncletee.org || Tel: +2347039334594</div>
                 </div>
 
                 {/* ---------- School logo badge ---------- */}

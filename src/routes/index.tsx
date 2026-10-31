@@ -62,6 +62,7 @@ import { AllSubjectsPage } from '@/pages/dashboard/admin/AllSubjectsPage';
 import { AllQuestionsPage } from '@/pages/dashboard/admin/AllQuestionsPage';
 import { AdminCombinationPage } from '@/pages/dashboard/admin/AdminCombinationPage';
 import { DeploymentsPage } from '@/pages/dashboard/admin/DeploymentsPage';
+import { AdminDeploymentSecurity } from '@/pages/dashboard/admin/AdminDeploymentSecurity';
 import { ClassExamsPage } from '@/pages/dashboard/admin/ClassExamsPage';
 import { ExamSubjectsPage } from '@/pages/dashboard/admin/ExamSubjectsPage';
 import { SubjectQuestionsPage } from '@/pages/dashboard/admin/SubjectQuestionsPage';
@@ -180,6 +181,7 @@ const appRoutes = [
           { path: 'exams/questions', element: <AllQuestionsPage /> },
           { path: 'exams/combinations', element: <AdminCombinationPage /> },
           { path: 'exams/deployments', element: <DeploymentsPage /> },
+          { path: 'exams/deployment-security', element: <AdminDeploymentSecurity /> },
           { path: 'exams/results', element: <ExamTestResultsPage origin="ONLINE" /> },
           { path: 'exams/results/offline', element: <ExamTestResultsPage origin="OFFLINE" /> },
           { path: 'exams/sessions', element: <AdminSessionOnline /> },

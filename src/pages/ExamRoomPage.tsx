@@ -396,24 +396,79 @@ export const ExamRoomPage = () => {
     return () => window.clearTimeout(t);
   }, [secondsLeft, submitted]);
 
-  // ── Online session heartbeat (every 30 s): persist answers + timer to DB ────
-  // Placed after secondsLeft state so all referenced vars are in scope.
+  // ── Session activity tracking ──────────────────────────────────────────────
+  // Every meaningful interaction (previous / next / option / calculator /
+  // typed answer) writes a snapshot immediately; a 30 s heartbeat keeps the
+  // timer fresh for pupils who sit still.
+  const progressRef = useRef({ picked, typed, currentQ, secondsLeft });
   useEffect(() => {
-    if (!userId || !exam?.id || submitted) return;
-    const tick = () => {
-      const combinedAnswers: Record<string, any> = {};
-      for (const [qId, idx] of Object.entries(picked)) combinedAnswers[qId] = idx;
-      for (const [qId, text] of Object.entries(typed)) combinedAnswers[qId] = text;
+    progressRef.current = { picked, typed, currentQ, secondsLeft };
+  }, [picked, typed, currentQ, secondsLeft]);
+
+  const flushProgress = useCallback(
+    (
+      action: string,
+      overrides?: Partial<{
+        picked: Record<string, number | null>;
+        typed: Record<string, string>;
+        currentQ: number;
+        secondsLeft: number;
+      }>,
+    ) => {
+      if (!userId || !exam?.id || submitted) return;
+      const snapshot = { ...progressRef.current, ...overrides };
+      progressRef.current = snapshot;
+      const answers: Record<string, any> = {};
+      for (const [qId, idx] of Object.entries(snapshot.picked)) answers[qId] = idx;
+      for (const [qId, text] of Object.entries(snapshot.typed)) answers[qId] = text;
       apiPost('/exam-sessions/online/save-progress', {
         userId,
         examId: exam.id,
-        answers: combinedAnswers,
-        timeLeft: secondsLeft,
-      }).catch(() => { /* non-blocking heartbeat */ });
-    };
-    const interval = window.setInterval(tick, 30_000);
+        answers,
+        timeLeft: snapshot.secondsLeft,
+        currentQuestion: snapshot.currentQ,
+        action,
+      }).catch(() => { /* non-blocking activity log */ });
+    },
+    [userId, exam?.id, submitted],
+  );
+
+  useEffect(() => {
+    if (!userId || !exam?.id || submitted) return;
+    const interval = window.setInterval(() => flushProgress('HEARTBEAT'), 30_000);
     return () => window.clearInterval(interval);
-  }, [userId, exam?.id, submitted, picked, typed, secondsLeft]);
+  }, [userId, exam?.id, submitted, flushProgress]);
+
+  // Typed answers are debounced so every keystroke does not hit the API.
+  const typingTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (typingTimer.current) window.clearTimeout(typingTimer.current);
+    },
+    [],
+  );
+
+  const trackTyped = useCallback(
+    (questionId: string, value: string) => {
+      const nextTyped = { ...progressRef.current.typed, [questionId]: value };
+      progressRef.current = { ...progressRef.current, typed: nextTyped };
+      setTyped(nextTyped);
+      if (typingTimer.current) window.clearTimeout(typingTimer.current);
+      typingTimer.current = window.setTimeout(() => flushProgress('TYPING', { typed: nextTyped }), 700);
+    },
+    [flushProgress],
+  );
+
+  /** Pick an option and immediately persist the choice + current question. */
+  const chooseOption = useCallback(
+    (questionId: string, optionIndex: number) => {
+      const nextPicked = { ...progressRef.current.picked, [questionId]: optionIndex };
+      progressRef.current = { ...progressRef.current, picked: nextPicked };
+      setPicked(nextPicked);
+      flushProgress('OPTION', { picked: nextPicked });
+    },
+    [flushProgress],
+  );
 
   // ── Anti-cheat: tab-switch / visibility / beforeunload ──────────────────────
   const violationsRef = useRef(0);
@@ -563,15 +618,28 @@ export const ExamRoomPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [secondsLeft]);
 
-  const goTo = useCallback((idx: number) => {
+  const goTo = useCallback((idx: number, action = 'JUMP') => {
+    const next = Math.max(0, Math.min(questions.length - 1, idx));
     setAttachOpen(false);
-    setCurrentQ(Math.max(0, Math.min(questions.length - 1, idx)));
+    setCurrentQ(next);
+    progressRef.current = { ...progressRef.current, currentQ: next };
+    flushProgress(action, { currentQ: next });
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [questions.length]);
+  }, [questions.length, flushProgress]);
 
   const goToSubject = (name: string) => {
     const idx = questions.findIndex((x) => (x.subject?.name ?? '') === name);
-    if (idx !== -1) goTo(idx);
+    if (idx !== -1) goTo(idx, 'SUBJECT');
+  };
+
+  const openCalculator = () => {
+    setCalcOpen(true);
+    flushProgress('CALCULATOR_OPEN');
+  };
+
+  const closeCalculator = () => {
+    setCalcOpen(false);
+    flushProgress('CALCULATOR_CLOSE');
   };
 
   // ── Keyboard shortcuts: A… selects options, P previous, N next ─────────────
@@ -599,7 +667,7 @@ export const ExamRoomPage = () => {
         if (k === 't' || k === 'f') {
           const oi = (optionsByQ[q.id] ?? []).indexOf(k === 't' ? 'True' : 'False');
           if (oi !== -1) {
-            setPicked((p) => ({ ...p, [q.id]: oi }));
+            chooseOption(q.id, oi);
             e.preventDefault();
           }
         }
@@ -609,22 +677,22 @@ export const ExamRoomPage = () => {
         const idx = k.charCodeAt(0) - 97;
         const opts = optionsByQ[q.id] ?? [];
         if (q.type !== 'FILL_IN_THE_BLANK' && idx < opts.length) {
-          setPicked((p) => ({ ...p, [q.id]: idx }));
+          chooseOption(q.id, idx);
           e.preventDefault();
         }
         return;
       }
       if (k === 'p') {
-        goTo(currentQ - 1);
+        goTo(currentQ - 1, 'PREVIOUS');
         return;
       }
       if (k === 'n') {
-        goTo(currentQ + 1);
+        goTo(currentQ + 1, 'NEXT');
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [submitted, calcOpen, warnOpen, confirmOpen, attachOpen, questions, currentQ, optionsByQ, goTo]);
+  }, [submitted, calcOpen, warnOpen, confirmOpen, attachOpen, questions, currentQ, optionsByQ, goTo, chooseOption]);
 
   // ── Guard: no session ───────────────────────────────────────────────────────
   if (!exam || !userId) {
@@ -671,7 +739,7 @@ export const ExamRoomPage = () => {
         description={`Sit ${exam.exam_name} online — answer and submit before time runs out.`}
       />
 
-      {calcOpen && <CalculatorDialog onClose={() => setCalcOpen(false)} />}
+      {calcOpen && <CalculatorDialog onClose={closeCalculator} />}
 
       {warnOpen && violationsRef.current < MAX_VIOLATIONS && (
         <WarningOverlay
@@ -716,7 +784,7 @@ export const ExamRoomPage = () => {
             <div className="flex flex-wrap items-center gap-2 sm:justify-end">
               <button
                 type="button"
-                onClick={() => setCalcOpen(true)}
+                onClick={openCalculator}
                 aria-label="Open calculator"
                 title="Calculator"
                 className="flex h-9 w-9 items-center justify-center rounded border border-line text-brand-800 transition-colors hover:bg-brand-50"
@@ -858,7 +926,7 @@ export const ExamRoomPage = () => {
                   <div>
                     <input
                       value={typed[q.id] ?? ''}
-                      onChange={(e) => setTyped({ ...typed, [q.id]: e.target.value })}
+                      onChange={(e) => trackTyped(q.id, e.target.value)}
                       placeholder="Type your answer here…"
                       aria-label={`Answer for question ${safeCurrent + 1}`}
                       className="w-full rounded border border-line bg-white p-4 text-sm outline-none transition-colors focus:border-brand-500 focus:bg-brand-50/40 focus:ring-1 focus:ring-brand-500"
@@ -879,7 +947,7 @@ export const ExamRoomPage = () => {
                           role="radio"
                           aria-checked={selected}
                           disabled={!available}
-                          onClick={() => setPicked({ ...picked, [q.id]: oi })}
+                          onClick={() => chooseOption(q.id, oi)}
                           className={`group flex w-full items-center gap-4 rounded border p-4 text-left transition-colors disabled:opacity-40 ${
                             selected
                               ? 'border-brand-500 bg-brand-50 text-brand-800'
@@ -910,7 +978,7 @@ export const ExamRoomPage = () => {
                           type="button"
                           role="radio"
                           aria-checked={selected}
-                          onClick={() => setPicked({ ...picked, [q.id]: oi })}
+                          onClick={() => chooseOption(q.id, oi)}
                           className={`group flex w-full items-center gap-4 rounded border p-4 text-left transition-colors ${
                             selected
                               ? 'border-brand-500 bg-brand-50 text-brand-800'
@@ -944,7 +1012,7 @@ export const ExamRoomPage = () => {
             <div className="flex flex-col gap-3 py-1 sm:flex-row sm:justify-between">
               <button
                 type="button"
-                onClick={() => goTo(safeCurrent - 1)}
+                onClick={() => goTo(safeCurrent - 1, 'PREVIOUS')}
                 disabled={isFirst}
                 title="Previous (P)"
                 className="flex items-center justify-center gap-2 rounded border border-line bg-white px-6 py-2.5 font-medium text-ink transition-colors hover:bg-cream disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
@@ -967,7 +1035,7 @@ export const ExamRoomPage = () => {
               ) : (
                 <button
                   type="button"
-                  onClick={() => goTo(safeCurrent + 1)}
+                  onClick={() => goTo(safeCurrent + 1, 'NEXT')}
                   title="Next (N)"
                   className="flex items-center justify-center gap-2 rounded bg-brand-500 px-6 py-2.5 font-medium text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
@@ -1015,7 +1083,7 @@ export const ExamRoomPage = () => {
                           <button
                             key={x.id}
                             type="button"
-                            onClick={() => goTo(i)}
+                            onClick={() => goTo(i, 'PALETTE')}
                             aria-label={`Go to question ${i + 1}${done ? ' (answered)' : ''}`}
                             aria-current={active ? 'step' : undefined}
                             className={`flex aspect-square w-full items-center justify-center rounded text-xs font-medium transition-colors ${

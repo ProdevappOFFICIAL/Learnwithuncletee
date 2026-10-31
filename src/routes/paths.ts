@@ -55,6 +55,7 @@ export const ROUTES = {
   adminAllQuestions: '/dashboard/admin/exams/questions',
   adminCombinations: '/dashboard/admin/exams/combinations',
   adminDeployments: '/dashboard/admin/exams/deployments',
+  adminDeploymentSecurity: '/dashboard/admin/exams/deployment-security',
   adminExamResults: '/dashboard/admin/exams/results',
   adminExamResultsOffline: '/dashboard/admin/exams/results/offline',
   adminSessionsOnline:   '/dashboard/admin/exams/sessions',

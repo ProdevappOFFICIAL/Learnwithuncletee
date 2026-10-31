@@ -20,6 +20,8 @@ interface SessionRow {
   overallScore?: number | null;
   startedAt?: string | null;
   lastActive?: string | null;
+  lastAction?: string | null;
+  currentQuestion?: number | null;
   user?: { id: string; user_name: string; user_email: string; class?: { name: string } | null };
   exam?: { id: string; exam_name: string; minutes: number };
   deployment?: { id: string; code: string } | null;
@@ -31,6 +33,15 @@ const fmtTime = (secs?: number | null) => {
   const m = Math.floor(secs / 60);
   const s = secs % 60;
   return `${m}m ${s}s`;
+};
+
+const actionLabel = (action?: string | null) => {
+  if (!action) return '—';
+  return action
+    .toLowerCase()
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 };
 
 export const AdminSessionOnline = () => {
@@ -120,6 +131,7 @@ export const AdminSessionOnline = () => {
                     <Th>Submitted</Th>
                     <Th>Marked</Th>
                     <Th>Last Active</Th>
+                    <Th>Activity</Th>
                     <Th><span className="sr-only">Actions</span></Th>
                   </tr>
                 </thead>
@@ -153,6 +165,18 @@ export const AdminSessionOnline = () => {
                           : <Pill tone="amber">Unmarked</Pill>}
                       </Td>
                       <Td className="text-muted text-xs">{r.lastActive ? new Date(r.lastActive).toLocaleString() : '—'}</Td>
+                      <Td className="text-xs">
+                        {r.lastAction ? (
+                          <span className="inline-flex flex-col">
+                            <span className="font-bold text-brand-700">{actionLabel(r.lastAction)}</span>
+                            {r.currentQuestion != null && (
+                              <span className="text-muted">Question {r.currentQuestion + 1}</span>
+                            )}
+                          </span>
+                        ) : (
+                          <span className="text-muted">—</span>
+                        )}
+                      </Td>
                       <Td>
                         <span className="flex items-center gap-1.5">
                           <button

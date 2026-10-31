@@ -20,6 +20,7 @@ import {
   ScrollText,
   Settings,
   ShieldAlert,
+  ShieldCheck,
   UserCog,
   Users,
   Video,
@@ -288,6 +289,12 @@ export const adminNav: DashboardNavItem[] = [
             to: ROUTES.adminDeployments,
             label: "All Deployments",
             icon: Rocket,
+            permission: "results.read",
+          },
+          {
+            to: ROUTES.adminDeploymentSecurity,
+            label: "Deployment Security",
+            icon: ShieldCheck,
             permission: "results.read",
           },
           {
@@ -710,4 +717,5 @@ export interface ExamDeploymentItem {
   status: "DRAFT" | "LIVE" | "ENDED";
   createdAt: string;
   exam?: { id: string; exam_name: string; minutes: number } | null;
+  deploymentSecurity?: { id: string; name: string; mode: "ONLINE" | "OFFLINE"; isDefault?: boolean } | null;
 }

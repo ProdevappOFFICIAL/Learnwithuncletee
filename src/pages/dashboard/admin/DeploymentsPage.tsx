@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, Modal, PageHeader, Pagination, Pill } from '@/components/dashboard/DashboardUI';
+import { ROUTES } from '@/routes/paths';
 import { useResource } from '@/context/AuthContext';
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { usePagedList } from '@/lib/pagedQuery';
 import type { ClassItem, ExamDeploymentItem, ExamItem, SubjectItem } from '@/data/dashboard';
-import { CheckSquare, Cloud, CloudOff, Copy, Play, Plus, Settings2, Square, Trash2 } from 'lucide-react';
+import type { DeploymentSecurityProfileItem } from '@/data/deploymentSecurity';
+import { CheckSquare, Cloud, CloudOff, Copy, Play, Plus, Settings2, ShieldCheck, Square, Trash2 } from 'lucide-react';
 
 type ModeFilter = '' | 'ONLINE' | 'OFFLINE';
 
@@ -33,6 +35,7 @@ export const DeploymentsPage = () => {
   const exams = useResource<ExamRow[]>('/exams', { limit: 200 });
   const classes = useResource<ClassItem[]>('/classes', { limit: 200 });
   const subjects = useResource<SubjectRow[]>('/subjects', { limit: 200 });
+  const securityProfiles = useResource<DeploymentSecurityProfileItem[]>('/deployment-security', { limit: 100 });
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [examId, setExamId] = useState('');
@@ -51,9 +54,23 @@ export const DeploymentsPage = () => {
   const [gearFor, setGearFor] = useState<OfflineDeployment | null>(null);
   const [gearSubjects, setGearSubjects] = useState<string[]>([]);
 
+  // ── Security profiles ─────────────────────────────────────────────────────
+  const [securityId, setSecurityId] = useState('');
+  const [offlineSecurityId, setOfflineSecurityId] = useState('');
+  const [securityFor, setSecurityFor] = useState<OfflineDeployment | null>(null);
+  const [assignSecurityId, setAssignSecurityId] = useState('');
+
   const examList = useMemo(() => exams.data ?? [], [exams.data]);
   const classList = useMemo(() => classes.data ?? [], [classes.data]);
   const subjectList = useMemo(() => subjects.data ?? [], [subjects.data]);
+  const onlineSecurity = useMemo(
+    () => (securityProfiles.data ?? []).filter((profile) => profile.mode === 'ONLINE'),
+    [securityProfiles.data],
+  );
+  const offlineSecurity = useMemo(
+    () => (securityProfiles.data ?? []).filter((profile) => profile.mode === 'OFFLINE'),
+    [securityProfiles.data],
+  );
   const classNameOf = (id: string) => classList.find((c) => c.id === id)?.name ?? 'Class';
 
   const examsByClass = useMemo(() => {
@@ -96,6 +113,7 @@ export const DeploymentsPage = () => {
     setSelSubjects([]);
     setLiveCode(null);
     setNotice(null);
+    setOfflineSecurityId(offlineSecurity.find((profile) => profile.isDefault)?.id ?? '');
     setOfflineOpen(true);
   };
 
@@ -110,6 +128,7 @@ export const DeploymentsPage = () => {
       const res = await apiPost<OfflineDeployment>('/exam-deployments', {
         mode: 'OFFLINE',
         scope: { classIds: selClasses, examIds: selExams, subjectIds: selSubjects },
+        deploymentSecurityId: offlineSecurityId || null,
       });
       if (startNow) {
         const started = await apiPost<OfflineDeployment>(`/exam-deployments/${res.data.id}/start`, {});
@@ -161,10 +180,39 @@ export const DeploymentsPage = () => {
     }
   };
 
+  const openSecurity = (d: OfflineDeployment) => {
+    setSecurityFor(d);
+    setAssignSecurityId(d.deploymentSecurity?.id ?? '');
+    setNotice(null);
+  };
+
+  const saveSecurity = async () => {
+    if (!securityFor) return;
+    setBusy(true);
+    try {
+      await apiPatch(`/exam-deployments/${securityFor.id}/security`, {
+        deploymentSecurityId: assignSecurityId || null,
+      });
+      setNotice(
+        assignSecurityId
+          ? `Security profile assigned to ${securityFor.code}.`
+          : `Security profile cleared from ${securityFor.code}.`,
+      );
+      setSecurityFor(null);
+      list.invalidate();
+      securityProfiles.reload();
+    } catch (err: any) {
+      setNotice(err?.message ?? 'Could not update the security profile');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const openDialog = () => {
     setExamId('');
     setLiveCode(null);
     setNotice(null);
+    setSecurityId(onlineSecurity.find((profile) => profile.isDefault)?.id ?? '');
     setDialogOpen(true);
   };
 
@@ -176,7 +224,11 @@ export const DeploymentsPage = () => {
     setBusy(true);
     setNotice(null);
     try {
-      const res = await apiPost<ExamDeploymentItem>('/exam-deployments', { examId, mode: 'ONLINE' });
+      const res = await apiPost<ExamDeploymentItem>('/exam-deployments', {
+        examId,
+        mode: 'ONLINE',
+        deploymentSecurityId: securityId || null,
+      });
       if (startNow) {
         const started = await apiPost<ExamDeploymentItem>(`/exam-deployments/${res.data.id}/start`, {});
         setLiveCode({ code: started.data.code, id: started.data.id });
@@ -263,8 +315,16 @@ export const DeploymentsPage = () => {
         eyebrow="Exam & Test"
         title="Deployments"
         text="Put an exam live so pupils can sit it at /examination/:code, or pack an offline bundle for the desktop host app."
+        actions={
+          <Link
+            to={ROUTES.adminDeploymentSecurity}
+            className="inline-flex min-h-11 items-center rounded border border-line bg-white px-4 py-2.5 text-sm font-bold hover:border-brand-500 hover:text-brand-700"
+          >
+            <ShieldCheck aria-hidden="true" size={16} className="mr-2" /> Security profiles
+          </Link>
+        }
       />
-      {notice && !dialogOpen && !offlineOpen && !gearFor && <p role="status" className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
+      {notice && !dialogOpen && !offlineOpen && !gearFor && !securityFor && <p role="status" className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
 
       <div className="grid gap-4 md:grid-cols-2">
         <button
@@ -338,8 +398,25 @@ export const DeploymentsPage = () => {
                       )}
                     </p>
                     {d.mode === 'OFFLINE' && <p className="mt-1 text-xs text-muted">{scopeSummary(d)}</p>}
+                    <p className="mt-1 flex items-center gap-1.5 text-xs">
+                      <ShieldCheck size={12} aria-hidden="true" className={d.deploymentSecurity ? 'text-brand-700' : 'text-muted'} />
+                      {d.deploymentSecurity ? (
+                        <span className="font-semibold text-brand-700">{d.deploymentSecurity.name}</span>
+                      ) : (
+                        <span className="text-muted">No security profile</span>
+                      )}
+                    </p>
                   </div>
                   <span className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openSecurity(d)}
+                      aria-label={`Assign security profile to ${d.code}`}
+                      title="Assign security profile"
+                      className="inline-flex items-center rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700"
+                    >
+                      <ShieldCheck size={14} aria-hidden="true" />
+                    </button>
                     {d.mode === 'OFFLINE' && (
                       <button
                         type="button"
@@ -404,6 +481,19 @@ export const DeploymentsPage = () => {
               <option value="">— Select an exam —</option>
               {(exams.data ?? []).map((x) => <option key={x.id} value={x.id}>{x.exam_name} ({x.minutes} mins)</option>)}
             </select>
+          </label>
+          <label className="block text-sm font-semibold">Security profile
+            <select value={securityId} onChange={(e) => setSecurityId(e.target.value)} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm">
+              <option value="">— No profile (default protections) —</option>
+              {onlineSecurity.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name}{profile.isDefault ? ' · default' : ''}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-xs font-normal text-muted">
+              Manage online profiles on the Deployment Security page.
+            </span>
           </label>
           <p className="text-xs leading-relaxed text-muted">
             Creates an <b>online</b> deployment with a join code. Press <b>Start</b> to go live immediately, or create a draft and start it later from the list.
@@ -490,6 +580,19 @@ export const DeploymentsPage = () => {
               </div>
             )}
           </div>
+          <label className="block text-sm font-semibold">4 · Security profile
+            <select value={offlineSecurityId} onChange={(e) => setOfflineSecurityId(e.target.value)} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm">
+              <option value="">— No profile (default protections) —</option>
+              {offlineSecurity.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name}{profile.isDefault ? ' · default' : ''}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-xs font-normal text-muted">
+              Manage offline profiles on the Deployment Security page.
+            </span>
+          </label>
           <p className="text-xs leading-relaxed text-muted">
             Bundle: <b>{selClasses.length}</b> classes · <b>{selExams.length}</b> exams · <b>{selSubjects.length === 0 ? 'all' : selSubjects.length}</b> subjects.
             The host app downloads it by code and serves pupils over LAN.
@@ -537,6 +640,47 @@ export const DeploymentsPage = () => {
             </button>
             <button type="button" disabled={busy} onClick={saveGear} className="min-h-11 flex-1 rounded bg-brand-500 px-4 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
               {busy ? 'Saving…' : 'Save subjects'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+      <Modal open={securityFor !== null} onClose={() => setSecurityFor(null)} title={`Security profile — ${securityFor?.code ?? ''}`}>
+        <div className="space-y-4">
+          <p className="text-xs leading-relaxed text-muted">
+            Choose a {securityFor?.mode === 'OFFLINE' ? 'offline' : 'online'} security profile for this deployment.
+            <b> Leave it blank to use default protections.</b>
+          </p>
+          <label className="block text-sm font-semibold">Profile
+            <select
+              value={assignSecurityId}
+              onChange={(e) => setAssignSecurityId(e.target.value)}
+              className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm"
+            >
+              <option value="">— No security profile —</option>
+              {(securityFor?.mode === 'OFFLINE' ? offlineSecurity : onlineSecurity).map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name}{profile.isDefault ? ' · default' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          {assignSecurityId && (
+            <p className="border border-line bg-cream px-4 py-3 text-xs leading-relaxed text-muted">
+              {(() => {
+                const profile = [...onlineSecurity, ...offlineSecurity].find((row) => row.id === assignSecurityId);
+                if (!profile) return 'Profile selected.';
+                const assignedCount = profile.deployments?.length ?? 0;
+                return `"${profile.name}" currently protects ${assignedCount} deployment${assignedCount === 1 ? '' : 's'}.`;
+              })()}
+            </p>
+          )}
+          {notice && <p role="status" className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
+          <div className="flex gap-3">
+            <button type="button" onClick={() => setSecurityFor(null)} className="min-h-11 flex-1 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">
+              Cancel
+            </button>
+            <button type="button" disabled={busy} onClick={saveSecurity} className="min-h-11 flex-1 rounded bg-brand-500 px-4 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
+              {busy ? 'Saving…' : 'Save profile'}
             </button>
           </div>
         </div>

@@ -28,6 +28,8 @@ interface SessionDetail {
   overallScore?: number | null;
   startedAt?: string | null;
   lastActive?: string | null;
+  lastAction?: string | null;
+  currentQuestion?: number | null;
   totalQuestions: number;
   answeredCount: number;
   correctCount: number;
@@ -127,6 +129,19 @@ export const AdminSessionDetailPage = () => {
               <p className="text-xs text-muted">Time left: <b className="text-ink">{fmtTime(session.timeLeft)}</b></p>
               {session.lastActive && (
                 <p className="text-xs text-muted">Last active: {new Date(session.lastActive).toLocaleString()}</p>
+              )}
+              {session.lastAction && (
+                <p className="text-xs text-muted">
+                  Last action:{' '}
+                  <b className="text-ink">
+                    {session.lastAction
+                      .toLowerCase()
+                      .split('_')
+                      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+                      .join(' ')}
+                  </b>
+                  {session.currentQuestion != null ? ` · question ${session.currentQuestion + 1}` : ''}
+                </p>
               )}
             </div>
             {/* Score */}

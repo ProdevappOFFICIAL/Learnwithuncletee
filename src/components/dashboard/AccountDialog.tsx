@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Bell, KeyRound, MonitorSmartphone, Smartphone, UserRound, X } from 'lucide-react';
 import { avatarOf, useAuth } from '@/context/AuthContext';
 import { apiDelete, apiGet, apiPatch, apiPut } from '@/lib/api';
@@ -19,6 +19,7 @@ interface SessionRow {
   deviceName?: string | null;
   lastUsedAt: string;
   createdAt: string;
+  isCurrent?: boolean;
 }
 
 const PREFS_KEY = 'lwu_notif_prefs';
@@ -56,6 +57,8 @@ export const AccountDialog = ({ open, onClose }: { open: boolean; onClose: () =>
   // sessions
   const [sessions, setSessions] = useState<SessionRow[] | null>(null);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
+  const sessionsRequestRef = useRef(0);
 
   // preferences
   const [prefs, setPrefs] = useState<Record<string, boolean>>(readPrefs);
@@ -67,20 +70,32 @@ export const AccountDialog = ({ open, onClose }: { open: boolean; onClose: () =>
       setProfileMsg(null);
       setSecurityMsg(null);
     }
+  }, [open, user?.id]);
+
+  useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, user?.id]);
+  }, [open, onClose]);
 
   const loadSessions = () => {
+    const requestId = ++sessionsRequestRef.current;
     setSessions(null);
     setSessionsError(null);
+    setRevokingId(null);
     apiGet<SessionRow[]>('/auth/sessions')
-      .then((res) => setSessions(res.data))
-      .catch((e: any) => setSessionsError(e?.message ?? 'Could not load sessions'));
+      .then((res) => {
+        // Ignore a stale response from a previous load.
+        if (requestId === sessionsRequestRef.current) setSessions(res.data ?? []);
+      })
+      .catch((e: any) => {
+        if (requestId === sessionsRequestRef.current) {
+          setSessionsError(e?.message ?? 'Could not load sessions');
+        }
+      });
   };
 
   useEffect(() => {
@@ -90,7 +105,7 @@ export const AccountDialog = ({ open, onClose }: { open: boolean; onClose: () =>
 
   const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || profileBusy) return;
     if (!name.trim()) {
       setProfileMsg('Enter your full name.');
       return;
@@ -116,6 +131,7 @@ export const AccountDialog = ({ open, onClose }: { open: boolean; onClose: () =>
 
   const changePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (securityBusy) return;
     if (newPassword.length < 8) {
       setSecurityMsg('New password must be at least 8 characters.');
       return;
@@ -135,11 +151,16 @@ export const AccountDialog = ({ open, onClose }: { open: boolean; onClose: () =>
   };
 
   const revokeSession = async (id: string) => {
+    if (revokingId) return;
+    setRevokingId(id);
+    setSessionsError(null);
     try {
       await apiDelete(`/auth/sessions/${id}`);
       setSessions((s) => (s ?? []).filter((row) => row.id !== id));
     } catch (err: any) {
       setSessionsError(err?.message ?? 'Could not revoke session');
+    } finally {
+      setRevokingId(null);
     }
   };
 
@@ -158,9 +179,14 @@ export const AccountDialog = ({ open, onClose }: { open: boolean; onClose: () =>
   const inputClass = 'mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500';
 
   return (
-    <div className={`fixed inset-0 z-50 ${open ? '' : 'pointer-events-none'}`} aria-hidden={!open}>
+    <div className={`fixed inset-0 z-50 ${open ? '' : 'pointer-events-none'}`} aria-hidden={!open} inert={!open}>
       <div onClick={onClose} className={`absolute inset-0 bg-brand-900/60 transition-opacity ${open ? 'opacity-100' : 'opacity-0'}`} />
-      <div className="absolute inset-0 flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 flex items-center justify-center p-4"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
         <div
           role="dialog"
           aria-modal="true"
@@ -172,8 +198,8 @@ export const AccountDialog = ({ open, onClose }: { open: boolean; onClose: () =>
           {/* Sidebar */}
           <div className="shrink-0 border-b border-line bg-brand-900 text-white sm:w-56 sm:border-b-0 sm:border-r">
             <div className="flex items-center gap-3 p-5">
-              {avatarOf(user) ? (
-                <img src={avatarOf(user) as string} alt="" className="h-11 w-11 rounded-full object-cover" />
+              {photo || avatarOf(user) ? (
+                <img src={photo || (avatarOf(user) as string)} alt="" className="h-11 w-11 rounded-full object-cover" />
               ) : (
                 <span className="flex h-11 w-11 items-center justify-center rounded-full bg-lime-accent text-sm font-extrabold text-brand-900">
                   {(user?.user_name ?? '?').slice(0, 2).toUpperCase()}
@@ -281,18 +307,30 @@ export const AccountDialog = ({ open, onClose }: { open: boolean; onClose: () =>
                               <Smartphone size={18} aria-hidden="true" className="shrink-0 text-muted" />
                             )}
                             <div className="min-w-0">
-                            <p className="flex items-center gap-2 text-sm font-bold">
+                            <p className="flex flex-wrap items-center gap-2 text-sm font-bold">
                               {s.deviceName || s.deviceType}
                               {String(s.deviceType ?? '').toLowerCase() === 'desktop' && (
                                 <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-brand-700">Desktop app</span>
+                              )}
+                              {s.isCurrent && (
+                                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-700">This device</span>
                               )}
                             </p>
                             <p className="text-xs text-muted">Last used {new Date(s.lastUsedAt).toLocaleString()}</p>
                             </div>
                           </div>
-                          <button type="button" onClick={() => revokeSession(s.id)} className="shrink-0 rounded border border-line px-3 py-1.5 text-xs font-bold text-rose-700 hover:border-rose-300">
-                            Revoke
-                          </button>
+                          {s.isCurrent ? (
+                            <span className="shrink-0 text-xs font-medium text-muted">Current</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => revokeSession(s.id)}
+                              disabled={revokingId !== null}
+                              className="shrink-0 rounded border border-line px-3 py-1.5 text-xs font-bold text-rose-700 hover:border-rose-300 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {revokingId === s.id ? 'Revoking…' : 'Revoke'}
+                            </button>
+                          )}
                         </li>
                       ))}
                     </ul>
