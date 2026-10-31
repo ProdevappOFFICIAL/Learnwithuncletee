@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PageMetadata } from '@/components/ui/PageMetadata';
 import { useAuth } from '@/context/AuthContext';
-import { apiGet, apiGetPublic } from '@/lib/api';
+import { apiGet, apiGetPublic, apiPost } from '@/lib/api';
 import { ROUTES } from '@/routes/paths';
 import { siteInfo } from '@/data/content';
 import { CheckCircle2, ChevronLeft } from 'lucide-react';
@@ -127,10 +127,23 @@ export const ExaminationPage = () => {
       return;
     }
     // Store exam payload + userId in sessionStorage so ExamRoomPage can pick it up
+    const startedAt = new Date().toISOString();
     sessionStorage.setItem(
       `exam_session_${code}`,
       JSON.stringify({ exam: feed.data.exam, questions: feed.data.questions, subjects: feed.data.subjects, gate: feed.data.gate, userId: me.id, startedAt: Date.now() }),
     );
+
+    // ── Create the OnlineSession row in the backend (fire-and-forget) ──────────
+    // This ensures the admin sees every student who opens the exam, even those
+    // who abandon without submitting. Errors are swallowed so they never block
+    // the student from entering the exam room.
+    apiPost('/exam-sessions/online/start', {
+      userId: me.id,
+      examId: feed.data.exam.id,
+      startedAt,
+      timeLeft: (feed.data.exam.minutes || 60) * 60,
+    }).catch(() => { /* non-blocking — session row is best-effort */ });
+
     // Hard navigate so ExamRoomPage mounts fresh (prevents back-button to login mid-exam)
     window.location.href = ROUTES.examinationRoom.replace(':code', code);
   };

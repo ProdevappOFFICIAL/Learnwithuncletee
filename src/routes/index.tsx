@@ -72,6 +72,9 @@ import { AdminAuditLogPage } from '@/pages/dashboard/admin/AdminAuditLogPage';
 import { AdminBillingPage } from '@/pages/dashboard/admin/AdminBillingPage';
 import { RouteError } from '@/components/ui/RouteError';
 import AdminResultGeneratorPage from '@/pages/dashboard/admin/AdminResultGeneratorPage';
+import { AdminSessionOnline } from '@/pages/dashboard/admin/AdminSessionOnline';
+import { AdminSessionOffline } from '@/pages/dashboard/admin/AdminSessionOffline';
+import { AdminSessionDetailPage } from '@/pages/dashboard/admin/AdminSessionDetailPage';
 
 const appRoutes = [
   { path: ROUTES.home, element: <HomePage /> },
@@ -179,6 +182,9 @@ const appRoutes = [
           { path: 'exams/deployments', element: <DeploymentsPage /> },
           { path: 'exams/results', element: <ExamTestResultsPage origin="ONLINE" /> },
           { path: 'exams/results/offline', element: <ExamTestResultsPage origin="OFFLINE" /> },
+          { path: 'exams/sessions', element: <AdminSessionOnline /> },
+          { path: 'exams/sessions/offline', element: <AdminSessionOffline /> },
+          { path: 'exams/sessions/:mode/:id', element: <AdminSessionDetailPage /> },
           { path: 'exams/:classId', element: <ClassExamsPage /> },
           { path: 'exams/:classId/:examId', element: <ExamSubjectsPage /> },
           { path: 'exams/:classId/:examId/:subjectId', element: <SubjectQuestionsPage /> },

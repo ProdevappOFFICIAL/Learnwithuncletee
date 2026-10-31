@@ -13,6 +13,7 @@ import {
   Layers,
   LayoutDashboard,
   MapPin,
+  MonitorPlay,
   Newspaper,
   Presentation,
   Rocket,
@@ -303,6 +304,26 @@ export const adminNav: DashboardNavItem[] = [
               },
               {
                 to: ROUTES.adminExamResultsOffline,
+                label: "Offline",
+                icon: CloudOff,
+                permission: "results.read",
+              },
+            ],
+          },
+          {
+            to: ROUTES.adminSessionsOnline,
+            label: "Sessions",
+            icon: MonitorPlay,
+            permission: "results.read",
+            children: [
+              {
+                to: ROUTES.adminSessionsOnline,
+                label: "Online",
+                icon: Cloud,
+                permission: "results.read",
+              },
+              {
+                to: ROUTES.adminSessionsOffline,
                 label: "Offline",
                 icon: CloudOff,
                 permission: "results.read",

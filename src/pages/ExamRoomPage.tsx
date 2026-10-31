@@ -383,7 +383,7 @@ export const ExamRoomPage = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // ── Timer ───────────────────────────────────────────────────────────────────
+
   const [secondsLeft, setSecondsLeft] = useState(() => {
     if (!session) return 0;
     const elapsed = Math.floor((Date.now() - session.startedAt) / 1000);
@@ -395,6 +395,25 @@ export const ExamRoomPage = () => {
     const t = window.setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
     return () => window.clearTimeout(t);
   }, [secondsLeft, submitted]);
+
+  // ── Online session heartbeat (every 30 s): persist answers + timer to DB ────
+  // Placed after secondsLeft state so all referenced vars are in scope.
+  useEffect(() => {
+    if (!userId || !exam?.id || submitted) return;
+    const tick = () => {
+      const combinedAnswers: Record<string, any> = {};
+      for (const [qId, idx] of Object.entries(picked)) combinedAnswers[qId] = idx;
+      for (const [qId, text] of Object.entries(typed)) combinedAnswers[qId] = text;
+      apiPost('/exam-sessions/online/save-progress', {
+        userId,
+        examId: exam.id,
+        answers: combinedAnswers,
+        timeLeft: secondsLeft,
+      }).catch(() => { /* non-blocking heartbeat */ });
+    };
+    const interval = window.setInterval(tick, 30_000);
+    return () => window.clearInterval(interval);
+  }, [userId, exam?.id, submitted, picked, typed, secondsLeft]);
 
   // ── Anti-cheat: tab-switch / visibility / beforeunload ──────────────────────
   const violationsRef = useRef(0);
@@ -502,6 +521,21 @@ export const ExamRoomPage = () => {
         total_questions: questions.length,
         questionAttempts,
       });
+
+      // ── Finalise OnlineSession row in the backend ────────────────────────────
+      // Build a flat answers map the same way as the heartbeat.
+      const combinedAnswers: Record<string, any> = {};
+      for (const [qId, idx] of Object.entries(picked)) combinedAnswers[qId] = idx;
+      for (const [qId, text] of Object.entries(typed)) combinedAnswers[qId] = text;
+      apiPost('/exam-sessions/online/submit', {
+        userId,
+        examId: exam.id,
+        answers: combinedAnswers,
+        timeLeft: secondsLeft,
+        overallScore: res.data.overallScore,
+        questionAttempts,
+      }).catch(() => { /* non-blocking — result already saved */ });
+
       setSubmitted(true);
       sessionStorage.removeItem(sessionKey);
       sessionStorage.removeItem(progressKey);
