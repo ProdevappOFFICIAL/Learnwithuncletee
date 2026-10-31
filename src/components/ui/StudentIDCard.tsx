@@ -194,7 +194,7 @@ export default function StudentIDCard({
                 </h1>
 
                 <p className="absolute left-[20.1%] top-[16.3%] -translate-y-1/2 whitespace-nowrap font-semibold leading-none text-white text-[length:2.12cqw]">
-                    UNCLE TEE SECONDARY SCHOOL ONDO, OLASOJI ICHMON STREET ONDO CITY
+                    UNCLE TEE SECONDARY SCHOOL ONDO, VALENTINO ONDO CITY
                 </p>
 
                 <p
