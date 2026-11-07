@@ -15,6 +15,7 @@ interface AttemptRow {
   attempted_questions: number;
   total_questions: number;
   date: string;
+  user?: { class?: { name: string } | null };
   exam?: { exam_name: string };
   subjectScores?: Record<string, { correct: number; total: number }>;
   subjectNames?: Record<string, string>;
@@ -24,8 +25,27 @@ interface SittingAttempt extends AttemptRow {
   origin: 'ONLINE' | 'OFFLINE';
 }
 
+const UTCC_CLASS = 'UTCC';
+const UTCC_MAX_SCORE = 400;
+
+/** UTCC's aggregate is a UTME-style total: each subject is scored out of 100. */
+const isUtccClass = (className?: string | null) =>
+  String(className ?? '').trim().toUpperCase() === UTCC_CLASS;
+
+/**
+ * Turn each subject's raw mark into a percentage (26/40 → 65) and add them up.
+ * With four subjects the result is a score out of 400.
+ */
+const utccAggregate = (scores?: AttemptRow['subjectScores']) => {
+  const subjects = Object.values(scores ?? {}).filter((s) => s.total > 0);
+  if (subjects.length === 0) return null;
+  const total = subjects.reduce((sum, s) => sum + (s.correct / s.total) * 100, 0);
+  return Math.round(total);
+};
+
 /** Pupil's own sittings from both stores, newest first (backend self-scopes each). */
 const SittingAttempts = () => {
+  const { user } = useAuth();
   const online = useResource<AttemptRow[]>('/results', { limit: 50 });
   const offline = useResource<AttemptRow[]>('/offline-results', { limit: 50 });
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -56,6 +76,8 @@ const SittingAttempts = () => {
             const parts = Object.entries(r.subjectScores ?? {})
               .map(([id, s]) => ({ id, name: r.subjectNames?.[id] ?? 'Subject', correct: s.correct, total: s.total }))
               .sort((a, b) => a.name.localeCompare(b.name));
+            const rowClass = r.user?.class?.name ?? user?.student?.className;
+            const utccScore = isUtccClass(rowClass) ? utccAggregate(r.subjectScores) : null;
             return (
               <li key={`${r.origin}:${r.id}`} className="px-5 py-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -74,6 +96,14 @@ const SittingAttempts = () => {
                     <span className="flex items-center gap-2">
                       <Pill tone={r.origin === 'OFFLINE' ? 'amber' : 'sky'}>{r.origin === 'OFFLINE' ? 'Offline' : 'Online'}</Pill>
                       <Pill tone={r.overallScore >= 75 ? 'emerald' : r.overallScore < 40 ? 'rose' : 'sky'}>{r.overallScore}%</Pill>
+                      {utccScore !== null && (
+                        <span
+                          className="inline-flex items-center rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 font-mono text-[11px] font-extrabold text-brand-700"
+                          title="UTCC aggregate — each subject scored out of 100, total out of 400"
+                        >
+                          {utccScore}/{UTCC_MAX_SCORE}
+                        </span>
+                      )}
                       <span className="text-xs font-bold text-brand-700">{open ? 'Hide ▲' : 'Subjects ▼'}</span>
                     </span>
                   </button>

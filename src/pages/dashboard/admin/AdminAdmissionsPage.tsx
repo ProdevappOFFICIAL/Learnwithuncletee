@@ -111,6 +111,8 @@ export const AdminAdmissionsPage = () => {
             </TableWrap>
           )}
         </Card>
+
+
       </div>
     </div>
   );

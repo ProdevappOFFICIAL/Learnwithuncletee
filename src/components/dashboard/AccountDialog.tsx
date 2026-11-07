@@ -114,11 +114,11 @@ export const AccountDialog = ({ open, onClose }: { open: boolean; onClose: () =>
     setProfileMsg(null);
     try {
       if (user.role === 'STUDENT') {
-        await apiPatch(`/students/${user.id}`, { user_name: name.trim(), photoUrl: photo || undefined });
+        await apiPatch(`/students/${user.id}`, { user_name: name.trim(), photoUrl: photo });
       } else if (user.role === 'TEACHER') {
-        await apiPatch(`/staff/${user.id}`, { user_name: name.trim(), photoUrl: photo || undefined });
+        await apiPatch(`/staff/${user.id}`, { user_name: name.trim(), photoUrl: photo });
       } else {
-        await apiPut(`/users/${user.id}`, { user_name: name.trim(), img: photo || undefined });
+        await apiPut(`/users/${user.id}`, { user_name: name.trim(), img: photo });
       }
       await refresh();
       setProfileMsg('Profile updated.');
