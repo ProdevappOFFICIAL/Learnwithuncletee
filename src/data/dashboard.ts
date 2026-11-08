@@ -240,7 +240,7 @@ export const adminNav: DashboardNavItem[] = [
   },
   {
     to: ROUTES.adminPPTMarker,
-    label: "PPT Marker",
+    label: "OMR Marker",
     icon: Presentation,
     permission: "results.read",
   },
