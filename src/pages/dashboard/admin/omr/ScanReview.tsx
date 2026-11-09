@@ -14,6 +14,8 @@ import {
 import { Pill } from '@/components/dashboard/DashboardUI';
 import { apiDelete, apiPatch } from '@/lib/api';
 import {
+  flagLabel,
+  flagTone,
   scoreTone,
   type OmrScanDetail,
   type OmrSubject,
@@ -110,6 +112,25 @@ export const ScanReview = ({
 
   const localScores = useMemo(() => scoreRows(keySubjects, answers), [keySubjects, answers]);
   const warnings = detail.detection?.warnings ?? [];
+  const aiMeta = detail.detection?.ai ?? null;
+  const aiConfidence = aiMeta?.student?.confidence ?? {};
+
+  const aiFieldBadge = (field: string) => {
+    if (!aiMeta?.enabled) return null;
+    const level = aiConfidence[field];
+    if (!level) return null;
+    const tone =
+      level === 'high'
+        ? 'bg-emerald-100 text-emerald-700'
+        : level === 'medium'
+          ? 'bg-amber-100 text-amber-700'
+          : 'bg-rose-100 text-rose-700';
+    return (
+      <span className={`ml-1 rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide ${tone}`}>
+        AI {level}
+      </span>
+    );
+  };
 
   const pickAnswer = (subjectIndex: number, questionIndex: number, option: string) => {
     if (confirmed) return;
@@ -221,8 +242,9 @@ export const ScanReview = ({
       <div className="grid gap-4 xl:grid-cols-[1.05fr_1fr]">
         <div className="border border-line bg-white p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-brand-700">
+            <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-brand-700">
               Header fields
+              {aiMeta?.enabled && <Pill tone="sky">AI assisted</Pill>}
             </p>
             {(detail.image || detail.preview) && (
               <button
@@ -254,15 +276,22 @@ export const ScanReview = ({
             />
           )}
           <p className="mt-2 text-[11px] leading-relaxed text-muted">
-            Handwritten fields are not OCR'd automatically. Read them from the crop and type them below.
+            {aiMeta?.enabled && aiMeta.student
+              ? `AI pre-filled the fields from this crop using ${aiMeta.model ?? 'the vision model'}. Verify every value before saving.`
+              : "Read the handwritten fields from the crop and type them below."}
           </p>
         </div>
 
         <div className="border border-line bg-white p-4">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-brand-700">Student details</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-brand-700">Student details</p>
+            {aiMeta?.enabled && aiMeta.student && (
+              <Pill tone="sky">AI pre-filled</Pill>
+            )}
+          </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="relative block text-[11px] font-bold text-ink">
-              Full name
+              Full name {aiFieldBadge('studentName')}
               <User size={13} className={fieldIcon} aria-hidden="true" />
               <input
                 value={studentName}
@@ -272,7 +301,7 @@ export const ScanReview = ({
               />
             </label>
             <label className="relative block text-[11px] font-bold text-ink">
-              Email address
+              Email address {aiFieldBadge('studentEmail')}
               <Mail size={13} className={fieldIcon} aria-hidden="true" />
               <input
                 value={studentEmail}
@@ -282,7 +311,7 @@ export const ScanReview = ({
               />
             </label>
             <label className="relative block text-[11px] font-bold text-ink">
-              University
+              University {aiFieldBadge('university')}
               <School size={13} className={fieldIcon} aria-hidden="true" />
               <input
                 value={university}
@@ -292,7 +321,7 @@ export const ScanReview = ({
               />
             </label>
             <label className="relative block text-[11px] font-bold text-ink">
-              First choice
+              First choice {aiFieldBadge('firstChoice')}
               <School size={13} className={fieldIcon} aria-hidden="true" />
               <input
                 value={firstChoice}
@@ -302,7 +331,7 @@ export const ScanReview = ({
               />
             </label>
             <label className="relative block text-[11px] font-bold text-ink">
-              Guardian phone
+              Guardian phone {aiFieldBadge('guardianPhone')}
               <Phone size={13} className={fieldIcon} aria-hidden="true" />
               <input
                 value={guardianPhone}
@@ -312,7 +341,7 @@ export const ScanReview = ({
               />
             </label>
             <label className="relative block text-[11px] font-bold text-ink">
-              Personal number
+              Personal number {aiFieldBadge('personalNos')}
               <Phone size={13} className={fieldIcon} aria-hidden="true" />
               <input
                 value={personalNos}
@@ -323,7 +352,9 @@ export const ScanReview = ({
             </label>
           </div>
           <div className="mt-3">
-            <p className="text-[11px] font-bold text-ink">Wants to be an alumni?</p>
+            <p className="text-[11px] font-bold text-ink">
+              Wants to be an alumni? {aiFieldBadge('isAlumni')}
+            </p>
             <div className="mt-1 flex gap-2">
               {[
                 { value: true, label: 'Yes' },
@@ -430,7 +461,13 @@ export const ScanReview = ({
                       return (
                         <div
                           key={questionIndex}
-                          className={`flex items-center gap-2 border-b border-line/60 py-1 last:border-0 ${flag === 'multiple' ? 'bg-amber-50/60' : ''}`}
+                          className={`flex items-center gap-2 border-b border-line/60 py-1 last:border-0 ${
+                            flag === 'multiple' || flag === 'ai-conflict'
+                              ? 'bg-amber-50/60'
+                              : flag === 'ai-corrected'
+                                ? 'bg-sky-50/50'
+                                : ''
+                          }`}
                         >
                           <span className="w-7 shrink-0 text-right text-[11px] font-medium text-muted">
                             {questionIndex + 1}.
@@ -461,11 +498,15 @@ export const ScanReview = ({
                               );
                             })}
                           </div>
-                          <span className="w-24 shrink-0 text-right text-[10px] leading-tight">
+                          <span className="w-28 shrink-0 text-right text-[10px] leading-tight">
                             <span className="block text-muted">Key: {expected ?? '—'}</span>
-                            <span className={flag === 'ok' ? 'text-emerald-700' : flag === 'blank' ? 'text-muted' : 'text-amber-700'}>
-                              {flag === 'ok' ? 'Read' : flag === 'blank' ? 'Blank' : flag === 'multiple' ? 'Multiple' : flag === 'unsure' ? 'Uncertain' : 'Light'}
-                            </span>
+                            <span className={`block ${flagTone[flag]}`}>{flagLabel[flag]}</span>
+                            {reading?.ai && (
+                              <span className="block text-sky-700">
+                                AI: {reading.ai.option ?? 'check'}
+                                {reading.ai.confidence !== 'high' ? ` (${reading.ai.confidence})` : ''}
+                              </span>
+                            )}
                           </span>
                         </div>
                       );

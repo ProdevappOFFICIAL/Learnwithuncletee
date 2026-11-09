@@ -190,6 +190,7 @@ export const AdminPPTMarkerPage = () => {
 
   const openScan = async (id: string) => {
     setDetailLoading(true);
+    setDetail(null);
     setScanError(null);
     setNotice(null);
     try {
@@ -424,7 +425,10 @@ export const AdminPPTMarkerPage = () => {
                       <RefreshCw size={15} className="animate-spin" aria-hidden="true" />
                       <div>
                         <p className="font-bold">Reading the sheet…</p>
-                        <p className="text-[11px]">Detecting the page, bubbles and shading. This can take a few seconds.</p>
+                        <p className="text-[11px]">
+                          Detecting the page and bubbles, then DeepSeek vision reads the header and checks
+                          ambiguous marks. This can take up to a minute.
+                        </p>
                       </div>
                     </div>
                   )}
@@ -461,22 +465,26 @@ export const AdminPPTMarkerPage = () => {
                     </li>
                     <li className="flex gap-2">
                       <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-50 text-[10px] font-bold text-brand-700">3</span>
-                      Answers are scored against the key. Ambiguous marks are flagged in amber for review.
+                      DeepSeek vision reads the handwritten header, printed subject names and any ambiguous bubble rows.
                     </li>
                     <li className="flex gap-2">
                       <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-50 text-[10px] font-bold text-brand-700">4</span>
-                      Read the header crop, type the student details and confirm. Nothing is final until you save.
+                      Answers are scored against the key. AI corrections and uncertain marks stay flagged for you to review.
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-50 text-[10px] font-bold text-brand-700">5</span>
+                      Check the header crop and student details, correct anything, then confirm. Nothing is final until you save.
                     </li>
                   </ol>
                 </Card>
                 <Card className="border-amber-200 bg-amber-50">
                   <div className="px-5 py-4 text-xs leading-relaxed text-amber-900">
                     <p className="flex items-center gap-1.5 font-bold">
-                      <AlertTriangle size={13} aria-hidden="true" /> Handwritten fields
+                      <AlertTriangle size={13} aria-hidden="true" /> AI + human review
                     </p>
                     <p className="mt-1">
-                      Names, emails and phone numbers are handwritten, so they are captured through the
-                      header crop and the review form rather than guessed by OCR.
+                      The AI pre-fills names, emails and phone numbers from the handwriting and double-checks
+                      uncertain bubbles. Always verify its suggestions before saving — the final answer is yours.
                     </p>
                   </div>
                 </Card>

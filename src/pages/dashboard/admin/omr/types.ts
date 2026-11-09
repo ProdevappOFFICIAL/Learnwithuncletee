@@ -21,13 +21,48 @@ export interface OmrKeySummary {
   subjects: OmrSubject[];
 }
 
-export type OmrQuestionFlag = 'ok' | 'blank' | 'multiple' | 'unsure' | 'low';
+export type OmrQuestionFlag =
+  | 'ok'
+  | 'blank'
+  | 'multiple'
+  | 'unsure'
+  | 'low'
+  | 'ai-corrected'
+  | 'ai-conflict';
 
 export interface OmrQuestionReading {
   question: number;
   detected: string | null;
   fills: Record<string, number>;
   flag: OmrQuestionFlag;
+  ai?: {
+    option: string | null;
+    confidence: 'high' | 'medium' | 'low';
+    reason?: string;
+  } | null;
+}
+
+export interface OmrAiMetadata {
+  enabled: boolean;
+  model?: string | null;
+  student?: {
+    values: Record<string, string | boolean | null>;
+    confidence: Record<string, 'high' | 'medium' | 'low'>;
+  } | null;
+  subjectNames?: string[];
+  fixes?: Array<{
+    subjectIndex: number;
+    question: number;
+    option: string | null;
+    confidence: 'high' | 'medium' | 'low';
+    reason?: string;
+  }>;
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+  } | null;
+  warnings?: string[];
 }
 
 export interface OmrSubjectReading {
@@ -44,6 +79,7 @@ export interface OmrDetection {
   columns: Array<{ x: number; count: number }>;
   warnings: string[];
   subjects: OmrSubjectReading[];
+  ai?: OmrAiMetadata | null;
 }
 
 export interface OmrSubjectScore {
@@ -135,6 +171,8 @@ export const flagLabel: Record<OmrQuestionFlag, string> = {
   multiple: 'Multiple marks',
   unsure: 'Uncertain',
   low: 'Light shading',
+  'ai-corrected': 'AI checked',
+  'ai-conflict': 'AI conflict',
 };
 
 export const flagTone: Record<OmrQuestionFlag, string> = {
@@ -143,4 +181,6 @@ export const flagTone: Record<OmrQuestionFlag, string> = {
   multiple: 'text-rose-700',
   unsure: 'text-amber-700',
   low: 'text-amber-700',
+  'ai-corrected': 'text-sky-700',
+  'ai-conflict': 'text-rose-700',
 };

@@ -34,11 +34,11 @@ The supplied sheet has:
 Consequences:
 
 - The answer key's subject order must match the sheet's left → right order.
+  Subject names are free-form/custom, but the column count and order matter.
 - Questions are mapped **top → bottom** from row 1.
-- Handwritten fields cannot be read reliably by OpenCV alone. The backend
-  returns a sharp crop of the header so the reviewer can read and type them.
-  This is deliberate: an OCR guess that silently corrupts a student's email
-  is worse than a two-second review step.
+- Handwritten fields are read by a vision model from separated header crops,
+  then confirmed by a human on the review screen. The crop is always shown so
+  a wrong AI guess cannot silently corrupt a student's details.
 
 ## 3. Architecture
 
@@ -168,6 +168,51 @@ expects, the missing questions count as blank and a warning is attached.
 Corrected answers submitted on confirmation are validated and rescored on the
 server; the client never writes a score directly.
 
+## 6b. AI assist (DeepSeek vision)
+
+OpenCV is deterministic and remains the primary bubble reader. A second,
+optional AI pass handles what classical CV cannot do well: handwriting and a
+second opinion on ambiguous shading.
+
+**Stack (already installed, no new packages):**
+
+- `ai` + `@ai-sdk/openai-compatible` (OpenRouter's OpenAI-compatible API)
+- default model `deepseek/deepseek-v4-flash-vision-exp`
+- key: `OPENROUTER_API_KEY` (or `OMR_AI_API_KEY`)
+- overrides: `OMR_AI_MODEL`, `OMR_AI_BASE_URL`, `OMR_AI_DISABLED=true`
+
+**Call 1 — header + subject names (one request, three images):**
+
+1. the rectified header crop,
+2. a close-up of the guardian / personal / alumni line,
+3. the printed subject-header band.
+
+The model returns strict JSON with: student name, university, email, first
+choice, guardian phone, personal number, alumni yes/no, per-field confidence,
+and the printed subject names left → right. Values are sanitised (phone digit
+count, email shape, boolean coercion) before storage. The scan is still a draft
+— the reviewer sees confidence badges and confirms.
+
+**Call 2 — ambiguous bubble rows (only when needed):**
+
+OpenCV flags `multiple`, `uncertain` or `lightly shaded` rows. Up to eight of
+those rows are cropped (subject + question position) and sent in one request.
+The model names the shaded option or says `MULTIPLE` / `BLANK`. A clear
+high/medium-confidence answer overrides the OpenCV pick and is marked
+`ai-corrected`; a disagreement is marked `ai-conflict`; blank/multiple AI
+answers never erase a valid OpenCV reading. Ordinary blanks are not sent, so a
+mostly-empty sheet does not burn credits.
+
+**Reliability rules:**
+
+- calls are serialized through an in-process queue to avoid OpenRouter
+  in-flight-credit rejections;
+- each call has a 60 s abort timeout and a capped output budget;
+- any AI failure adds a warning and the scan continues with OpenCV + manual
+  review — the API never fails because the AI is down;
+- AI usage (tokens/model) and all suggestions are stored under
+  `OmrScan.detection.ai` for auditability.
+
 ## 7. API
 
 Base: `/api/omr` (auth required, `results.read` / `results.write`).
@@ -236,20 +281,34 @@ manually, without destructive statements. Once the Neon host is reachable:
 
 ## 11. Verification
 
-- Unit-style script against the supplied sheet: 16 columns, 30 rows, 120/120
-  synthetic filled bubbles correct, blank maximum darkness ≤ 0.21.
-- `npx tsc -p . --noEmit` in `api/`.
-- `npx tsc -p tsconfig.app.json --noEmit` and `npm run build` at the app root.
+- Engine test on the supplied sheet: 16 option columns, 30 answer rows,
+  120/120 synthetic shaded bubbles correct, blank sheet produced 120 blanks
+  with zero false positives.
+- Document detection test: synthetic phone photo with a desk background,
+  trapezoid and rotation → perspective corrected, 120/120 still correct.
+- AI header test on a filled header crop: name, university, email, first
+  choice and guardian phone extracted; printed subject names read correctly.
+- AI ambiguous-row test: a row with two shaded bubbles returned `MULTIPLE`
+  with high confidence and was kept flagged for the reviewer.
+- `node node_modules/typescript/bin/tsc -p . --noEmit` in `api/`.
+- `node node_modules/typescript/bin/tsc -p tsconfig.app.json --noEmit` and
+  `npm run build` at the app root.
 - Manual: create key → photograph sheet → review → confirm → history.
 
 ## 12. Known limits / next steps
 
-- Handwriting OCR is intentionally replaced by the header-crop review; a
-  future optional OCR suggestion can be layered in without changing the API.
-- The template priors are for the four-subject Uncle Tee sheet. Additional
-  templates should store their grid priors on `OmrAnswerKey` (template field)
-  rather than editing code.
-- CPU-bound processing runs in the request; a worker queue is the next step
-  if several invigilators scan simultaneously.
+- DeepSeek vision is very good on clear print and reasonably good on neat
+  handwriting, but it is an assistant, not an authority. Names, emails and
+  phone numbers are always confirmed by a human before saving. If the model is
+  unavailable the header crop remains the fallback.
+- The template priors are for the four-subject Uncle Tee sheet. Custom subject
+  **names** are supported; the physical sheet must expose the same number of
+  columns in the key's order. Additional print templates should store their
+  grid priors per answer key rather than editing code.
+- CPU-bound OpenCV processing runs in the request; AI calls are serialized. A
+  worker queue is the next step if several invigilators scan simultaneously.
+- OpenRouter credit limits can throttle the AI pass. The queue and safe
+  degradation prevent failed scans; set `OMR_AI_DISABLED=true` to run pure
+  OpenCV, or point `OMR_AI_MODEL` at another vision model.
 - Publishing OMR scores into the school results tables can be added later as
   an explicit “publish” action.

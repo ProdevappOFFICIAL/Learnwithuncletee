@@ -181,8 +181,9 @@ export const AnswerKeyModal = ({
           <div>
             <p className="text-sm font-bold text-ink">Sheet layout</p>
             <p className="mt-0.5 text-xs leading-relaxed text-muted">
-              Subjects are marked left → right in this exact order. Use the same number of bubble rows
-              as the printed sheet.
+              You can rename each subject freely (custom names are fine). The physical sheet is read
+              left → right in this exact order, so keep the same number of subjects and use the same
+              number of bubble rows as the printed sheet.
             </p>
           </div>
           <Pill tone={unset === 0 ? 'emerald' : 'amber'}>{unset === 0 ? 'Key complete' : `${unset} unset`}</Pill>
