@@ -70,7 +70,6 @@ import { ExamTestResultsPage } from '@/pages/dashboard/admin/ExamTestResultsPage
 import { WebsiteSectionPage } from '@/pages/dashboard/admin/AdminSectionPage';
 import { AdminSettingsPage } from '@/pages/dashboard/admin/AdminSettingsPage';
 import { AdminAuditLogPage } from '@/pages/dashboard/admin/AdminAuditLogPage';
-import { AdminBillingPage } from '@/pages/dashboard/admin/AdminBillingPage';
 import { RouteError } from '@/components/ui/RouteError';
 import AdminResultGeneratorPage from '@/pages/dashboard/admin/AdminResultGeneratorPage';
 import { AdminSessionOnline } from '@/pages/dashboard/admin/AdminSessionOnline';
@@ -195,7 +194,6 @@ const appRoutes = [
           { path: 'website/:section', element: <WebsiteSectionPage /> },
           { path: 'settings', element: <AdminSettingsPage /> },
           { path: 'audit-log', element: <AdminAuditLogPage /> },
-          { path: 'billing', element: <AdminBillingPage /> },
           { path: 'result-generator', element: <AdminResultGeneratorPage /> },
         ],
       },

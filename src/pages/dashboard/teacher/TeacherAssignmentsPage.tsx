@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pill, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
 import { useAuth, useResource } from '@/context/AuthContext';
-import { apiGet, apiPatch, apiPost } from '@/lib/api';
+import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { UploadButton } from '@/lib/uploadthing';
 
 interface AssignmentRow {
@@ -57,6 +58,7 @@ export const TeacherAssignmentsPage = () => {
   const [openId, setOpenId] = useState<string | null>(null);
   const [subs, setSubs] = useState<SubmissionRow[] | null>(null);
   const [grading, setGrading] = useState<Record<string, string>>({});
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Dropdowns come from the API, scoped to this teacher's assigned courses.
   const courses = coursesRes.data ?? [];
@@ -124,6 +126,28 @@ export const TeacherAssignmentsPage = () => {
     }
   };
 
+  const remove = async (id: string, title: string, submissions: number) => {
+    const warning = submissions > 0
+      ? ` This also deletes ${submissions} submission${submissions === 1 ? '' : 's'}.`
+      : '';
+    if (!window.confirm(`Delete “${title}”?${warning} This cannot be undone.`)) return;
+    setDeletingId(id);
+    setNotice(null);
+    try {
+      await apiDelete(`/school-assignments/${id}`);
+      setNotice('Assignment deleted.');
+      if (openId === id) {
+        setOpenId(null);
+        setSubs(null);
+      }
+      list.reload();
+    } catch (err: any) {
+      setNotice(err?.message ?? 'Delete failed');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -183,14 +207,27 @@ export const TeacherAssignmentsPage = () => {
           ) : (
             <TableWrap>
               <table className="w-full min-w-[520px] text-left text-sm">
-                <thead><tr><Th>Title</Th><Th>Due</Th><Th>Submitted</Th><Th><span className="sr-only">Actions</span></Th></tr></thead>
+                <thead><tr><Th>Title</Th><Th>Due</Th><Th>Submitted</Th><Th>Actions</Th></tr></thead>
                 <tbody>
                   {list.data.map((a) => (
                     <tr key={a.id}>
                       <Td><span className="font-bold">{a.title}</span><span className="block text-xs text-muted">{a.className} · {a.subject} · /{a.maxScore}</span></Td>
                       <Td>{new Date(a.dueAt).toLocaleDateString()}</Td>
                       <Td className="font-semibold">{a._count.submissions}</Td>
-                      <Td><button type="button" onClick={() => openSubmissions(a.id)} className="rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">Submissions</button></Td>
+                      <Td>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <button type="button" onClick={() => openSubmissions(a.id)} className="rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">Submissions</button>
+                          <button
+                            type="button"
+                            onClick={() => remove(a.id, a.title, a._count.submissions)}
+                            disabled={deletingId === a.id}
+                            className="inline-flex items-center gap-1 rounded border border-rose-200 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <Trash2 size={12} aria-hidden="true" />
+                            {deletingId === a.id ? 'Deleting…' : 'Delete'}
+                          </button>
+                        </div>
+                      </Td>
                     </tr>
                   ))}
                 </tbody>

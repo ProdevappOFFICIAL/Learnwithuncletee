@@ -4,7 +4,6 @@ import {
   Cloud,
   CloudOff,
   Cog,
-  CreditCard,
   FileBarChart2,
   FileQuestion,
   FileText,
@@ -357,12 +356,6 @@ export const adminNav: DashboardNavItem[] = [
         label: "Audit Log",
         icon: ScrollText,
         permission: "settings.read",
-      },
-      {
-        to: ROUTES.adminBilling,
-        label: "Billing",
-        icon: CreditCard,
-        permission: "fees.read",
       },
       /*  {
         label: "Website Management",

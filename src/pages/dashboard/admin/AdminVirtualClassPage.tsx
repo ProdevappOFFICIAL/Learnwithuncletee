@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pill, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
 import { useResource } from '@/context/AuthContext';
-import { apiPatch, apiPost } from '@/lib/api';
+import { apiDelete, apiPatch, apiPost } from '@/lib/api';
 import { UploadButton } from '@/lib/uploadthing';
 import type { LessonData } from '@/data/dashboard';
 
@@ -10,6 +11,7 @@ export const AdminVirtualClassPage = () => {
   const [form, setForm] = useState({ topic: '', subject: 'Mathematics', className: 'JSS 2 Diamond', startsAt: '', durationMins: '45', joinUrl: 'https://meet.google.com/new' });
   const [coverUrl, setCoverUrl] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,6 +33,21 @@ export const AdminVirtualClassPage = () => {
       reload();
     } catch (err: any) {
       setNotice(err?.message ?? 'Update failed');
+    }
+  };
+
+  const remove = async (id: string, topic: string) => {
+    if (!window.confirm(`Delete the virtual class “${topic}”? This cannot be undone.`)) return;
+    setDeletingId(id);
+    setNotice(null);
+    try {
+      await apiDelete(`/virtual-lessons/${id}`);
+      setNotice('Lesson deleted.');
+      reload();
+    } catch (err: any) {
+      setNotice(err?.message ?? 'Delete failed');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -71,7 +88,7 @@ export const AdminVirtualClassPage = () => {
           ) : (
             <TableWrap>
               <table className="w-full min-w-[560px] text-left text-sm">
-                <thead><tr><Th>Topic</Th><Th>When</Th><Th>Status</Th><Th><span className="sr-only">Actions</span></Th></tr></thead>
+                <thead><tr><Th>Topic</Th><Th>When</Th><Th>Status</Th><Th>Actions</Th></tr></thead>
                 <tbody>
                   {data.map((r) => (
                     <tr key={r.id}>
@@ -79,9 +96,20 @@ export const AdminVirtualClassPage = () => {
                       <Td className="text-muted">{new Date(r.startsAt).toLocaleString()}</Td>
                       <Td><Pill tone={r.status === 'Live' ? 'emerald' : 'sky'}>{r.status}</Pill></Td>
                       <Td>
-                        <select value={r.status} onChange={(e) => setStatus(r.id, e.target.value)} className="rounded border border-line bg-white px-2 py-1.5 text-xs font-bold">
-                          {['Scheduled', 'Live', 'Ended'].map((s) => <option key={s}>{s}</option>)}
-                        </select>
+                        <div className="flex items-center gap-2">
+                          <select value={r.status} onChange={(e) => setStatus(r.id, e.target.value)} className="rounded border border-line bg-white px-2 py-1.5 text-xs font-bold">
+                            {['Scheduled', 'Live', 'Ended'].map((s) => <option key={s}>{s}</option>)}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => remove(r.id, r.topic)}
+                            disabled={deletingId === r.id}
+                            className="inline-flex items-center gap-1 rounded border border-rose-200 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <Trash2 size={12} aria-hidden="true" />
+                            {deletingId === r.id ? 'Deleting…' : 'Delete'}
+                          </button>
+                        </div>
                       </Td>
                     </tr>
                   ))}
