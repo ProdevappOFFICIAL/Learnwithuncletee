@@ -57,6 +57,7 @@ import { AdminMemberPage } from '@/pages/dashboard/admin/AdminMemberPage';
 import { AdminWebsitePage } from '@/pages/dashboard/admin/AdminWebsitePage';
 import { AdminWebsitePagesPage } from '@/pages/dashboard/admin/AdminWebsitePagesPage';
 import { ExamClassesPage } from '@/pages/dashboard/admin/ExamClassesPage';
+import { AdminDatabasePage } from '@/pages/dashboard/admin/AdminDatabasePage';
 import { AllExamsPage } from '@/pages/dashboard/admin/AllExamsPage';
 import { AllSubjectsPage } from '@/pages/dashboard/admin/AllSubjectsPage';
 import { AllQuestionsPage } from '@/pages/dashboard/admin/AllQuestionsPage';
@@ -175,6 +176,7 @@ const appRoutes = [
           { path: 'forms/preview', element: <AdminFormPreviewPage /> },
           { path: 'forms/responses', element: <FormResponsesPage /> },
           { path: 'exams', element: <ExamClassesPage /> },
+          { path: 'database', element: <AdminDatabasePage /> },
           { path: 'exams/all', element: <AllExamsPage /> },
           { path: 'exams/subjects', element: <AllSubjectsPage /> },
           { path: 'exams/questions', element: <AllQuestionsPage /> },

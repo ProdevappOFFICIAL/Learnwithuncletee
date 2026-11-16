@@ -5,7 +5,8 @@ import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, Modal, PageHea
 import { useAuth } from '@/context/AuthContext';
 import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api';
 import { LIST_STALE, usePagedList } from '@/lib/pagedQuery';
-import { ChevronRight, GraduationCap, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronRight, Download, GraduationCap, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ClassExportModal } from './exam-database/ClassExportModal';
 
 interface ClassItem {
   id: string;
@@ -50,6 +51,7 @@ export const ExamClassesPage = () => {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [exportClass, setExportClass] = useState<ClassItem | null>(null);
 
   const openCreate = () => {
     setEditing(null);
@@ -186,6 +188,9 @@ export const ExamClassesPage = () => {
                     <ChevronRight size={16} aria-hidden="true" className="ml-auto shrink-0 text-muted group-hover:text-brand-700" />
                   </Link>
                   <span className="flex shrink-0 gap-2 border-t border-line pt-3 sm:border-t-0 sm:pt-0 sm:pl-4">
+                    <button type="button" onClick={() => setExportClass(cls)} disabled={(cls._count?.exams ?? 0) === 0} aria-label={`Export ${cls.name}`} title={(cls._count?.exams ?? 0) === 0 ? 'No exams to export yet' : 'Export class data'} className="rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40">
+                      <Download aria-hidden="true" size={14} />
+                    </button>
                     <button type="button" onClick={() => openEdit(cls)} aria-label={`Edit ${cls.name}`} title="Edit" className="rounded border border-line px-3 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">
                       <Pencil aria-hidden="true" size={14} />
                     </button>
@@ -235,6 +240,22 @@ export const ExamClassesPage = () => {
           </div>
         </form>
       </Modal>
+
+      <ClassExportModal
+        open={!!exportClass}
+        onClose={() => setExportClass(null)}
+        classId={exportClass?.id ?? ''}
+        classLabel={exportClass?.name ?? ''}
+        onExported={(result) => {
+          setNotice(
+            result.deletedExams > 0
+              ? `Exported "${result.snapshot.className}" to "${result.database.name}" and removed ${result.deletedExams} exam(s) from Exam & Test.`
+              : `Exported "${result.snapshot.className}" to "${result.database.name}" (${result.snapshot.summary.exams} exam(s), ${result.snapshot.summary.results} result(s)).`,
+          );
+          classes.invalidate();
+          overview.refetch();
+        }}
+      />
     </div>
   );
 };

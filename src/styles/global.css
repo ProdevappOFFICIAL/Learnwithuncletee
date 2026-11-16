@@ -171,3 +171,23 @@ h4 {
 .scroll-slim::-webkit-scrollbar-thumb:hover {
   background: rgba(183, 227, 107, 0.55);
 }
+
+/* Light-surface variant for data tables (Database page). */
+.scroll-db {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(31, 61, 43, 0.28) transparent;
+}
+.scroll-db::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-db::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-db::-webkit-scrollbar-thumb {
+  background: rgba(31, 61, 43, 0.28);
+  border-radius: 999px;
+}
+.scroll-db::-webkit-scrollbar-thumb:hover {
+  background: rgba(31, 61, 43, 0.5);
+}

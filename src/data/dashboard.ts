@@ -4,6 +4,7 @@ import {
   Cloud,
   CloudOff,
   Cog,
+  Database,
   FileBarChart2,
   FileQuestion,
   FileText,
@@ -338,6 +339,12 @@ export const adminNav: DashboardNavItem[] = [
           },
         ],
       },
+      {
+        to: ROUTES.adminDatabase,
+        label: "Database",
+        icon: Database,
+        permission: "results.read",
+      },
     ],
   },
   {
@@ -593,6 +600,8 @@ export interface StudentRow {
   average?: number | null;
 }
 
+export type TeacherTypeStatus = 'PRINCIPAL' | 'CLASS_TEACHER';
+
 export interface StaffRow {
   id: string;
   user_name: string;
@@ -605,6 +614,7 @@ export interface StaffRow {
     department?: string;
     photoUrl?: string | null;
     subjects: string[];
+    type_status?: TeacherTypeStatus | null;
   } | null;
 }
 

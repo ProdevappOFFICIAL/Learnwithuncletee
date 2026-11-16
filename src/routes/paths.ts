@@ -49,6 +49,7 @@ export const ROUTES = {
   formPublic: '/form/:id',
   formSuccess: '/form/:id/success',
   adminExams: '/dashboard/admin/exams',
+  adminDatabase: '/dashboard/admin/database',
   adminAllExams: '/dashboard/admin/exams/all',
   adminAllSubjects: '/dashboard/admin/exams/subjects',
   adminAllQuestions: '/dashboard/admin/exams/questions',

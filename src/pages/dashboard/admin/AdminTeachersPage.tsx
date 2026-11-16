@@ -4,8 +4,9 @@ import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, Modal, PageHea
 import { useResource } from '@/context/AuthContext';
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { UploadButton } from '@/lib/uploadthing';
-import type { ClassItem, CourseAssignmentItem, ExamItem, StaffRow, SubjectItem } from '@/data/dashboard';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import type { CourseAssignmentItem, StaffRow, TeacherTypeStatus } from '@/data/dashboard';
+import { BookOpen, Pencil, Plus, Trash2 } from 'lucide-react';
+import { CourseAssignmentWizard, type InitialAssignTeacher } from './teacher-assign/CourseAssignmentWizard';
 
 // Same caching strategy as the student directory: 5-min stale directory data,
 // 30-min garbage collection, previous-page rows kept during page turns, and
@@ -19,6 +20,9 @@ const fetchStaff = (search: string, page: number) =>
 
 const initialsOf = (name: string) =>
   name.split(' ').map((p) => p.replace('.', '')[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'LW';
+
+const teacherTypeLabel = (value?: string | null) =>
+  value === 'PRINCIPAL' ? 'Principal' : value === 'CLASS_TEACHER' ? 'Class Teacher' : null;
 
 /** Staff picture with initials fallback. */
 const StaffPicture = ({ row }: { row: StaffRow }) => {
@@ -37,9 +41,17 @@ interface TeacherForm {
   password: string;
   active: boolean;
   photoUrl: string;
+  type_status: '' | TeacherTypeStatus;
 }
 
-const emptyForm = (): TeacherForm => ({ user_name: '', user_email: '', password: '', active: true, photoUrl: '' });
+const emptyForm = (): TeacherForm => ({
+  user_name: '',
+  user_email: '',
+  password: '',
+  active: true,
+  photoUrl: '',
+  type_status: '',
+});
 
 export const AdminTeachersPage = () => {
   const [search, setSearch] = useState('');
@@ -78,9 +90,6 @@ export const AdminTeachersPage = () => {
     }
   }, [qc, query, safePage, pageCount]);
   const assignments = useResource<CourseAssignmentItem[]>('/course-assignments', { limit: 100 });
-  const exams = useResource<ExamItem[]>('/exams', { limit: 100 });
-  const subjects = useResource<SubjectItem[]>('/subjects', { limit: 100 });
-  const classes = useResource<ClassItem[]>('/classes');
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<StaffRow | null>(null);
@@ -89,12 +98,10 @@ export const AdminTeachersPage = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [rowBusy, setRowBusy] = useState<string | null>(null);
-
-  // Assigned-courses composer (per selected teacher in the section below).
-  const [assignTeacherId, setAssignTeacherId] = useState('');
-  const [assignExamId, setAssignExamId] = useState('');
-  const [assignSubjectId, setAssignSubjectId] = useState('');
-  const [assignClassId, setAssignClassId] = useState('');
+  const [assignWizard, setAssignWizard] = useState<{ open: boolean; teacher: InitialAssignTeacher | null }>({
+    open: false,
+    teacher: null,
+  });
 
   const openCreate = () => {
     setEditing(null);
@@ -106,10 +113,26 @@ export const AdminTeachersPage = () => {
 
   const openEdit = (row: StaffRow) => {
     setEditing(row);
-    setForm({ user_name: row.user_name, user_email: row.user_email, password: '', active: row.active, photoUrl: '' });
+    setForm({
+      user_name: row.user_name,
+      user_email: row.user_email,
+      password: '',
+      active: row.active,
+      photoUrl: '',
+      type_status: row.teacher?.type_status ?? '',
+    });
     setCreated(null);
     setNotice(null);
     setModalOpen(true);
+  };
+
+  const openAssignments = (row?: StaffRow) => {
+    setAssignWizard({
+      open: true,
+      teacher: row
+        ? { id: row.id, name: row.user_name, typeStatus: row.teacher?.type_status ?? null }
+        : null,
+    });
   };
 
   const save = async (e: React.FormEvent) => {
@@ -119,7 +142,11 @@ export const AdminTeachersPage = () => {
     setCreated(null);
     try {
       if (editing) {
-        await apiPatch(`/staff/${editing.id}`, { user_name: form.user_name.trim(), active: form.active });
+        await apiPatch(`/staff/${editing.id}`, {
+          user_name: form.user_name.trim(),
+          active: form.active,
+          type_status: form.type_status || null,
+        });
         setNotice(`"${form.user_name.trim()}" updated.`);
       } else {
         const res = await apiPost<{ login: { email: string; password: string }; profile: { staffCode: string } }>('/staff', {
@@ -127,6 +154,7 @@ export const AdminTeachersPage = () => {
           user_email: form.user_email.trim(),
           password: form.password || undefined,
           photoUrl: form.photoUrl || undefined,
+          type_status: form.type_status || null,
         });
         setCreated({ email: res.data.login.email, password: res.data.login.password, staffCode: res.data.profile.staffCode });
         setNotice(null);
@@ -166,37 +194,6 @@ export const AdminTeachersPage = () => {
     }
   };
 
-  const addAssignment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!assignTeacherId) {
-      setNotice('Select a teacher first.');
-      return;
-    }
-    if (!assignExamId && !assignSubjectId && !assignClassId) {
-      setNotice('Pick at least an exam, a subject or a class to assign.');
-      return;
-    }
-    setBusy(true);
-    setNotice(null);
-    try {
-      await apiPost('/course-assignments', {
-        teacherId: assignTeacherId,
-        examId: assignExamId || undefined,
-        subjectId: assignSubjectId || undefined,
-        classId: assignClassId || undefined,
-      });
-      setNotice('Course assigned.');
-      setAssignExamId('');
-      setAssignSubjectId('');
-      setAssignClassId('');
-      assignments.reload();
-    } catch (err: any) {
-      setNotice(err?.message ?? 'Could not assign course');
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const removeAssignment = async (id: string) => {
     if (!confirm('Remove this course assignment?')) return;
     try {
@@ -214,17 +211,26 @@ export const AdminTeachersPage = () => {
       <PageHeader
         eyebrow="Members"
         title="Teachers & staff"
-        text="Accounts, course assignments and access."
+        text="Accounts, leadership types, course assignments and access."
         actions={
-          <button type="button" onClick={openCreate} className="inline-flex min-h-11 items-center rounded bg-brand-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
-            <Plus aria-hidden="true" size={16} className="mr-2" /> Add Teacher
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => openAssignments()}
+              className="inline-flex min-h-11 items-center rounded border border-line bg-white px-5 py-2.5 text-sm font-bold text-ink hover:border-brand-500 hover:text-brand-700"
+            >
+              <BookOpen aria-hidden="true" size={16} className="mr-2" /> Assign Courses
+            </button>
+            <button type="button" onClick={openCreate} className="inline-flex min-h-11 items-center rounded bg-brand-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
+              <Plus aria-hidden="true" size={16} className="mr-2" /> Add Teacher
+            </button>
+          </div>
         }
       />
       {notice && !modalOpen && <p role="status" className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
       {created && (
         <Card className="border-lime-accent p-4 text-sm">
-          <p className="font-extrabold text-brand-800">Account created — share these login details now (shown once):</p>
+          <p className="font-extrabold text-brand-800">Account created - share these login details now (shown once):</p>
           <ul className="mt-2 space-y-1 font-mono text-[13px]">
             <li>Email: <b>{created.email}</b></li>
             <li>Password: <b>{created.password}</b></li>
@@ -234,42 +240,7 @@ export const AdminTeachersPage = () => {
       )}
 
       <Card>
-        <CardHead title="Assigned courses" sub="Link a teacher to an exam, a subject and/or a class" />
-        <form onSubmit={addAssignment} className="grid gap-3 border-b border-line px-5 py-4 sm:grid-cols-2 lg:grid-cols-5">
-          <label className="block text-sm font-semibold">Teacher
-            <select required value={assignTeacherId} onChange={(e) => setAssignTeacherId(e.target.value)} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm">
-              <option value="">— Select —</option>
-              {(data ?? []).filter((t) => t.role === 'TEACHER').map((t) => <option key={t.id} value={t.id}>{t.user_name}</option>)}
-            </select>
-          </label>
-          <label className="block text-sm font-semibold">Exam
-            <select value={assignExamId} onChange={(e) => setAssignExamId(e.target.value)} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm">
-              <option value="">— None —</option>
-              {(exams.data ?? []).map((x) => <option key={x.id} value={x.id}>{x.exam_name}</option>)}
-            </select>
-          </label>
-          <label className="block text-sm font-semibold">Subject
-            <select value={assignSubjectId} onChange={(e) => setAssignSubjectId(e.target.value)} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm">
-              <option value="">— None —</option>
-              {(subjects.data ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </label>
-          <label className="block text-sm font-semibold">Class
-            <select value={assignClassId} onChange={(e) => setAssignClassId(e.target.value)} className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm">
-              <option value="">— None —</option>
-              {(classes.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </label>
-          <div className="flex items-end">
-            <button type="submit" disabled={busy} className="min-h-11 w-full rounded bg-brand-900 px-4 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
-              {busy ? '…' : 'Assign'}
-            </button>
-          </div>
-        </form>
-      </Card>
-
-      <Card>
-        <CardHead title="Staff directory" sub={`${total} staff · search, edit and manage records`} />
+        <CardHead title="Staff directory" sub={`${total} staff - search, set leadership type and assign courses`} />
         <form
           className="flex flex-wrap gap-2 border-b border-line px-5 py-4"
           onSubmit={(e) => {
@@ -278,7 +249,7 @@ export const AdminTeachersPage = () => {
             setPage(1);
           }}
         >
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name or email…" className="min-h-11 w-full max-w-xs rounded border border-line px-3 text-sm outline-none focus:border-brand-500" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name or email..." className="min-h-11 w-full max-w-xs rounded border border-line px-3 text-sm outline-none focus:border-brand-500" />
           <button type="submit" className="min-h-11 rounded bg-brand-900 px-4 text-sm font-bold text-white hover:bg-brand-700">Search</button>
           {search && (
             <button type="button" onClick={() => { setSearch(''); setQuery(''); setPage(1); }} className="min-h-11 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">
@@ -295,23 +266,31 @@ export const AdminTeachersPage = () => {
         ) : (
           <>
           <TableWrap>
-            <table className={`w-full min-w-[880px] text-left text-sm transition-opacity ${list.isFetching ? 'opacity-60' : ''}`}>
-              <thead><tr><Th>Picture</Th><Th>Staff</Th><Th>Role</Th><Th>Assigned courses</Th><Th>Status</Th><Th><span className="sr-only">Actions</span></Th></tr></thead>
+            <table className={`w-full min-w-[1040px] text-left text-sm transition-opacity ${list.isFetching ? 'opacity-60' : ''}`}>
+              <thead><tr><Th>Picture</Th><Th>Staff</Th><Th>Role / type</Th><Th>Assigned courses</Th><Th>Status</Th><Th><span className="sr-only">Actions</span></Th></tr></thead>
               <tbody>
                 {data.map((s) => {
                   const courses = coursesByTeacher(s.id);
+                  const typeLabel = teacherTypeLabel(s.teacher?.type_status);
                   return (
                     <tr key={s.id}>
                       <Td><StaffPicture row={s} /></Td>
-                      <Td><span className="font-bold">{s.user_name}</span><span className="block text-xs text-muted">{s.user_email}{s.teacher ? ` · ${s.teacher.staffCode}` : ''}</span></Td>
-                      <Td><Pill tone="ink">{s.role}</Pill></Td>
+                      <Td><span className="font-bold">{s.user_name}</span><span className="block text-xs text-muted">{s.user_email}{s.teacher ? ` - ${s.teacher.staffCode}` : ''}</span></Td>
+                      <Td>
+                        <Pill tone="ink">{s.role}</Pill>
+                        {typeLabel && (
+                          <span className="mt-1 block">
+                            <Pill tone={s.teacher?.type_status === 'PRINCIPAL' ? 'violet' : 'sky'}>{typeLabel}</Pill>
+                          </span>
+                        )}
+                      </Td>
                       <Td className="text-muted">
-                        {courses.length === 0 ? '—' : (
+                        {courses.length === 0 ? '-' : (
                           <ul className="space-y-1">
                             {courses.map((c) => (
                               <li key={c.id} className="flex items-center gap-2 text-xs">
-                                <span className="font-semibold text-ink">{[c.exam?.exam_name, c.subject?.name, c.class?.name].filter(Boolean).join(' · ') || 'Assigned'}</span>
-                                <button type="button" onClick={() => removeAssignment(c.id)} aria-label="Remove assignment" title="Remove" className="font-bold text-rose-700 hover:underline">✕</button>
+                                <span className="font-semibold text-ink">{[c.exam?.exam_name, c.subject?.name, c.class?.name].filter(Boolean).join(' / ') || 'Assigned'}</span>
+                                <button type="button" onClick={() => removeAssignment(c.id)} aria-label="Remove assignment" title="Remove" className="font-bold text-rose-700 hover:underline">x</button>
                               </li>
                             ))}
                           </ul>
@@ -319,7 +298,17 @@ export const AdminTeachersPage = () => {
                       </Td>
                       <Td><Pill tone={s.active ? 'emerald' : 'rose'}>{s.active ? 'Active' : 'Inactive'}</Pill></Td>
                       <Td>
-                        <span className="flex gap-1.5">
+                        <span className="flex flex-wrap gap-1.5">
+                          <button
+                            type="button"
+                            disabled={s.role !== 'TEACHER'}
+                            onClick={() => openAssignments(s)}
+                            aria-label={`Assign courses to ${s.user_name}`}
+                            title={s.role === 'TEACHER' ? 'Assign courses' : 'Only teacher accounts can be assigned courses'}
+                            className="inline-flex items-center gap-1 rounded border border-line px-2.5 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <BookOpen aria-hidden="true" size={14} /> Assign
+                          </button>
                           <button type="button" onClick={() => openEdit(s)} aria-label={`Edit ${s.user_name}`} title="Edit" className="rounded border border-line px-2.5 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">
                             <Pencil aria-hidden="true" size={14} />
                           </button>
@@ -338,7 +327,7 @@ export const AdminTeachersPage = () => {
             </table>
           </TableWrap>
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-5 py-3 text-sm">
-            <p className="text-muted">{total} staff · page {safePage} of {pageCount}</p>
+            <p className="text-muted">{total} staff - page {safePage} of {pageCount}</p>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -346,7 +335,7 @@ export const AdminTeachersPage = () => {
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 className="min-h-10 rounded border border-line px-4 text-sm font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-50"
               >
-                ← Prev
+                &larr; Prev
               </button>
               <button
                 type="button"
@@ -354,7 +343,7 @@ export const AdminTeachersPage = () => {
                 onClick={() => setPage((p) => p + 1)}
                 className="min-h-10 rounded border border-line px-4 text-sm font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-50"
               >
-                Next →
+                Next &rarr;
               </button>
             </div>
           </div>
@@ -381,7 +370,7 @@ export const AdminTeachersPage = () => {
           </label>
           {!editing && (
             <>
-              <label className="block text-sm font-semibold">Password (optional — auto-generated if blank)
+              <label className="block text-sm font-semibold">Password (optional - auto-generated if blank)
                 <input type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Auto-generate" className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500" />
               </label>
               <div className="flex items-center gap-3">
@@ -391,7 +380,7 @@ export const AdminTeachersPage = () => {
                   <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-sm font-extrabold text-brand-700">?</span>
                 )}
                 <div>
-                  <p className="text-sm font-semibold">Avatar {form.photoUrl && <span className="text-emerald-700">✓ set</span>}</p>
+                  <p className="text-sm font-semibold">Avatar {form.photoUrl && <span className="text-emerald-700">set</span>}</p>
                   <div className="mt-1">
                     <UploadButton endpoint="avatarUploader" label="Upload avatar" onClientUploadComplete={(res) => setForm({ ...form, photoUrl: res?.[0]?.ufsUrl ?? '' })} onUploadError={(err) => setNotice(err.message)} />
                   </div>
@@ -399,6 +388,18 @@ export const AdminTeachersPage = () => {
               </div>
             </>
           )}
+          <label className="block text-sm font-semibold">Staff type
+            <select
+              value={form.type_status}
+              onChange={(e) => setForm({ ...form, type_status: e.target.value as TeacherForm['type_status'] })}
+              className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500"
+            >
+              <option value="">Not set</option>
+              <option value="CLASS_TEACHER">Class Teacher</option>
+              <option value="PRINCIPAL">Principal</option>
+            </select>
+            <span className="mt-1 block text-xs font-normal text-muted">The leadership type shown in the staff directory.</span>
+          </label>
           <div className="flex items-center justify-between gap-3 rounded border border-line bg-cream px-4 py-3">
             <div>
               <p className="text-sm font-bold">Active account</p>
@@ -421,11 +422,18 @@ export const AdminTeachersPage = () => {
               Cancel
             </button>
             <button type="submit" disabled={busy} className="min-h-11 flex-1 rounded bg-brand-500 px-4 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
-              {busy ? 'Saving…' : editing ? 'Save Changes' : 'Add Teacher'}
+              {busy ? 'Saving...' : editing ? 'Save Changes' : 'Add Teacher'}
             </button>
           </div>
         </form>
       </Modal>
+
+      <CourseAssignmentWizard
+        open={assignWizard.open}
+        onClose={() => setAssignWizard({ open: false, teacher: null })}
+        initialTeacher={assignWizard.teacher}
+        onAssigned={() => assignments.reload()}
+      />
     </div>
   );
 };

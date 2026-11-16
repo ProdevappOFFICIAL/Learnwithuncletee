@@ -6,7 +6,8 @@ import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api';
 import { usePagedList } from '@/lib/pagedQuery';
 import { ROUTES } from '@/routes/paths';
 import type { CombinationItem } from '@/data/dashboard';
-import { BookOpen, ChevronRight, Clock, Eye, EyeOff, FileText, Pencil, Plus, Trash2, Users } from 'lucide-react';
+import { BookOpen, ChevronRight, Clock, Download, Eye, EyeOff, FileText, Pencil, Plus, Trash2, Users } from 'lucide-react';
+import { ClassExportModal } from './exam-database/ClassExportModal';
 
 interface ExamItem {
   id: string;
@@ -53,6 +54,7 @@ export const ClassExamsPage = () => {
   const [form, setForm] = useState({ exam_name: '', minutes: '60', visible: true, combinationId: '' });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const openCreate = () => {
     setEditing(null);
@@ -141,9 +143,14 @@ export const ClassExamsPage = () => {
         title={`Exams — ${className}`}
         text="Each exam belongs to this class. Select an exam to manage its subjects and questions."
         actions={
-          <button type="button" onClick={openCreate} className="inline-flex min-h-11 items-center rounded bg-brand-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
-            <Plus aria-hidden="true" size={16} className="mr-2" /> Add New Exam
-          </button>
+          <>
+            <button type="button" onClick={() => setExportOpen(true)} disabled={!classId} className="inline-flex min-h-11 items-center rounded border border-line bg-white px-5 py-2.5 text-sm font-bold text-ink hover:border-brand-500 hover:text-brand-700 disabled:opacity-50">
+              <Download aria-hidden="true" size={16} className="mr-2" /> Export Class
+            </button>
+            <button type="button" onClick={openCreate} className="inline-flex min-h-11 items-center rounded bg-brand-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
+              <Plus aria-hidden="true" size={16} className="mr-2" /> Add New Exam
+            </button>
+          </>
         }
       />
       <nav aria-label="Breadcrumb" className="text-sm text-muted">
@@ -296,6 +303,22 @@ export const ClassExamsPage = () => {
           </div>
         </form>
       </Modal>
+
+      <ClassExportModal
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        classId={classId}
+        classLabel={className}
+        onExported={(result) => {
+          setNotice(
+            result.deletedExams > 0
+              ? `Exported ${className} to "${result.database.name}" and removed ${result.deletedExams} exam(s) from Exam & Test.`
+              : `Exported ${className} to "${result.database.name}" (${result.snapshot.summary.exams} exam(s), ${result.snapshot.summary.results} result(s)).`,
+          );
+          exams.invalidate();
+          cls.reload();
+        }}
+      />
     </div>
   );
 };
