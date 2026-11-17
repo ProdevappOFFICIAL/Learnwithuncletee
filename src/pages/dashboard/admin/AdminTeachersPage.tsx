@@ -5,7 +5,9 @@ import { useResource } from '@/context/AuthContext';
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { UploadButton } from '@/lib/uploadthing';
 import type { CourseAssignmentItem, StaffRow, TeacherTypeStatus } from '@/data/dashboard';
-import { BookOpen, Pencil, Plus, Trash2 } from 'lucide-react';
+import { BookOpen, BadgeCheck, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ROUTES } from '@/routes/paths';
 import { CourseAssignmentWizard, type InitialAssignTeacher } from './teacher-assign/CourseAssignmentWizard';
 
 // Same caching strategy as the student directory: 5-min stale directory data,
@@ -214,6 +216,12 @@ export const AdminTeachersPage = () => {
         text="Accounts, leadership types, course assignments and access."
         actions={
           <div className="flex flex-wrap gap-2">
+            <Link
+              to={ROUTES.adminTeacherStatuses}
+              className="inline-flex min-h-11 items-center rounded border border-line bg-white px-5 py-2.5 text-sm font-bold text-ink hover:border-brand-500 hover:text-brand-700"
+            >
+              <BadgeCheck aria-hidden="true" size={16} className="mr-2" /> Statuses
+            </Link>
             <button
               type="button"
               onClick={() => openAssignments()}

@@ -37,6 +37,7 @@ import { TeacherCourseQuestionsPage } from '@/pages/dashboard/teacher/TeacherCou
 import { AdminDashboardPage } from '@/pages/dashboard/admin/AdminDashboardPage';
 import { AdminStudentsPage } from '@/pages/dashboard/admin/AdminStudentsPage';
 import { AdminTeachersPage } from '@/pages/dashboard/admin/AdminTeachersPage';
+import { AdminStatusPage } from '@/pages/dashboard/admin/AdminStatusPage';
 import { AdminAdmissionsPage } from '@/pages/dashboard/admin/AdminAdmissionsPage';
 import { AdminAttendancePage } from '@/pages/dashboard/admin/AdminAttendancePage';
 import { AdminFeesPage } from '@/pages/dashboard/admin/AdminFeesPage';
@@ -161,6 +162,7 @@ const appRoutes = [
           { path: 'members/list', element: <AdminMemberPage /> },
           { path: 'students', element: <AdminStudentsPage /> },
           { path: 'teachers', element: <AdminTeachersPage /> },
+          { path: 'teachers/statuses', element: <AdminStatusPage /> },
           { path: 'admissions', element: <AdminAdmissionsPage /> },
           { path: 'attendance', element: <AdminAttendancePage /> },
           { path: 'attendance', element: <AdminAttendancePage /> },

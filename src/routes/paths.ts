@@ -33,6 +33,7 @@ export const ROUTES = {
   adminMembersList: '/dashboard/admin/members/list',
   adminStudents: '/dashboard/admin/students',
   adminTeachers: '/dashboard/admin/teachers',
+  adminTeacherStatuses: '/dashboard/admin/teachers/statuses',
   adminAdmissions: '/dashboard/admin/admissions',
   adminAttendance: '/dashboard/admin/attendance',
   adminFees: '/dashboard/admin/fees',

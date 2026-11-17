@@ -1,4 +1,5 @@
 import {
+  BadgeCheck,
   BookOpenCheck,
   ClipboardList,
   Cloud,
@@ -156,6 +157,20 @@ export const adminNav: DashboardNavItem[] = [
         label: "Teachers",
         icon: UserCog,
         permission: "teachers.read",
+        children: [
+          {
+            to: ROUTES.adminTeachers,
+            label: "Directory",
+            icon: UserCog,
+            permission: "teachers.read",
+          },
+          {
+            to: ROUTES.adminTeacherStatuses,
+            label: "Statuses",
+            icon: BadgeCheck,
+            permission: "settings.read",
+          },
+        ],
       },
       {
         to: ROUTES.adminMembersList,
@@ -244,12 +259,12 @@ export const adminNav: DashboardNavItem[] = [
     icon: Presentation,
     permission: "results.read",
   },
-    {
+   /* {
     to: ROUTES.adminResultGenerator,
     label: "Result Generator",
     icon: Presentation,
     permission: "results.read",
-  },
+  },*/
   {
     label: "Exam & Test",
     icon: GraduationCap,
@@ -601,6 +616,34 @@ export interface StudentRow {
 }
 
 export type TeacherTypeStatus = 'PRINCIPAL' | 'CLASS_TEACHER';
+
+export type StatusScope = 'TEACHER' | 'MEMBER' | 'STUDENT';
+
+export interface StatusDefinitionItem {
+  id: string;
+  name: string;
+  scope: StatusScope;
+  _count?: { assignments?: number };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StatusAssignmentItem {
+  id: string;
+  statusId: string;
+  userId: string;
+  classId?: string | null;
+  createdAt: string;
+  status: { id: string; name: string; scope: StatusScope };
+  user: {
+    id: string;
+    user_name: string;
+    user_email: string;
+    role: string;
+    class?: { id: string; name: string } | null;
+  };
+  class?: { id: string; name: string } | null;
+}
 
 export interface StaffRow {
   id: string;

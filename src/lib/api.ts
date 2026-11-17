@@ -244,6 +244,74 @@ export async function api<T = any>(path: string, opts: RequestOptions = {}): Pro
   return { data: payload?.data as T, meta: payload?.meta, message: payload?.message };
 }
 
+/**
+ * Authenticated binary download (Excel/PDF). Reuses the same silent-refresh
+ * path as `api`, then triggers the browser save dialog from the response blob.
+ */
+export async function apiDownload(
+  path: string,
+  query?: RequestOptions['query'],
+): Promise<{ filename: string }> {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const url = new URL(`${API_BASE}${normalizedPath}`);
+  if (query) {
+    for (const [k, v] of Object.entries(query)) {
+      if (v !== undefined && v !== '') url.searchParams.set(k, String(v));
+    }
+  }
+
+  const send = (accessToken: string | null) =>
+    fetch(url.toString(), {
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      credentials: 'include',
+    });
+
+  let res = await send(tokenStore.get());
+  if (res.status === 401) {
+    try {
+      const fresh = await refreshAccessToken();
+      tokenStore.set(fresh, tokenStore.isPersistent());
+      res = await send(fresh);
+    } catch {
+      notifySessionDead();
+      throw new ApiError(401, 'Session expired. Please sign in again.');
+    }
+  }
+
+  if (!res.ok) {
+    let payload: any = null;
+    try {
+      payload = await res.json();
+    } catch {
+      /* binary/empty error body */
+    }
+    if (res.status === 401) notifySessionDead();
+    throw new ApiError(res.status, payload?.message ?? `Download failed (${res.status})`);
+  }
+
+  const disposition = res.headers.get('content-disposition') ?? '';
+  const match = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(disposition);
+  let filename = 'results-export.xlsx';
+  if (match?.[1]) {
+    try {
+      filename = decodeURIComponent(match[1].replace(/"/g, '').trim()) || filename;
+    } catch {
+      filename = match[1].replace(/"/g, '').trim() || filename;
+    }
+  }
+
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
+  return { filename };
+}
+
 export const apiGet = <T = any>(path: string, query?: RequestOptions['query'], opts?: { auth?: boolean }) =>
   api<T>(path, { query, auth: opts?.auth ?? true });
 /** Public GET — no Authorization header attempted (for public website endpoints). */

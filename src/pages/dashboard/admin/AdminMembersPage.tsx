@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { ROUTES } from '@/routes/paths';
 import { Card, CardHead, PageHeader, Pill, StatTile } from '@/components/dashboard/DashboardUI';
 import { useResource } from '@/context/AuthContext';
-import { IdCard, UserCog, UserPlus, Users } from 'lucide-react';
+import { IdCard, BadgeCheck, UserCog, UserPlus, Users } from 'lucide-react';
 
 export const AdminMembersPage = () => {
   const students = useResource<unknown[]>('/students', { limit: 1 });
@@ -14,6 +14,7 @@ export const AdminMembersPage = () => {
     { to: ROUTES.adminStudents, title: 'Students', text: 'Directory, enrolment, guardians and fee status.', icon: Users },
     { to: ROUTES.adminTeachers, title: 'Teachers', text: 'Staff directory, departments and subjects.', icon: UserCog },
     { to: ROUTES.adminMembersList, title: 'Members', text: 'General member accounts with email login.', icon: IdCard },
+    { to: ROUTES.adminTeacherStatuses, title: 'Statuses', text: 'Create and assign teacher, member and student statuses.', icon: BadgeCheck },
     { to: ROUTES.adminMembersList, title: 'Add Member', text: 'Create a member account + login details.', icon: UserPlus },
   ];
 
