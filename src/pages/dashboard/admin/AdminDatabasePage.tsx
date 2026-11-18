@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -25,9 +26,9 @@ import {
 } from '@/components/dashboard/DashboardUI';
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { usePagedList } from '@/lib/pagedQuery';
+import { ROUTES } from '@/routes/paths';
 import type {
   DatabaseImportResult,
-  ExamDatabaseDetail,
   ExamDatabaseOverview,
   ExamDatabaseRow,
 } from './exam-database/types';
@@ -52,6 +53,7 @@ const modeLabel = (mode?: string | null) =>
   mode === 'MOVE' ? 'Exported & removed' : mode === 'COPY' ? 'Exported only' : 'No exports yet';
 
 export const AdminDatabasePage = () => {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
@@ -81,12 +83,6 @@ export const AdminDatabasePage = () => {
   const [form, setForm] = useState({ name: '', description: '' });
   const [formBusy, setFormBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-
-  // Details
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [detail, setDetail] = useState<ExamDatabaseDetail | null>(null);
-  const [detailBusy, setDetailBusy] = useState(false);
-  const [detailError, setDetailError] = useState<string | null>(null);
 
   // Import
   const [importTarget, setImportTarget] = useState<ExamDatabaseRow | null>(null);
@@ -148,19 +144,8 @@ export const AdminDatabasePage = () => {
     }
   };
 
-  const openDetails = async (database: ExamDatabaseRow) => {
-    setDetailOpen(true);
-    setDetail(null);
-    setDetailError(null);
-    setDetailBusy(true);
-    try {
-      const response = await apiGet<ExamDatabaseDetail>(`/exam-databases/${database.id}`);
-      setDetail(response.data);
-    } catch (error: any) {
-      setDetailError(error?.message ?? 'Could not load database details');
-    } finally {
-      setDetailBusy(false);
-    }
+  const openDetails = (database: ExamDatabaseRow) => {
+    navigate(`${ROUTES.adminDatabase}/${database.id}`);
   };
 
   const remove = async (database: ExamDatabaseRow) => {
@@ -419,7 +404,7 @@ export const AdminDatabasePage = () => {
                             onClick={() => openDetails(database)}
                             className="inline-flex items-center gap-1 rounded border border-line px-2.5 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700"
                           >
-                            <Eye aria-hidden="true" size={12} /> Details
+                            <Eye aria-hidden="true" size={12} /> View
                           </button>
                           <button
                             type="button"
@@ -525,101 +510,6 @@ export const AdminDatabasePage = () => {
             </button>
           </div>
         </form>
-      </Modal>
-
-      <Modal
-        open={detailOpen}
-        onClose={() => setDetailOpen(false)}
-        title={detail?.name ?? 'Database details'}
-        size="lg"
-      >
-        {detailBusy ? (
-          <LoadingSkeleton rows={3} />
-        ) : detailError ? (
-          <ErrorState message={detailError} />
-        ) : !detail ? (
-          <EmptyState message="No details available." />
-        ) : (
-          <div className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-4">
-              <div className="border border-line bg-cream px-3 py-3">
-                <p className="text-[11px] font-bold uppercase tracking-widest text-muted">Classes</p>
-                <p className="mt-1 font-display text-xl font-extrabold text-brand-700">{detail.classCount}</p>
-              </div>
-              <div className="border border-line bg-cream px-3 py-3">
-                <p className="text-[11px] font-bold uppercase tracking-widest text-muted">Exams</p>
-                <p className="mt-1 font-display text-xl font-extrabold text-brand-700">{detail.examCount}</p>
-              </div>
-              <div className="border border-line bg-cream px-3 py-3">
-                <p className="text-[11px] font-bold uppercase tracking-widest text-muted">Questions</p>
-                <p className="mt-1 font-display text-xl font-extrabold text-brand-700">
-                  {detail.questionCount}
-                </p>
-              </div>
-              <div className="border border-line bg-cream px-3 py-3">
-                <p className="text-[11px] font-bold uppercase tracking-widest text-muted">Results</p>
-                <p className="mt-1 font-display text-xl font-extrabold text-brand-700">
-                  {detail.resultCount}
-                </p>
-              </div>
-            </div>
-
-            {detail.description && <p className="text-sm text-muted">{detail.description}</p>}
-
-            <div>
-              <p className="text-sm font-bold text-ink">Class snapshots</p>
-              {detail.snapshots.length === 0 ? (
-                <p className="mt-2 border border-dashed border-line bg-cream px-4 py-4 text-sm text-muted">
-                  This database is empty. Export a class from Exam & Test into it.
-                </p>
-              ) : (
-                <ul className="mt-2 space-y-2">
-                  {detail.snapshots.map((snapshot) => (
-                    <li key={snapshot.id} className="border border-line px-4 py-3">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div>
-                          <p className="font-bold text-ink">{snapshot.className}</p>
-                          <p className="mt-0.5 text-xs text-muted">
-                            Exported {formatDate(snapshot.exportedAt)}
-                          </p>
-                        </div>
-                        <Pill tone={snapshot.mode === 'MOVE' ? 'rose' : 'emerald'}>
-                          {modeLabel(snapshot.mode)}
-                        </Pill>
-                      </div>
-                      <p className="mt-2 text-xs text-muted">
-                        {snapshot.summary.exams} exam(s) · {snapshot.summary.subjects} subject(s) ·{' '}
-                        {snapshot.summary.questions} question(s) · {snapshot.summary.results} result(s) ·{' '}
-                        {snapshot.summary.attempts} attempt(s)
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-4">
-              <button
-                type="button"
-                onClick={() => download(detail)}
-                className="inline-flex min-h-11 items-center gap-2 rounded border border-line px-4 text-sm font-bold hover:border-brand-500 hover:text-brand-700"
-              >
-                <Download aria-hidden="true" size={14} /> Download JSON
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setDetailOpen(false);
-                  openImport(detail);
-                }}
-                disabled={detail.examCount === 0}
-                className="inline-flex min-h-11 items-center gap-2 rounded bg-brand-500 px-4 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-50"
-              >
-                <Upload aria-hidden="true" size={14} /> Import to Exam &amp; Test
-              </button>
-            </div>
-          </div>
-        )}
       </Modal>
 
       <Modal

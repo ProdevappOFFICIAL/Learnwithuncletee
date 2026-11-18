@@ -28,6 +28,8 @@ export const ROUTES = {
   teacherAssignments: '/dashboard/teacher/assignments',
   teacherResults: '/dashboard/teacher/results',
   teacherClasses: '/dashboard/teacher/classes',
+  teacherPrincipalComments: '/dashboard/teacher/principal-comments',
+  teacherClassTeacherComments: '/dashboard/teacher/class-teacher-comments',
   adminDashboard: '/dashboard/admin',
   adminMembers: '/dashboard/admin/members',
   adminMembersList: '/dashboard/admin/members/list',
@@ -67,6 +69,7 @@ export const ROUTES = {
   adminSettings: '/dashboard/admin/settings',
   adminAuditLog: '/dashboard/admin/audit-log',
   adminResultGenerator: '/dashboard/admin/result-generator',
+  adminPrincipalComments: '/dashboard/admin/principal-comments',
   notFound: '*',
   
 } as const;

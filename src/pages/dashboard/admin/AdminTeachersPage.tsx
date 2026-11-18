@@ -4,7 +4,7 @@ import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, Modal, PageHea
 import { useResource } from '@/context/AuthContext';
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { UploadButton } from '@/lib/uploadthing';
-import type { CourseAssignmentItem, StaffRow, TeacherTypeStatus } from '@/data/dashboard';
+import type { CourseAssignmentItem, StaffRow } from '@/data/dashboard';
 import { BookOpen, BadgeCheck, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '@/routes/paths';
@@ -23,9 +23,6 @@ const fetchStaff = (search: string, page: number) =>
 const initialsOf = (name: string) =>
   name.split(' ').map((p) => p.replace('.', '')[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'LW';
 
-const teacherTypeLabel = (value?: string | null) =>
-  value === 'PRINCIPAL' ? 'Principal' : value === 'CLASS_TEACHER' ? 'Class Teacher' : null;
-
 /** Staff picture with initials fallback. */
 const StaffPicture = ({ row }: { row: StaffRow }) => {
   const src = row.teacher?.photoUrl || row.img || null;
@@ -43,7 +40,6 @@ interface TeacherForm {
   password: string;
   active: boolean;
   photoUrl: string;
-  type_status: '' | TeacherTypeStatus;
 }
 
 const emptyForm = (): TeacherForm => ({
@@ -52,7 +48,6 @@ const emptyForm = (): TeacherForm => ({
   password: '',
   active: true,
   photoUrl: '',
-  type_status: '',
 });
 
 export const AdminTeachersPage = () => {
@@ -121,7 +116,6 @@ export const AdminTeachersPage = () => {
       password: '',
       active: row.active,
       photoUrl: '',
-      type_status: row.teacher?.type_status ?? '',
     });
     setCreated(null);
     setNotice(null);
@@ -131,9 +125,7 @@ export const AdminTeachersPage = () => {
   const openAssignments = (row?: StaffRow) => {
     setAssignWizard({
       open: true,
-      teacher: row
-        ? { id: row.id, name: row.user_name, typeStatus: row.teacher?.type_status ?? null }
-        : null,
+      teacher: row ? { id: row.id, name: row.user_name } : null,
     });
   };
 
@@ -147,7 +139,6 @@ export const AdminTeachersPage = () => {
         await apiPatch(`/staff/${editing.id}`, {
           user_name: form.user_name.trim(),
           active: form.active,
-          type_status: form.type_status || null,
         });
         setNotice(`"${form.user_name.trim()}" updated.`);
       } else {
@@ -156,7 +147,6 @@ export const AdminTeachersPage = () => {
           user_email: form.user_email.trim(),
           password: form.password || undefined,
           photoUrl: form.photoUrl || undefined,
-          type_status: form.type_status || null,
         });
         setCreated({ email: res.data.login.email, password: res.data.login.password, staffCode: res.data.profile.staffCode });
         setNotice(null);
@@ -213,7 +203,7 @@ export const AdminTeachersPage = () => {
       <PageHeader
         eyebrow="Members"
         title="Teachers & staff"
-        text="Accounts, leadership types, course assignments and access."
+        text="Accounts, course assignments and access."
         actions={
           <div className="flex flex-wrap gap-2">
             <Link
@@ -248,7 +238,7 @@ export const AdminTeachersPage = () => {
       )}
 
       <Card>
-        <CardHead title="Staff directory" sub={`${total} staff - search, set leadership type and assign courses`} />
+        <CardHead title="Staff directory" sub={`${total} staff - search and assign courses`} />
         <form
           className="flex flex-wrap gap-2 border-b border-line px-5 py-4"
           onSubmit={(e) => {
@@ -275,22 +265,16 @@ export const AdminTeachersPage = () => {
           <>
           <TableWrap>
             <table className={`w-full min-w-[1040px] text-left text-sm transition-opacity ${list.isFetching ? 'opacity-60' : ''}`}>
-              <thead><tr><Th>Picture</Th><Th>Staff</Th><Th>Role / type</Th><Th>Assigned courses</Th><Th>Status</Th><Th><span className="sr-only">Actions</span></Th></tr></thead>
+              <thead><tr><Th>Picture</Th><Th>Staff</Th><Th>Role</Th><Th>Assigned courses</Th><Th>Status</Th><Th><span className="sr-only">Actions</span></Th></tr></thead>
               <tbody>
                 {data.map((s) => {
                   const courses = coursesByTeacher(s.id);
-                  const typeLabel = teacherTypeLabel(s.teacher?.type_status);
                   return (
                     <tr key={s.id}>
                       <Td><StaffPicture row={s} /></Td>
                       <Td><span className="font-bold">{s.user_name}</span><span className="block text-xs text-muted">{s.user_email}{s.teacher ? ` - ${s.teacher.staffCode}` : ''}</span></Td>
                       <Td>
                         <Pill tone="ink">{s.role}</Pill>
-                        {typeLabel && (
-                          <span className="mt-1 block">
-                            <Pill tone={s.teacher?.type_status === 'PRINCIPAL' ? 'violet' : 'sky'}>{typeLabel}</Pill>
-                          </span>
-                        )}
                       </Td>
                       <Td className="text-muted">
                         {courses.length === 0 ? '-' : (
@@ -396,18 +380,6 @@ export const AdminTeachersPage = () => {
               </div>
             </>
           )}
-          <label className="block text-sm font-semibold">Staff type
-            <select
-              value={form.type_status}
-              onChange={(e) => setForm({ ...form, type_status: e.target.value as TeacherForm['type_status'] })}
-              className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500"
-            >
-              <option value="">Not set</option>
-              <option value="CLASS_TEACHER">Class Teacher</option>
-              <option value="PRINCIPAL">Principal</option>
-            </select>
-            <span className="mt-1 block text-xs font-normal text-muted">The leadership type shown in the staff directory.</span>
-          </label>
           <div className="flex items-center justify-between gap-3 rounded border border-line bg-cream px-4 py-3">
             <div>
               <p className="text-sm font-bold">Active account</p>

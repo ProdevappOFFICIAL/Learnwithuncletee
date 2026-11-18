@@ -59,6 +59,8 @@ import { AdminWebsitePage } from '@/pages/dashboard/admin/AdminWebsitePage';
 import { AdminWebsitePagesPage } from '@/pages/dashboard/admin/AdminWebsitePagesPage';
 import { ExamClassesPage } from '@/pages/dashboard/admin/ExamClassesPage';
 import { AdminDatabasePage } from '@/pages/dashboard/admin/AdminDatabasePage';
+import { AdminDatabaseDetailPage } from '@/pages/dashboard/admin/AdminDatabaseDetailPage';
+import { AdminPrincipalCommentsPage, TeacherClassTeacherCommentsPage } from '@/pages/dashboard/admin/AdminPrincipalCommentsPage';
 import { AllExamsPage } from '@/pages/dashboard/admin/AllExamsPage';
 import { AllSubjectsPage } from '@/pages/dashboard/admin/AllSubjectsPage';
 import { AllQuestionsPage } from '@/pages/dashboard/admin/AllQuestionsPage';
@@ -142,6 +144,8 @@ const appRoutes = [
           { path: 'results', element: <TeacherResultsPage /> },
           { path: 'classes', element: <TeacherClassesPage /> },
           { path: 'courses/questions', element: <TeacherCourseQuestionsPage /> },
+          { path: 'principal-comments', element: <AdminPrincipalCommentsPage /> },
+          { path: 'class-teacher-comments', element: <TeacherClassTeacherCommentsPage /> },
         ],
       },
     ],
@@ -179,6 +183,7 @@ const appRoutes = [
           { path: 'forms/responses', element: <FormResponsesPage /> },
           { path: 'exams', element: <ExamClassesPage /> },
           { path: 'database', element: <AdminDatabasePage /> },
+          { path: 'database/:databaseId', element: <AdminDatabaseDetailPage /> },
           { path: 'exams/all', element: <AllExamsPage /> },
           { path: 'exams/subjects', element: <AllSubjectsPage /> },
           { path: 'exams/questions', element: <AllQuestionsPage /> },
@@ -199,6 +204,7 @@ const appRoutes = [
           { path: 'settings', element: <AdminSettingsPage /> },
           { path: 'audit-log', element: <AdminAuditLogPage /> },
           { path: 'result-generator', element: <AdminResultGeneratorPage /> },
+          { path: 'principal-comments', element: <AdminPrincipalCommentsPage /> },
         ],
       },
     ],

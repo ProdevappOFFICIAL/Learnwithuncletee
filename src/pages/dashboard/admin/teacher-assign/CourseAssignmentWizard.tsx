@@ -9,11 +9,7 @@ import type { ClassItem, ExamItem, StaffRow, SubjectItem } from '@/data/dashboar
 export interface InitialAssignTeacher {
   id: string;
   name: string;
-  typeStatus?: string | null;
 }
-
-const teacherTypeLabel = (value?: string | null) =>
-  value === 'PRINCIPAL' ? 'Principal' : value === 'CLASS_TEACHER' ? 'Class Teacher' : null;
 
 const STEP_META = [
   { label: 'Teacher', icon: UserRound },
@@ -86,14 +82,14 @@ export const CourseAssignmentWizard = ({
       .map((row) => ({
         id: row.id,
         label: row.user_name,
-        hint: [row.user_email, teacherTypeLabel(row.teacher?.type_status)].filter(Boolean).join(' · '),
+        hint: row.user_email,
       }));
 
     if (initialTeacher && !options.some((option) => option.id === initialTeacher.id)) {
       options.unshift({
         id: initialTeacher.id,
         label: initialTeacher.name,
-        hint: teacherTypeLabel(initialTeacher.typeStatus) ?? 'Teacher',
+        hint: 'Teacher',
       });
     }
     return options;

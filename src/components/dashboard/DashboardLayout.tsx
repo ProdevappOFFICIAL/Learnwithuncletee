@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LogOut, Menu, Search, X } from 'lucide-react';
 import { ROUTES } from '@/routes/paths';
@@ -22,6 +23,13 @@ interface Props {
  */
 type NavExtras = { dividerBefore?: boolean; disabled?: boolean };
 const extras = (item: DashboardNavItem) => item as DashboardNavItem & NavExtras;
+
+interface MyStatusSummary {
+  canManagePrincipalComments?: boolean;
+  canManageClassTeacherComments?: boolean;
+  isPrincipal?: boolean;
+  isClassTeacher?: boolean;
+}
 
 const initialsOf = (name: string) =>
   name
@@ -48,6 +56,20 @@ export const DashboardLayout = ({ role, nav }: Props) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, can, logout } = useAuth();
+  const statusQuery = useQuery({
+    queryKey: ['my-statuses'],
+    queryFn: async () => (await apiGet<MyStatusSummary>('/statuses/me')).data,
+    enabled: Boolean(user),
+    staleTime: 60_000,
+  });
+  const canManagePrincipalComments =
+    user?.role === 'OWNER' ||
+    user?.role === 'ADMIN' ||
+    statusQuery.data?.canManagePrincipalComments === true;
+  const canManageClassTeacherComments =
+    user?.role === 'OWNER' ||
+    user?.role === 'ADMIN' ||
+    statusQuery.data?.canManageClassTeacherComments === true;
 
   const isMember = user?.role === 'MEMBER';
   const effectiveRole: DashboardRole = isMember ? 'member' : role;
@@ -59,6 +81,8 @@ export const DashboardLayout = ({ role, nav }: Props) => {
   // Groups survive only while at least one child remains visible.
   const filterVisible = (items: DashboardNavItem[]): DashboardNavItem[] =>
     items.flatMap((item) => {
+      if (item.requiresPrincipal && !canManagePrincipalComments) return [];
+      if (item.requiresClassTeacher && !canManageClassTeacherComments) return [];
       if (item.children) {
         const kids = filterVisible(item.children);
         if (!kids.length) return [];

@@ -191,3 +191,39 @@ h4 {
 .scroll-db::-webkit-scrollbar-thumb:hover {
   background: rgba(31, 61, 43, 0.5);
 }
+
+/* Result Generator: print only the result-notification sheet. */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  body {
+    background: #ffffff !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #report-card-print,
+  #report-card-print * {
+    visibility: visible;
+  }
+
+  #report-card-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    overflow: visible !important;
+    border: 0 !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+  }
+
+  #report-card-print .print\:hidden {
+    display: none !important;
+  }
+}

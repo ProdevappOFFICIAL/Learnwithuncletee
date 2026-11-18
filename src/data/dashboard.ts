@@ -14,6 +14,7 @@ import {
   Layers,
   LayoutDashboard,
   MapPin,
+  MessageSquare,
   MonitorPlay,
   Newspaper,
   Presentation,
@@ -38,6 +39,10 @@ export interface DashboardNavItem {
   badge?: string;
   /** Permission key required to see this item. Undefined = visible to the role. */
   permission?: string;
+  /** Principal-only entries stay hidden for ordinary staff. */
+  requiresPrincipal?: boolean;
+  /** Class-teacher entries stay hidden unless a class is attached to the status. */
+  requiresClassTeacher?: boolean;
   /** Nested children — rendered as a collapsible subgroup. */
   children?: DashboardNavItem[];
 }
@@ -129,6 +134,20 @@ export const teacherNav: DashboardNavItem[] = [
         permission: "assignments.read",
       },
     ],
+  },
+  {
+    to: ROUTES.teacherPrincipalComments,
+    label: "Principal Comments",
+    icon: MessageSquare,
+    permission: "results.write",
+    requiresPrincipal: true,
+  },
+  {
+    to: ROUTES.teacherClassTeacherComments,
+    label: "Class Teacher Remarks",
+    icon: MessageSquare,
+    permission: "results.write",
+    requiresClassTeacher: true,
   },
   /* {
         to: ROUTES.teacherResults,
@@ -259,12 +278,19 @@ export const adminNav: DashboardNavItem[] = [
     icon: Presentation,
     permission: "results.read",
   },
-   /* {
+  {
     to: ROUTES.adminResultGenerator,
     label: "Result Generator",
     icon: Presentation,
     permission: "results.read",
-  },*/
+  },
+  {
+    to: ROUTES.adminPrincipalComments,
+    label: "Principal Comments",
+    icon: MessageSquare,
+    permission: "results.write",
+    requiresPrincipal: true,
+  },
   {
     label: "Exam & Test",
     icon: GraduationCap,
@@ -615,8 +641,6 @@ export interface StudentRow {
   average?: number | null;
 }
 
-export type TeacherTypeStatus = 'PRINCIPAL' | 'CLASS_TEACHER';
-
 export type StatusScope = 'TEACHER' | 'MEMBER' | 'STUDENT';
 
 export interface StatusDefinitionItem {
@@ -657,7 +681,6 @@ export interface StaffRow {
     department?: string;
     photoUrl?: string | null;
     subjects: string[];
-    type_status?: TeacherTypeStatus | null;
   } | null;
 }
 

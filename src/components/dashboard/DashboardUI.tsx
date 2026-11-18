@@ -229,7 +229,7 @@ export const Pagination = ({
           aria-label="Rows per page"
           className="min-h-10 rounded border border-line bg-white px-2 text-sm font-bold text-ink disabled:opacity-50"
         >
-          {[5, 10, 20, 50].map((n) => (
+          {[5, 10, 20, 50, 100, 200].map((n) => (
             <option key={n} value={n}>{n}</option>
           ))}
         </select>

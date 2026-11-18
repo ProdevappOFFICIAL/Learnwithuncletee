@@ -31,6 +31,10 @@ export interface ReportCardVariantPreset {
 }
 
 export interface ReportCardProps {
+    /** Field currently being inspected in the generator. */
+    activeField?: string | null;
+    /** Enables click-to-edit without changing the printed sheet layout. */
+    onFieldClick?: (field: string) => void;
     /** Selects the default subject set, header and section title. */
     variant?: ReportCardVariant;
     /** Leave empty to print the blank line, or pass e.g. "SECOND" */
@@ -132,7 +136,7 @@ export const REPORT_CARD_VARIANTS: ReportCardVariantPreset[] = [
         label: "Senior Science Section",
         shortLabel: "Science",
         sectionTitle: "RESULT NOTIFICATION (SENIOR SCIENCE SECTION)",
-        headerSrc: "/Sheader.png",
+        headerSrc: "/Jheader.jpg",
         subjects: SENIOR_SCIENCE_SUBJECTS,
     },
     {
@@ -140,7 +144,7 @@ export const REPORT_CARD_VARIANTS: ReportCardVariantPreset[] = [
         label: "Senior Commercial Section",
         shortLabel: "Commercial",
         sectionTitle: "RESULT NOTIFICATION (SENIOR COMMERCIAL SECTION)",
-        headerSrc: "/Sheader.png",
+        headerSrc: "/Jheader.jpg",
         subjects: SENIOR_COMMERCE_SUBJECTS,
     },
     {
@@ -148,7 +152,7 @@ export const REPORT_CARD_VARIANTS: ReportCardVariantPreset[] = [
         label: "Senior Art Section",
         shortLabel: "Art",
         sectionTitle: "RESULT NOTIFICATION (SENIOR ART SECTION)",
-        headerSrc: "/Sheader.png",
+        headerSrc: "/Jheader.jpg",
         subjects: SENIOR_ART_SUBJECTS,
     },
 ];
@@ -161,6 +165,8 @@ const td = "border border-black px-[7px] align-middle";
 
 const fmt = (v?: number) => (v === undefined || Number.isNaN(v) ? "" : String(v));
 
+const fmtDash = (v?: number) => (v === undefined || v === null || Number.isNaN(v) ? "—" : String(v));
+
 const fmtAttendance = (v?: number) => (v === undefined || Number.isNaN(v) ? "____" : String(v));
 
 const cTotalOf = (s: ReportSubject) =>
@@ -169,6 +175,13 @@ const cTotalOf = (s: ReportSubject) =>
 const totalOf = (s: ReportSubject) => {
     const c = cTotalOf(s);
     return c !== undefined && s.exam !== undefined ? c + s.exam : undefined;
+};
+
+/** First term has no previous cumulative, so Overall Total equals Total. */
+const overallOf = (s: ReportSubject) => {
+    const total = totalOf(s);
+    if (total === undefined) return undefined;
+    return s.lastCum === undefined ? total : Math.round((total + s.lastCum) / 2);
 };
 
 /** Compact row heights let the 13-subject junior sheet and the 11-subject
@@ -219,6 +232,8 @@ function PhoneIcon() {
 /* -------------------------------------------------------------------------- */
 
 export default function ReportCard({
+    activeField,
+    onFieldClick,
     variant = "junior",
     term = "",
     session = "2026/2027",
@@ -245,6 +260,31 @@ export default function ReportCard({
     const resolvedSectionTitle = sectionTitle ?? preset.sectionTitle;
     const resolvedHeaderSrc = headerSrc ?? preset.headerSrc;
     const recreation = psychomotor.recreation ?? psychomotor.sports;
+    const termLabel = term ? term.replace(/\s*term\s*$/i, "").toUpperCase() : "_____________";
+
+    /** Click-to-edit affordance only; all printed dimensions stay untouched. */
+    const cellProps = (field: string) => {
+        if (!onFieldClick) return {};
+        return {
+            onClick: () => onFieldClick(field),
+            role: "button",
+            tabIndex: 0,
+            onKeyDown: (event: { key: string; preventDefault: () => void }) => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onFieldClick(field);
+                }
+            },
+            "aria-label": `Edit ${field.replace(/\./g, " ")}`,
+        };
+    };
+
+    const cellClass = (field: string) => {
+        if (!onFieldClick) return "";
+        const active = activeField === field;
+        return `cursor-pointer transition-colors hover:bg-brand-50/60 ${active ? "outline outline-2 -outline-offset-2 outline-brand-500" : ""
+            }`;
+    };
 
     return (
         <div
@@ -290,10 +330,18 @@ export default function ReportCard({
                 <Tbl cols={[190, 181, 155, 115]} className="mt-[2px] text-[16px] leading-[20px]">
                     <tr className="h-[29px]">
                         <td className={`${td} px-[6px]`}>STUDENT NAME:</td>
-                        <td className={`${td} px-[6px]`} colSpan={2}>
+                        <td
+                            className={`${td} px-[6px] ${cellClass("studentName")}`}
+                            colSpan={2}
+                            {...cellProps("studentName")}
+                        >
                             {studentName}
                         </td>
-                        <td className="border border-black align-top" rowSpan={2}>
+                        <td
+                            className={`border border-black align-top ${cellClass("photo")}`}
+                            rowSpan={2}
+                            {...cellProps("photo")}
+                        >
                             {photoUrl && (
                                 <img src={photoUrl} alt="Student" className="block h-full w-full object-cover" />
                             )}
@@ -301,8 +349,18 @@ export default function ReportCard({
                     </tr>
                     <tr className="h-[60px]">
                         <td className={`${td} px-[6px] align-top`}>ADMISSION NUMBER:</td>
-                        <td className={`${td} px-[6px] align-top`}>{admissionNumber}</td>
-                        <td className={`${td} px-[6px] align-top`}>CLASS: {className}</td>
+                        <td
+                            className={`${td} px-[6px] align-top ${cellClass("admissionNumber")}`}
+                            {...cellProps("admissionNumber")}
+                        >
+                            {admissionNumber}
+                        </td>
+                        <td
+                            className={`${td} px-[6px] align-top ${cellClass("className")}`}
+                            {...cellProps("className")}
+                        >
+                            CLASS: {className}
+                        </td>
                     </tr>
                 </Tbl>
 
@@ -312,10 +370,13 @@ export default function ReportCard({
                 <div className="mt-[3px] w-[641px] pl-[7px]">
                     <div className="flex flex-wrap items-end justify-between gap-x-6 text-[13px] leading-[17px]">
                         <p>
-                            <b>{term ? term.toUpperCase() : "_____________"} TERM</b>{" "}
+                            <b>{termLabel} TERM</b>{" "}
                             <span>{session} ACADEMIC SESSION</span>
                         </p>
-                        <p className="flex gap-[14px] text-[11.5px] leading-[15px]">
+                        <p
+                            className={`flex gap-[14px] text-[11.5px] leading-[15px] ${cellClass("attendance")}`}
+                            {...cellProps("attendance")}
+                        >
                             <span>
                                 Present: <b>{fmtAttendance(present)}</b>
                             </span>
@@ -324,7 +385,10 @@ export default function ReportCard({
                             </span>
                         </p>
                     </div>
-                    <p className="text-[11.5px] leading-[15px]">
+                    <p
+                        className={`text-[11.5px] leading-[15px] ${cellClass("attendance")}`}
+                        {...cellProps("attendance")}
+                    >
                         Attendance Record || Total school days: <b>{fmtAttendance(totalSchoolDays)}</b>
                     </p>
                 </div>
@@ -380,27 +444,69 @@ export default function ReportCard({
                         </td>
                     </tr>
 
-                    {rows.map((s) => (
-                        <tr key={s.lines[0]} style={{ height: rowHeight(s.lines.length, compact) }}>
-                            <td className={td}>
+                    {rows.map((s, index) => (
+                        <tr key={`${s.lines[0]}-${index}`} style={{ height: rowHeight(s.lines.length, compact) }}>
+                            <td
+                                className={`${td} ${cellClass(`subject.${index}.label`)}`}
+                                {...cellProps(`subject.${index}.label`)}
+                            >
                                 {s.lines.map((line, k) => (
                                     <div key={k}>{line}</div>
                                 ))}
                             </td>
-                            <td className={td}>{fmt(s.cbt1)}</td>
-                            <td className={td}>{fmt(s.cbt2)}</td>
-                            <td className={td}>{fmt(cTotalOf(s))}</td>
-                            <td className={td}>{fmt(s.exam)}</td>
-                            <td className={td}>{fmt(totalOf(s))}</td>
-                            <td className={td}>{fmt(s.lastCum)}</td>
-                            <td className={td}>{fmt(s.overall)}</td>
+                            <td
+                                className={`${td} ${cellClass(`subject.${index}.cbt1`)}`}
+                                {...cellProps(`subject.${index}.cbt1`)}
+                            >
+                                {fmt(s.cbt1)}
+                            </td>
+                            <td
+                                className={`${td} ${cellClass(`subject.${index}.cbt2`)}`}
+                                {...cellProps(`subject.${index}.cbt2`)}
+                            >
+                                {fmt(s.cbt2)}
+                            </td>
+                            <td
+                                className={`${td} ${cellClass(`subject.${index}.ctotal`)}`}
+                                {...cellProps(`subject.${index}.ctotal`)}
+                            >
+                                {fmt(cTotalOf(s))}
+                            </td>
+                            <td
+                                className={`${td} ${cellClass(`subject.${index}.exam`)}`}
+                                {...cellProps(`subject.${index}.exam`)}
+                            >
+                                {fmt(s.exam)}
+                            </td>
+                            <td
+                                className={`${td} ${cellClass(`subject.${index}.total`)}`}
+                                {...cellProps(`subject.${index}.total`)}
+                            >
+                                {fmt(totalOf(s))}
+                            </td>
+                            <td
+                                className={`${td} ${cellClass(`subject.${index}.lastCum`)}`}
+                                {...cellProps(`subject.${index}.lastCum`)}
+                            >
+                                {fmtDash(s.lastCum)}
+                            </td>
+                            <td
+                                className={`${td} ${cellClass(`subject.${index}.overall`)}`}
+                                {...cellProps(`subject.${index}.overall`)}
+                            >
+                                {fmtDash(overallOf(s))}
+                            </td>
                         </tr>
                     ))}
 
                     {/* Class teacher remark */}
                     <tr>
                         <td className={`${td} py-[3px] font-bold`}>CLASS TEACHER REMARK:</td>
-                        <td className={`${td} whitespace-normal py-[3px]`} colSpan={7}>
+                        <td
+                            className={`${td} whitespace-normal py-[3px] ${cellClass("classTeacherRemark")}`}
+                            colSpan={7}
+                            {...cellProps("classTeacherRemark")}
+                        >
                             {classTeacherRemark}
                         </td>
                     </tr>
@@ -411,11 +517,15 @@ export default function ReportCard({
                         <td className={td} colSpan={2}>
                             PUNTUALITY
                         </td>
-                        <td className={td}>{affective.puntuality}</td>
+                        <td className={`${td} ${cellClass("affective.puntuality")}`} {...cellProps("affective.puntuality")}>
+                            {affective.puntuality}
+                        </td>
                         <td className={td} colSpan={3}>
                             RESPECT FOR AUTHORITY
                         </td>
-                        <td className={td}>{affective.respect}</td>
+                        <td className={`${td} ${cellClass("affective.respect")}`} {...cellProps("affective.respect")}>
+                            {affective.respect}
+                        </td>
                     </tr>
 
                     {/* Psychomotor skills */}
@@ -424,17 +534,31 @@ export default function ReportCard({
                         <td className={td} colSpan={2}>
                             HANDWRITING
                         </td>
-                        <td className={td}>{psychomotor.handwriting}</td>
+                        <td
+                            className={`${td} ${cellClass("psychomotor.handwriting")}`}
+                            {...cellProps("psychomotor.handwriting")}
+                        >
+                            {psychomotor.handwriting}
+                        </td>
                         <td className={td} colSpan={3}>
                             RECREATION
                         </td>
-                        <td className={td}>{recreation}</td>
+                        <td
+                            className={`${td} ${cellClass("psychomotor.recreation")}`}
+                            {...cellProps("psychomotor.recreation")}
+                        >
+                            {recreation}
+                        </td>
                     </tr>
 
                     {/* Principal's comment */}
                     <tr>
                         <td className={`${td} py-[3px] font-bold`}>PRINCIPALS COMMENT:</td>
-                        <td className={`${td} whitespace-normal py-[3px]`} colSpan={7}>
+                        <td
+                            className={`${td} whitespace-normal py-[3px] ${cellClass("principalComment")}`}
+                            colSpan={7}
+                            {...cellProps("principalComment")}
+                        >
                             {principalComment}
                         </td>
                     </tr>
@@ -442,7 +566,11 @@ export default function ReportCard({
                     {/* News letter */}
                     <tr>
                         <td className={`${td} py-[3px] font-bold`}>NEWS LETTER:</td>
-                        <td className={`${td} whitespace-normal py-[3px]`} colSpan={7}>
+                        <td
+                            className={`${td} whitespace-normal py-[3px] ${cellClass("newsLetter")}`}
+                            colSpan={7}
+                            {...cellProps("newsLetter")}
+                        >
                             {newsLetter}
                         </td>
                     </tr>
