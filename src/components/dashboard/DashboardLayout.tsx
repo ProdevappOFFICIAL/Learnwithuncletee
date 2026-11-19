@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LogOut, Menu, Search, X } from 'lucide-react';
+import { Bell, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LogOut, Menu, Search, Sparkles, X } from 'lucide-react';
 import { ROUTES } from '@/routes/paths';
 import { memberNav, roleMeta, type DashboardNavItem, type DashboardRole } from '@/data/dashboard';
 import { siteInfo } from '@/data/content';
@@ -9,6 +9,7 @@ import { avatarOf, useAuth } from '@/context/AuthContext';
 import { apiGet } from '@/lib/api';
 import { NotificationDrawer, readSeen, type FeedItem } from './NotificationDrawer';
 import { AccountDialog } from './AccountDialog';
+import { AiChatDrawer, type AiChatMode } from './ai/AiChatDrawer';
 
 interface Props {
   role: DashboardRole;
@@ -317,6 +318,14 @@ export const DashboardLayout = ({ role, nav }: Props) => {
   const [notifOpen, setNotifOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [aiMode, setAiMode] = useState<AiChatMode>(() => {
+    try {
+      const stored = localStorage.getItem('lwu_ai_mode');
+      return stored === 'drawer' || stored === 'full' || stored === 'minimized' ? stored : 'closed';
+    } catch {
+      return 'closed';
+    }
+  });
 
   // Badge count: fetch feed silently, diff against locally-seen ids.
   useEffect(() => {
@@ -339,7 +348,34 @@ export const DashboardLayout = ({ role, nav }: Props) => {
     };
   }, [user?.id, notifOpen]);
 
-  const openNotif = () => setNotifOpen(true);
+  const openNotif = () => {
+    setAiMode('closed');
+    setNotifOpen(true);
+  };
+  const openAccount = () => {
+    setAiMode('closed');
+    setAccountOpen(true);
+  };
+  const openAi = () => {
+    setNotifOpen(false);
+    setAccountOpen(false);
+    setAiMode('drawer');
+  };
+  const changeAiMode = (next: AiChatMode) => {
+    if (next !== 'closed') {
+      setNotifOpen(false);
+      setAccountOpen(false);
+    }
+    setAiMode(next);
+  };
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('lwu_ai_mode', aiMode);
+    } catch {
+      /* private mode */
+    }
+  }, [aiMode]);
   const closeNotif = () => {
     // Recompute badge from what the drawer just marked seen.
     setNotifOpen(false);
@@ -416,7 +452,7 @@ export const DashboardLayout = ({ role, nav }: Props) => {
       <div className="space-y-0.5 border-t border-white/10 p-3">
         <button
           type="button"
-          onClick={() => setAccountOpen(true)}
+          onClick={openAccount}
           aria-label="Open account settings"
           title={isCollapsed ? displayName : undefined}
           className={cx(
@@ -532,6 +568,19 @@ export const DashboardLayout = ({ role, nav }: Props) => {
                 <Search size={15} aria-hidden="true" />
                 <input placeholder="Search…" className="w-36 bg-transparent outline-none placeholder:text-muted/70 lg:w-44" />
               </label>
+              {can('ai.use') && (
+                <button
+                  type="button"
+                  onClick={openAi}
+                  aria-label="Open the AI school assistant"
+                  title="Uncle Tee AI (Ctrl+Shift+A)"
+                  className={`relative flex h-10 w-10 items-center justify-center rounded border text-brand-800 ${
+                    aiMode === 'closed' ? 'border-line hover:bg-brand-50' : 'border-brand-500 bg-brand-50'
+                  }`}
+                >
+                  <Sparkles size={17} aria-hidden="true" />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={openNotif}
@@ -547,7 +596,7 @@ export const DashboardLayout = ({ role, nav }: Props) => {
               </button>
               <button
                 type="button"
-                onClick={() => setAccountOpen(true)}
+                onClick={openAccount}
                 aria-label="Account settings"
                 className="hidden items-center gap-2 rounded bg-brand-900 py-1.5 pl-1.5 pr-3 text-white hover:bg-brand-700 sm:flex"
               >
@@ -580,6 +629,7 @@ export const DashboardLayout = ({ role, nav }: Props) => {
           otherwise trap `fixed` positioning inside the 68px header. */}
       <NotificationDrawer open={notifOpen} onClose={closeNotif} />
       <AccountDialog open={accountOpen} onClose={() => setAccountOpen(false)} />
+      <AiChatDrawer mode={aiMode} onModeChange={changeAiMode} onClose={() => setAiMode('closed')} />
     </div>
   );
 };

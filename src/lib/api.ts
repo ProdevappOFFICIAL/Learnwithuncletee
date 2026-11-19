@@ -314,13 +314,56 @@ export async function apiDownload(
 
 export const apiGet = <T = any>(path: string, query?: RequestOptions['query'], opts?: { auth?: boolean }) =>
   api<T>(path, { query, auth: opts?.auth ?? true });
-/** Public GET — no Authorization header attempted (for public website endpoints). */
+/** Public GET - no Authorization header attempted (for public website endpoints). */
 export const apiGetPublic = <T = any>(path: string, query?: RequestOptions['query']) =>
   api<T>(path, { query, auth: false });
 export const apiPost = <T = any>(path: string, body?: unknown) => api<T>(path, { method: 'POST', body });
 export const apiPatch = <T = any>(path: string, body?: unknown) => api<T>(path, { method: 'PATCH', body });
 export const apiPut = <T = any>(path: string, body?: unknown) => api<T>(path, { method: 'PUT', body });
 export const apiDelete = <T = any>(path: string) => api<T>(path, { method: 'DELETE' });
+
+/**
+ * Authenticated fetch that keeps the same silent-refresh behavior as `api()`.
+ * Used for streaming endpoints (SSE) that cannot go through `res.json()`.
+ */
+export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const url = new URL(`${API_BASE}${normalizedPath}`);
+
+  const send = (accessToken: string | null) => {
+    const headers = new Headers(init.headers);
+    if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+    return fetch(url.toString(), {
+      ...init,
+      headers,
+      credentials: 'include',
+    });
+  };
+
+  let res = await send(tokenStore.get());
+  if (res.status === 401) {
+    try {
+      const fresh = await refreshAccessToken();
+      tokenStore.set(fresh, tokenStore.isPersistent());
+      res = await send(fresh);
+    } catch {
+      notifySessionDead();
+      throw new ApiError(401, 'Session expired. Please sign in again.');
+    }
+  }
+
+  if (!res.ok) {
+    let payload: any = null;
+    try {
+      payload = await res.json();
+    } catch {
+      /* empty/stream body */
+    }
+    if (res.status === 401) notifySessionDead();
+    throw new ApiError(res.status, payload?.message ?? `Request failed (${res.status})`);
+  }
+  return res;
+}
 
 /** Backend returns kobo ints — format as ₦ for display. */
 export const formatNaira = (kobo: number | null | undefined) =>
