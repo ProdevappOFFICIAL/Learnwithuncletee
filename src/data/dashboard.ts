@@ -321,6 +321,12 @@ export const adminNav: DashboardNavItem[] = [
             permission: "results.read",
           },
           {
+            to: ROUTES.adminQuestionBank,
+            label: "Question Bank",
+            icon: ClipboardList,
+            permission: "results.read",
+          },
+          {
             to: ROUTES.adminCombinations,
             label: "All Combinations",
             icon: Layers,
@@ -552,7 +558,7 @@ export const TERM_OPTIONS = ["First Term", "Second Term", "Third Term"];
 export const sessionOptions = () => {
   const cy = new Date().getFullYear();
   const years: string[] = [];
-  for (let y = cy - 3; y <= cy + 1; y++) years.push(`${y}/${y + 1}`);
+  for (let y = cy - 3; y <= cy + 4; y++) years.push(`${y}/${y + 1}`);
   return years.reverse();
 };
 

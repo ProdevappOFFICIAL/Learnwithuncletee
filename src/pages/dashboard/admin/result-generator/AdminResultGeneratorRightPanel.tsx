@@ -17,7 +17,6 @@ import {
   bestSubjectMatch,
   mappedScore,
   sourcePercentage,
-  termDateRange,
   totalOf,
   VARIANT_LABELS,
 } from './helpers';
@@ -41,11 +40,10 @@ interface AdminResultGeneratorRightPanelProps {
   sourceResults: SourceResult[];
   selectedSourceKey: string;
   onSourceChange: (key: string) => void;
-  onCalculateAttendance: (from: string, to: string) => void;
+  onCalculateAttendance: () => void;
   attendanceBusy: boolean;
   attendanceError: string | null;
   attendance: AttendanceSummary | null;
-  onUseTermDates: () => void;
   onAutoMap: () => void;
   profilePhotoUrl: string;
   attachOptions: SearchOption[];
@@ -124,7 +122,6 @@ export const AdminResultGeneratorRightPanel = ({
   attendanceBusy,
   attendanceError,
   attendance,
-  onUseTermDates,
   onAutoMap,
   profilePhotoUrl,
   attachOptions,
@@ -258,51 +255,33 @@ export const AdminResultGeneratorRightPanel = ({
         ) : selectedField === 'attendance' ? (
           <section className="space-y-3 border-t border-line pt-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-bold text-ink">Attendance settings</p>
-              <button
-                type="button"
-                onClick={onUseTermDates}
-                className="inline-flex items-center gap-1 rounded border border-line px-2 py-1 text-[10px] font-bold text-brand-700 hover:border-brand-500"
-              >
-                <CalendarDays size={11} aria-hidden="true" /> Term dates
-              </button>
+              <p className="text-sm font-bold text-ink">Attendance</p>
+              <span className="rounded border border-line bg-brand-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-brand-700">
+                Locked to Settings
+              </span>
             </div>
             <p className="text-xs leading-5 text-muted">
-              Choose the term window. Saturdays and Sundays are excluded, then present and absent days are calculated from this pupil’s register.
+              Present and absent days are read from this pupil’s register across the Settings term dates.
+              Saturdays and Sundays are excluded.
             </p>
             <div className="grid grid-cols-2 gap-2">
-              <label className="block text-xs font-semibold text-muted">
-                From
-                <input
-                  type="date"
-                  value={draft.attendanceFrom ?? ''}
-                  onChange={(event) => onPatchDraft({ attendanceFrom: event.target.value })}
-                  className="mt-1 block min-h-10 w-full rounded border border-line bg-white px-2 text-xs font-semibold"
-                />
-              </label>
-              <label className="block text-xs font-semibold text-muted">
-                To
-                <input
-                  type="date"
-                  value={draft.attendanceTo ?? ''}
-                  onChange={(event) => onPatchDraft({ attendanceTo: event.target.value })}
-                  className="mt-1 block min-h-10 w-full rounded border border-line bg-white px-2 text-xs font-semibold"
-                />
-              </label>
+              <div className="rounded border border-line bg-cream px-2 py-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-muted">From</p>
+                <p className="text-xs font-semibold text-ink">{draft.attendanceFrom || '—'}</p>
+              </div>
+              <div className="rounded border border-line bg-cream px-2 py-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-muted">To</p>
+                <p className="text-xs font-semibold text-ink">{draft.attendanceTo || '—'}</p>
+              </div>
             </div>
             <button
               type="button"
-              onClick={() =>
-                onCalculateAttendance(
-                  draft.attendanceFrom || termDateRange(draft.term, draft.session).from,
-                  draft.attendanceTo || termDateRange(draft.term, draft.session).to,
-                )
-              }
+              onClick={onCalculateAttendance}
               disabled={attendanceBusy || !draft.studentId}
               className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded bg-brand-500 px-3 text-xs font-bold text-white hover:bg-brand-700 disabled:opacity-50"
             >
               <CalendarDays size={13} aria-hidden="true" />
-              {attendanceBusy ? 'Calculating...' : 'Calculate from attendance'}
+              {attendanceBusy ? 'Refreshing...' : 'Refresh from register'}
             </button>
             {!draft.studentId && (
               <p className="text-[11px] text-amber-800">Attach this row to a pupil first to read attendance.</p>
@@ -312,42 +291,20 @@ export const AdminResultGeneratorRightPanel = ({
                 {attendanceError}
               </p>
             )}
-            {(attendance || draft.totalSchoolDays != null) && (
-              <div className="grid grid-cols-3 gap-2">
-                <label className="block text-[10px] font-bold uppercase tracking-wide text-muted">
-                  School days
-                  <input
-                    type="number"
-                    min={0}
-                    value={draft.totalSchoolDays ?? ''}
-                    onChange={(event) =>
-                      onPatchDraft({ totalSchoolDays: clampNumber(event.target.value, 366) ?? undefined })
-                    }
-                    className="mt-1 block min-h-9 w-full rounded border border-line bg-white px-2 text-xs font-semibold"
-                  />
-                </label>
-                <label className="block text-[10px] font-bold uppercase tracking-wide text-muted">
-                  Present
-                  <input
-                    type="number"
-                    min={0}
-                    value={draft.present ?? ''}
-                    onChange={(event) => onPatchDraft({ present: clampNumber(event.target.value, 366) ?? undefined })}
-                    className="mt-1 block min-h-9 w-full rounded border border-line bg-white px-2 text-xs font-semibold"
-                  />
-                </label>
-                <label className="block text-[10px] font-bold uppercase tracking-wide text-muted">
-                  Absent
-                  <input
-                    type="number"
-                    min={0}
-                    value={draft.absent ?? ''}
-                    onChange={(event) => onPatchDraft({ absent: clampNumber(event.target.value, 366) ?? undefined })}
-                    className="mt-1 block min-h-9 w-full rounded border border-line bg-white px-2 text-xs font-semibold"
-                  />
-                </label>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded border border-line bg-cream px-2 py-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-muted">School days</p>
+                <p className="text-sm font-bold text-ink">{draft.totalSchoolDays ?? '—'}</p>
               </div>
-            )}
+              <div className="rounded border border-line bg-cream px-2 py-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-muted">Present</p>
+                <p className="text-sm font-bold text-ink">{draft.present ?? '—'}</p>
+              </div>
+              <div className="rounded border border-line bg-cream px-2 py-1.5">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-muted">Absent</p>
+                <p className="text-sm font-bold text-ink">{draft.absent ?? '—'}</p>
+              </div>
+            </div>
             {attendance && (
               <p className="border-l-2 border-lime-accent bg-brand-50 px-3 py-2 text-[11px] text-brand-800">
                 {attendance.from} to {attendance.to}: {attendance.present} present, {attendance.absent} absent, {attendance.totalSchoolDays} school days. Weekends excluded.

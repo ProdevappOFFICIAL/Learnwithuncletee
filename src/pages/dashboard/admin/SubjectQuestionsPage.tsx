@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pagination, Pill } from '@/components/dashboard/DashboardUI';
 import { useAuth } from '@/context/AuthContext';
 import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api';
+import { useAcademicSettings } from '@/lib/academic';
 import { usePagedList } from '@/lib/pagedQuery';
 import { UploadButton } from '@/lib/uploadthing';
 import { ROUTES } from '@/routes/paths';
@@ -42,15 +43,20 @@ export const SubjectQuestionsPage = () => {
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<QuestionType | ''>('');
+  const academic = useAcademicSettings();
+  const session = academic.data?.data.session ?? '';
+  const term = academic.data?.data.term ?? '';
 
   const questions = usePagedList<QuestionItem>(
-    ['subject-questions', examId, subjectId, query, typeFilter],
+    ['subject-questions', examId, subjectId, query, typeFilter, session, term],
     (page, limit) =>
       apiGet<QuestionItem[]>('/questions', {
         examId,
         subjectId,
         searchTerm: query || undefined,
         type: typeFilter || undefined,
+        session: session || undefined,
+        term: term || undefined,
         page,
         limit,
       }),
@@ -342,7 +348,7 @@ export const SubjectQuestionsPage = () => {
         </Card>
 
         <Card className="min-w-0">
-          <CardHead title="Question bank" sub={`${questions.total} shown`} />
+          <CardHead title="Question bank" sub={`${questions.total} shown${session || term ? ` · ${session}${term ? ` · ${term}` : ''}` : ''}`} />
           <form
             className="flex flex-wrap gap-2 border-b border-line px-4 py-4 sm:px-5"
             onSubmit={(e) => {

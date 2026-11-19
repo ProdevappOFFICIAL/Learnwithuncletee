@@ -5,6 +5,7 @@ import type {
   GeneratedSubject,
   ReportCardDraft,
   ReportVariant,
+  SourceResult,
   SourceSubject,
 } from './types';
 
@@ -41,6 +42,37 @@ export const presetSubjects = (variant: ReportVariant): GeneratedSubject[] => {
     lines: [...subject.lines],
     sourceSubjectId: null,
     sourceSubjectName: null,
+    cbt1: null,
+    cbt2: null,
+    exam: null,
+    lastCum: null,
+    overall: null,
+  }));
+};
+
+/**
+ * Build the printable rows from the pupil's actual result subjects for the
+ * current session/term. Preset subject names are only a fallback when the
+ * pupil has no result subjects yet.
+ */
+export const subjectsFromSources = (sources: SourceResult[]): GeneratedSubject[] => {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const source of sources) {
+    for (const subject of source.subjects) {
+      const name = String(subject.name ?? '').trim();
+      const key = name.toLowerCase();
+      if (!name || seen.has(key)) continue;
+      seen.add(key);
+      names.push(name);
+    }
+  }
+  names.sort((a, b) => a.localeCompare(b));
+  return names.map((name, index) => ({
+    position: index,
+    lines: [`${index + 1}. ${name.toUpperCase()}`],
+    sourceSubjectId: null,
+    sourceSubjectName: name,
     cbt1: null,
     cbt2: null,
     exam: null,

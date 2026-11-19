@@ -1,10 +1,13 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pagination, Pill } from '@/components/dashboard/DashboardUI';
 import { useResource } from '@/context/AuthContext';
 import { apiGet } from '@/lib/api';
+import { useAcademicSettings } from '@/lib/academic';
 import { usePagedList } from '@/lib/pagedQuery';
 import type { ExamItem, SubjectItem } from '@/data/dashboard';
-import { HelpCircle } from 'lucide-react';
+import { ROUTES } from '@/routes/paths';
+import { HelpCircle, Library } from 'lucide-react';
 
 interface QuestionRow {
   id: string;
@@ -12,6 +15,8 @@ interface QuestionRow {
   type: string;
   examId: string;
   subjectId: string;
+  session?: string | null;
+  term?: string | null;
   exam?: { exam_name: string } | null;
   subject?: { name: string } | null;
 }
@@ -31,14 +36,19 @@ export const AllQuestionsPage = () => {
   const [query, setQuery] = useState('');
   const exams = useResource<ExamItem[]>('/exams', { limit: 200 });
   const subjects = useResource<SubjectItem[]>('/subjects', { limit: 200 });
+  const academic = useAcademicSettings();
+  const session = academic.data?.data.session ?? '';
+  const term = academic.data?.data.term ?? '';
   const questions = usePagedList<QuestionRow>(
-    ['all-questions', examFilter, subjectFilter, typeFilter, query],
+    ['all-questions', examFilter, subjectFilter, typeFilter, query, session, term],
     (page, limit) =>
       apiGet<QuestionRow[]>('/questions', {
         examId: examFilter || undefined,
         subjectId: subjectFilter || undefined,
         type: typeFilter || undefined,
         searchTerm: query || undefined,
+        session: session || undefined,
+        term: term || undefined,
         page,
         limit,
       }),
@@ -51,10 +61,21 @@ export const AllQuestionsPage = () => {
       <PageHeader
         eyebrow="Exam & Test"
         title="Questions"
-        text="Every question across exams. Open one inside its exam + subject to edit it."
+        text={`Every question for ${session || 'the current session'} · ${term || 'the current term'}. Open one inside its exam + subject to edit it.`}
+        actions={
+          <Link
+            to={ROUTES.adminQuestionBank}
+            className="inline-flex min-h-11 items-center rounded border border-line bg-white px-4 py-2.5 text-sm font-bold hover:border-brand-500 hover:text-brand-700"
+          >
+            <Library aria-hidden="true" size={15} className="mr-2" /> Question Bank
+          </Link>
+        }
       />
       <Card>
-        <CardHead title="All questions" sub={`${questions.total} shown`} />
+        <CardHead
+          title="All questions"
+          sub={`${questions.total} shown${session || term ? ` · ${session}${term ? ` · ${term}` : ''}` : ''}`}
+        />
         <form
           className="flex flex-wrap gap-2 border-b border-line px-5 py-4"
           onSubmit={(e) => {
@@ -87,7 +108,7 @@ export const AllQuestionsPage = () => {
         ) : questions.isError ? (
           <div className="px-5 py-5"><ErrorState message="Could not load questions" onRetry={() => questions.refetch()} /></div>
         ) : questions.rows.length === 0 ? (
-          <div className="px-5 py-5"><EmptyState message="No questions found." /></div>
+          <div className="px-5 py-5"><EmptyState message="No questions found for the current session and term." /></div>
         ) : (
           <>
             <ul className={`divide-y divide-line transition-opacity ${questions.isFetching ? 'opacity-60' : ''}`}>
@@ -103,7 +124,9 @@ export const AllQuestionsPage = () => {
                     </span>
                     <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
                       <Pill tone="sky">{q.type.replace(/_/g, ' ')}</Pill>
-                      <span>{q.exam?.exam_name ?? ''}</span>
+                      {q.session && <span>{q.session}</span>}
+                      {q.term && <span>· {q.term}</span>}
+                      {q.exam?.exam_name && <span>· {q.exam.exam_name}</span>}
                       {q.subject?.name && <span>· {q.subject.name}</span>}
                     </span>
                   </span>

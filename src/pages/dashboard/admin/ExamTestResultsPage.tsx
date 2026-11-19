@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pagination, Pill, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
 import { useResource } from '@/context/AuthContext';
 import { apiDelete, apiDownload, apiGet, apiPatch } from '@/lib/api';
+import { useAcademicSettings } from '@/lib/academic';
 import { usePagedList } from '@/lib/pagedQuery';
 import type { ClassItem } from '@/data/dashboard';
 import { ChevronDown, ChevronRight, Download } from 'lucide-react';
@@ -37,13 +38,18 @@ export const ExamTestResultsPage = ({ origin }: { origin: 'ONLINE' | 'OFFLINE' }
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState<'selected' | 'all' | null>(null);
   const classes = useResource<ClassItem[]>('/classes', { limit: 200 });
+  const academic = useAcademicSettings();
+  const session = academic.data?.data.session ?? '';
+  const term = academic.data?.data.term ?? '';
 
   const results = usePagedList<TestResultRow>(
-    ['test-results', query, classFilter, mode],
+    ['test-results', query, classFilter, mode, session, term],
     (page, limit) =>
       apiGet<TestResultRow[]>(mode === 'OFFLINE' ? '/offline-results' : '/results', {
         searchTerm: query || undefined,
         classId: classFilter || undefined,
+        session: session || undefined,
+        term: term || undefined,
         page,
         limit,
       }),
@@ -84,8 +90,13 @@ export const ExamTestResultsPage = ({ origin }: { origin: 'ONLINE' | 'OFFLINE' }
       const { filename } = await apiDownload(
         mode === 'OFFLINE' ? '/offline-results/export' : '/results/export',
         which === 'selected'
-          ? { ids: [...selected].join(',') }
-          : { searchTerm: query || undefined, classId: classFilter || undefined },
+          ? { ids: [...selected].join(','), session: session || undefined, term: term || undefined }
+          : {
+              searchTerm: query || undefined,
+              classId: classFilter || undefined,
+              session: session || undefined,
+              term: term || undefined,
+            },
       );
       setNotice(
         `Exported ${which === 'selected' ? selected.size : results.total} result(s) to ${filename}.`,
@@ -141,7 +152,7 @@ export const ExamTestResultsPage = ({ origin }: { origin: 'ONLINE' | 'OFFLINE' }
       {notice && <p role="status" className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
 
       <Card>
-        <CardHead title="All attempts" sub={`${results.total} newest first`} />
+        <CardHead title="All attempts" sub={`${results.total} newest first${session || term ? ` · ${session}${term ? ` · ${term}` : ''}` : ''}`} />
         <form
           className="flex flex-wrap gap-2 border-b border-line px-5 py-4"
           onSubmit={(e) => {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BadgeCheck, MessageSquareText, Search } from 'lucide-react';
 import {
@@ -14,8 +14,9 @@ import {
   Th,
 } from '@/components/dashboard/DashboardUI';
 import { apiGet, apiPost } from '@/lib/api';
+import { useAcademicSettings } from '@/lib/academic';
 import { TERM_OPTIONS, sessionOptions, type ClassItem } from '@/data/dashboard';
-import { currentSession, currentTerm, initialsOf, VARIANT_SHORT } from './result-generator/helpers';
+import { initialsOf, VARIANT_SHORT } from './result-generator/helpers';
 import type { PrincipalStudentList, PrincipalStudentRow } from './result-generator/types';
 
 type CommentKind = 'principal' | 'class-teacher';
@@ -62,8 +63,11 @@ const CONFIG = {
 const CommentReviewPage = ({ kind }: { kind: CommentKind }) => {
   const config = CONFIG[kind];
   const queryClient = useQueryClient();
-  const [session, setSession] = useState(currentSession());
-  const [term, setTerm] = useState(currentTerm());
+  const academic = useAcademicSettings();
+  // Start on the current period from Settings, but keep the controls so a
+  // principal can review another term without leaving the page.
+  const [session, setSession] = useState('');
+  const [term, setTerm] = useState('');
   const [classFilter, setClassFilter] = useState('');
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
@@ -71,6 +75,13 @@ const CommentReviewPage = ({ kind }: { kind: CommentKind }) => {
   const [comment, setComment] = useState('');
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null);
+
+  useEffect(() => {
+    const settings = academic.data?.data;
+    if (!settings) return;
+    setSession((previous) => previous || settings.session);
+    setTerm((previous) => previous || settings.term);
+  }, [academic.data]);
 
   const classesQuery = useQuery({
     queryKey: ['comment-classes'],
@@ -90,6 +101,7 @@ const CommentReviewPage = ({ kind }: { kind: CommentKind }) => {
         })
       ).data,
     staleTime: 30_000,
+    enabled: Boolean(session && term),
   });
 
   const rows = listQuery.data?.rows ?? [];

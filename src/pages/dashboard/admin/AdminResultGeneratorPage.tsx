@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Download, Printer, Upload } from 'lucide-react';
-import { PageHeader } from '@/components/dashboard/DashboardUI';
+import { ErrorState, LoadingSkeleton, PageHeader } from '@/components/dashboard/DashboardUI';
 import { apiDownload, apiGet, apiPost } from '@/lib/api';
-import { TERM_OPTIONS, sessionOptions, type ClassItem, type StudentRow } from '@/data/dashboard';
+import { useAcademicSettings } from '@/lib/academic';
+import type { ClassItem, StudentRow } from '@/data/dashboard';
 import ReportCard, { type ReportSubject } from '@/components/ui/ReportCard';
 import { AdminResultGeneratorLeftPanel } from './result-generator/AdminResultGeneratorLeftPanel';
 import { AdminResultGeneratorRightPanel } from './result-generator/AdminResultGeneratorRightPanel';
@@ -14,8 +15,6 @@ import {
   bestSubjectMatch,
   blankDraft,
   cardToDraft,
-  currentSession,
-  currentTerm,
   detectVariant,
   draftPayload,
   draftToReportSubjects,
@@ -23,7 +22,7 @@ import {
   previousTermOf,
   presetSubjects,
   recalcSubject,
-  termDateRange,
+  subjectsFromSources,
   VARIANT_LABELS,
 } from './result-generator/helpers';
 import type {
@@ -64,10 +63,14 @@ const sourceFromResult = (row: TestResultRow, origin: 'ONLINE' | 'OFFLINE'): Sou
   })),
 });
 
-const loadSources = async (studentId: string): Promise<SourceResult[]> => {
+const loadSources = async (
+  studentId: string,
+  session: string,
+  term: string,
+): Promise<SourceResult[]> => {
   const [online, offline] = await Promise.allSettled([
-    apiGet<TestResultRow[]>('/results', { userId: studentId, limit: 50 }),
-    apiGet<TestResultRow[]>('/offline-results', { userId: studentId, limit: 50 }),
+    apiGet<TestResultRow[]>('/results', { userId: studentId, session, term, limit: 50 }),
+    apiGet<TestResultRow[]>('/offline-results', { userId: studentId, session, term, limit: 50 }),
   ]);
   const rows: SourceResult[] = [];
   if (online.status === 'fulfilled') {
@@ -82,10 +85,13 @@ const loadSources = async (studentId: string): Promise<SourceResult[]> => {
 export default function AdminResultGeneratorPage() {
   const queryClient = useQueryClient();
   const requestRef = useRef(0);
+  const attendanceRequestRef = useRef(0);
   const editRevisionRef = useRef(0);
   const lastAutosaveErrorRef = useRef<string | null>(null);
-  const [session, setSession] = useState(currentSession());
-  const [term, setTerm] = useState(currentTerm());
+  const academicQuery = useAcademicSettings();
+  // The generator is locked to the current period chosen in Settings.
+  const session = academicQuery.data?.data.session ?? '';
+  const term = academicQuery.data?.data.term ?? '';
   const [variant, setVariant] = useState<ReportVariant>('junior');
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
@@ -189,6 +195,39 @@ export default function AdminResultGeneratorPage() {
     setSelectedField(null);
   };
 
+  /**
+   * Attendance is derived from the register over the Settings term dates.
+   * The generator never accepts manual date edits.
+   */
+  const fetchAttendance = async (studentId: string) => {
+    if (!studentId || !term) return;
+    const requestId = ++attendanceRequestRef.current;
+    setAttendanceBusy(true);
+    setAttendanceError(null);
+    try {
+      const response = await apiGet<AttendanceSummary>('/report-cards/attendance', { studentId, term });
+      if (requestId !== attendanceRequestRef.current) return;
+      setAttendance(response.data);
+      setDraft((previous) =>
+        previous && previous.studentId === studentId
+          ? {
+              ...previous,
+              attendanceFrom: response.data.from,
+              attendanceTo: response.data.to,
+              totalSchoolDays: response.data.totalSchoolDays,
+              present: response.data.present,
+              absent: response.data.absent,
+            }
+          : previous,
+      );
+    } catch (error: any) {
+      if (requestId !== attendanceRequestRef.current) return;
+      setAttendanceError(error?.message ?? 'Could not calculate attendance');
+    } finally {
+      if (requestId === attendanceRequestRef.current) setAttendanceBusy(false);
+    }
+  };
+
   const loadStudent = async (
     student: StudentRow,
     options: { session?: string; term?: string; successMessage?: boolean } = {},
@@ -196,6 +235,10 @@ export default function AdminResultGeneratorPage() {
     const requestId = ++requestRef.current;
     const nextSession = options.session ?? session;
     const nextTerm = options.term ?? term;
+    if (!nextSession || !nextTerm) {
+      setNotice({ text: 'The current session and term are not set in Settings yet.', tone: 'error' });
+      return;
+    }
     const detected = detectVariant(student.student?.combination?.name, student.student?.className);
     const base = blankDraft(student.id, detected, nextSession, nextTerm, student);
 
@@ -227,16 +270,23 @@ export default function AdminResultGeneratorPage() {
           term: nextTerm,
         }),
         previousPromise,
-        loadSources(student.id).catch(() => []),
+        loadSources(student.id, nextSession, nextTerm).catch(() => []),
       ]);
       if (requestId !== requestRef.current) return;
       let nextDraft = cardResponse.data ? cardToDraft(cardResponse.data) : base;
+      // Subject rows come from the pupil's result subjects for this period;
+      // the template preset is only used when there are no result subjects.
+      if (!cardResponse.data) {
+        const dynamicSubjects = subjectsFromSources(sources);
+        if (dynamicSubjects.length) nextDraft = { ...nextDraft, subjects: dynamicSubjects };
+      }
       nextDraft = previousTerm
         ? applyPreviousTermScores(nextDraft, previousCard, Boolean(cardResponse.data))
         : applyPreviousTermScores(nextDraft, null, false);
       setLoadedDraft(nextDraft);
       setSourceResults(sources);
       setSelectedSourceKey(sources[0]?.key ?? '');
+      void fetchAttendance(student.id);
       if (options.successMessage) {
         setNotice({ text: `Loaded ${student.user_name}.`, tone: 'ok' });
       }
@@ -250,6 +300,10 @@ export default function AdminResultGeneratorPage() {
 
   const loadImportedRow = async (row: ImportedStudentRow) => {
     const requestId = ++requestRef.current;
+    if (!session || !term) {
+      setNotice({ text: 'The current session and term are not set in Settings yet.', tone: 'error' });
+      return;
+    }
     setMode('import');
     setSelectedImportKey(row.key);
     setImportedRow(row);
@@ -315,6 +369,17 @@ export default function AdminResultGeneratorPage() {
         /* keep imported draft */
       }
     }
+    if (!hasSavedCard) {
+      const dynamicSubjects = subjectsFromSources([
+        {
+          key: `import:${row.key}`,
+          origin: 'IMPORT',
+          examName: row.examName || 'Imported results',
+          subjects: row.subjects,
+        },
+      ]);
+      if (dynamicSubjects.length) nextDraft = { ...nextDraft, subjects: dynamicSubjects };
+    }
     nextDraft = previousTerm
       ? applyPreviousTermScores(nextDraft, previousCard, hasSavedCard)
       : applyPreviousTermScores(nextDraft, null, false);
@@ -322,6 +387,7 @@ export default function AdminResultGeneratorPage() {
     if (requestId !== requestRef.current) return;
     setSelectedStudent(student);
     setLoadedDraft(nextDraft);
+    if (row.matchedStudentId) void fetchAttendance(row.matchedStudentId);
     const source: SourceResult = {
       key: `import:${row.key}`,
       origin: 'IMPORT',
@@ -425,60 +491,12 @@ export default function AdminResultGeneratorPage() {
     }
   };
 
-  const changePeriod = async (nextSession: string, nextTerm: string) => {
-    if (nextSession === session && nextTerm === term) return;
-    if (dirty) {
-      if (!draft?.studentId) {
-        setNotice({ text: 'Attach this imported row to a pupil before switching term.', tone: 'error' });
-        return;
-      }
-      const saved = await saveDraft(true);
-      if (!saved) return;
-    }
-    setSession(nextSession);
-    setTerm(nextTerm);
-    if (effectiveStudent) {
-      await loadStudent(effectiveStudent, {
-        session: nextSession,
-        term: nextTerm,
-        successMessage: true,
-      });
-    } else if (draft) {
-      patchDraft({
-        session: nextSession,
-        term: nextTerm,
-        attendanceFrom: termDateRange(nextTerm, nextSession).from,
-        attendanceTo: termDateRange(nextTerm, nextSession).to,
-      });
-    }
-  };
-
-  const calculateAttendance = async (from: string, to: string) => {
+  const calculateAttendance = async () => {
     if (!draft?.studentId) {
       setAttendanceError('Attach this imported row to a pupil first.');
       return;
     }
-    setAttendanceBusy(true);
-    setAttendanceError(null);
-    try {
-      const response = await apiGet<AttendanceSummary>('/report-cards/attendance', {
-        studentId: draft.studentId,
-        from,
-        to,
-      });
-      setAttendance(response.data);
-      patchDraft({
-        attendanceFrom: response.data.from,
-        attendanceTo: response.data.to,
-        totalSchoolDays: response.data.totalSchoolDays,
-        present: response.data.present,
-        absent: response.data.absent,
-      });
-    } catch (error: any) {
-      setAttendanceError(error?.message ?? 'Could not calculate attendance');
-    } finally {
-      setAttendanceBusy(false);
-    }
+    await fetchAttendance(draft.studentId);
   };
 
   const autoMapScores = () => {
@@ -653,6 +671,24 @@ export default function AdminResultGeneratorPage() {
   const previewSubjects: ReportSubject[] = draft ? draftToReportSubjects(draft) : draftToReportSubjects(previewDraft);
   const sourceForPanel = sourceResults.find((item) => item.key === selectedSourceKey) ?? sourceResults[0] ?? null;
 
+  if (academicQuery.isPending) {
+    return (
+      <div className="space-y-6">
+        <PageHeader eyebrow="Reports" title="Result Generator" text="Loading the current session and term from Settings." />
+        <div className="border border-line bg-white p-5"><LoadingSkeleton rows={6} /></div>
+      </div>
+    );
+  }
+
+  if (academicQuery.isError || !academicQuery.data?.data) {
+    return (
+      <div className="space-y-6">
+        <PageHeader eyebrow="Reports" title="Result Generator" text="The current session and term could not be loaded." />
+        <ErrorState message="Could not load the academic period from Settings." onRetry={() => academicQuery.refetch()} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <div className="print:hidden">
@@ -778,34 +814,13 @@ export default function AdminResultGeneratorPage() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <label className="text-[10px] font-bold uppercase tracking-wide text-muted">
-                Session
-                <select
-                  value={session}
-                  onChange={(event) => void changePeriod(event.target.value, term)}
-                  className="ml-1 min-h-9 rounded border border-line bg-white px-2 text-xs font-semibold"
-                >
-                  {sessionOptions().map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-[10px] font-bold uppercase tracking-wide text-muted">
-                Term
-                <select
-                  value={term}
-                  onChange={(event) => void changePeriod(session, event.target.value)}
-                  className="ml-1 min-h-9 rounded border border-line bg-white px-2 text-xs font-semibold"
-                >
-                  {TERM_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <span
+                className="inline-flex min-h-9 items-center rounded border border-line bg-brand-50 px-2.5 text-xs font-bold text-brand-900"
+                title="The current session and term come from Settings and cannot be changed here."
+              >
+                {session || '—'} · {term || '—'}
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-wide text-muted">Locked in Settings</span>
               <span
                 className={`inline-flex min-h-8 items-center rounded px-2 text-[10px] font-bold uppercase tracking-wide ${
                   dirty ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-800'
@@ -886,14 +901,10 @@ export default function AdminResultGeneratorPage() {
           sourceResults={sourceResults}
           selectedSourceKey={selectedSourceKey}
           onSourceChange={setSelectedSourceKey}
-          onCalculateAttendance={(from, to) => void calculateAttendance(from, to)}
+          onCalculateAttendance={() => void calculateAttendance()}
           attendanceBusy={attendanceBusy}
           attendanceError={attendanceError}
           attendance={attendance}
-          onUseTermDates={() => {
-            const range = termDateRange(draft?.term ?? term, draft?.session ?? session);
-            patchDraft({ attendanceFrom: range.from, attendanceTo: range.to });
-          }}
           onAutoMap={autoMapScores}
           profilePhotoUrl={effectiveStudent?.student?.photoUrl || effectiveStudent?.img || ''}
           attachOptions={attachOptions}
