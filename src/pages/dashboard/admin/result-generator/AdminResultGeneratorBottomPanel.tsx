@@ -1,4 +1,4 @@
-import { Download, Printer, Save, Trash2 } from 'lucide-react';
+import { Download, Eraser, Printer, Save, Trash2 } from 'lucide-react';
 import type { ReportCardDraft } from './types';
 import { cTotalOf, totalOf, VARIANT_LABELS } from './helpers';
 
@@ -11,6 +11,7 @@ interface AdminResultGeneratorBottomPanelProps {
   onPrint: () => void;
   onExport: () => void;
   onReset: () => void;
+  onClear: () => void;
 }
 
 export const AdminResultGeneratorBottomPanel = ({
@@ -22,6 +23,7 @@ export const AdminResultGeneratorBottomPanel = ({
   onPrint,
   onExport,
   onReset,
+  onClear,
 }: AdminResultGeneratorBottomPanelProps) => {
   const filled = draft
     ? draft.subjects.filter(
@@ -68,6 +70,15 @@ export const AdminResultGeneratorBottomPanel = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onClear}
+            disabled={!draft || saving}
+            className="inline-flex min-h-10 items-center gap-1.5 rounded border border-line px-3 text-xs font-bold text-rose-700 hover:border-rose-300 hover:bg-rose-50 disabled:opacity-40"
+            title="Clear every score, attendance value and comment on this card"
+          >
+            <Eraser size={13} aria-hidden="true" /> Clear
+          </button>
           <button
             type="button"
             onClick={onReset}

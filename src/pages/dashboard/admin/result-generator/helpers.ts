@@ -369,6 +369,88 @@ export const mappedScore = (
   return Math.round(percentage);
 };
 
+export type ScoreColumn = 'cbt1' | 'cbt2' | 'exam' | 'lastCum';
+
+/**
+ * The school names its assessments e.g. "JSS1 CBT 1", "JSS1 CBT 2",
+ * "JSS1 EXAM" or "COMPUTER BASED TEST 2". Translate the name into the
+ * report-card column it belongs to.
+ */
+export const columnForExamName = (name: string): ScoreColumn | null => {
+  const value = String(name ?? '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, ' ')
+    .trim();
+  if (
+    /\b(?:CBT|COMPUTER\s+BASED\s+TEST)\s*0?1\b/.test(value) ||
+    /\b(?:FIRST|1ST)\s+(?:CBT|TEST)\b/.test(value)
+  ) {
+    return 'cbt1';
+  }
+  if (
+    /\b(?:CBT|COMPUTER\s+BASED\s+TEST)\s*0?2\b/.test(value) ||
+    /\b(?:SECOND|2ND)\s+(?:CBT|TEST)\b/.test(value)
+  ) {
+    return 'cbt2';
+  }
+  if (/\bLAST\s+CUM(?:ULATIVE)?\b/.test(value)) return 'lastCum';
+  if (/\b(?:EXAM|EXAMINATION)\b/.test(value)) return 'exam';
+  return null;
+};
+
+/**
+ * Fill CBT 1, CBT 2, Exam and Last Cum. columns from the pupil's result
+ * sources. The newest source wins when two exams map to the same column.
+ * `onlyBlank` preserves values already saved on an existing report card.
+ */
+export const autoMapSources = (
+  draft: ReportCardDraft,
+  sources: SourceResult[],
+  options: { onlyBlank?: boolean } = {},
+) => {
+  const byColumn = new Map<ScoreColumn, SourceResult>();
+  for (const source of sources) {
+    const column = columnForExamName(source.examName);
+    if (column && !byColumn.has(column)) byColumn.set(column, source);
+  }
+  if (!byColumn.size) {
+    return { draft, mapped: 0, sourcesUsed: [] as string[], columns: [] as ScoreColumn[] };
+  }
+
+  const used = new Set<string>();
+  let mapped = 0;
+  const subjects = draft.subjects.map((subject) => {
+    let next = subject;
+    for (const column of ['cbt1', 'cbt2', 'exam', 'lastCum'] as ScoreColumn[]) {
+      const source = byColumn.get(column);
+      if (!source) continue;
+      if (options.onlyBlank && next[column] != null) continue;
+      const match = bestSubjectMatch(next, source.subjects);
+      if (!match) continue;
+      const value = mappedScore(match, column);
+      if (value == null) continue;
+      next = recalcSubject(
+        {
+          ...next,
+          sourceSubjectId: match.id ?? next.sourceSubjectId,
+          sourceSubjectName: match.name ?? next.sourceSubjectName,
+        },
+        { [column]: value } as Partial<GeneratedSubject>,
+      );
+      mapped += 1;
+      used.add(source.examName);
+    }
+    return next;
+  });
+
+  return {
+    draft: { ...draft, subjects },
+    mapped,
+    sourcesUsed: [...used],
+    columns: [...byColumn.keys()],
+  };
+};
+
 export const initialsOf = (name: string) =>
   name
     .split(' ')

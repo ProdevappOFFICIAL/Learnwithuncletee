@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -35,6 +35,8 @@ export interface ReportCardProps {
     activeField?: string | null;
     /** Enables click-to-edit without changing the printed sheet layout. */
     onFieldClick?: (field: string) => void;
+    /** Commits an inline edit made directly on a printed box. */
+    onFieldCommit?: (field: string, value: string) => void;
     /** Selects the default subject set, header and section title. */
     variant?: ReportCardVariant;
     /** Leave empty to print the blank line, or pass e.g. "SECOND" */
@@ -234,6 +236,7 @@ function PhoneIcon() {
 export default function ReportCard({
     activeField,
     onFieldClick,
+    onFieldCommit,
     variant = "junior",
     term = "",
     session = "2026/2027",
@@ -262,17 +265,119 @@ export default function ReportCard({
     const recreation = psychomotor.recreation ?? psychomotor.sports;
     const termLabel = term ? term.replace(/\s*term\s*$/i, "").toUpperCase() : "_____________";
 
+    const sheetRef = useRef<HTMLDivElement>(null);
+    const cancelInlineRef = useRef(false);
+    type InlineEdit = {
+        field: string;
+        value: string;
+        left: number;
+        top: number;
+        width: number;
+        height: number;
+        multiline: boolean;
+        numeric: boolean;
+        max?: number;
+    };
+    const [inline, setInline] = useState<InlineEdit | null>(null);
+
+    const isInlineField = (field: string) => {
+        if (
+            [
+                "studentName",
+                "admissionNumber",
+                "className",
+                "classTeacherRemark",
+                "principalComment",
+                "newsLetter",
+                "affective.puntuality",
+                "affective.respect",
+                "psychomotor.handwriting",
+                "psychomotor.recreation",
+            ].includes(field)
+        ) {
+            return true;
+        }
+        return /^subject\.\d+\.(label|cbt1|cbt2|exam|lastCum)$/.test(field);
+    };
+
+    const inlineMax = (field: string) => {
+        if (/\.(cbt1|cbt2)$/.test(field)) return 20;
+        if (/\.exam$/.test(field)) return 60;
+        if (/\.lastCum$/.test(field)) return 100;
+        return undefined;
+    };
+
+    const fieldValue = (field: string): string => {
+        const textFields: Record<string, string | undefined> = {
+            studentName,
+            admissionNumber,
+            className,
+            classTeacherRemark,
+            principalComment,
+            newsLetter,
+            "affective.puntuality": affective.puntuality,
+            "affective.respect": affective.respect,
+            "psychomotor.handwriting": psychomotor.handwriting,
+            "psychomotor.recreation": recreation,
+        };
+        if (field in textFields) return String(textFields[field] ?? "");
+        const match = /^subject\.(\d+)\.(label|cbt1|cbt2|exam|lastCum)$/.exec(field);
+        if (!match) return "";
+        const subject = rows[Number(match[1])];
+        if (!subject) return "";
+        const part = match[2];
+        if (part === "label") return subject.lines.join("\n");
+        const value = subject[part as "cbt1" | "cbt2" | "exam" | "lastCum"];
+        return value === undefined || value === null ? "" : String(value);
+    };
+
+    const startInline = (field: string, element: HTMLElement) => {
+        if (!onFieldCommit || !isInlineField(field)) return false;
+        const root = sheetRef.current?.getBoundingClientRect();
+        if (!root) return false;
+        const box = element.getBoundingClientRect();
+        const multiline = /\.label$|Remark|Comment|newsLetter/.test(field);
+        setInline({
+            field,
+            value: fieldValue(field),
+            left: box.left - root.left,
+            top: box.top - root.top,
+            width: Math.max(box.width, 44),
+            height: multiline ? Math.max(box.height, 48) : Math.max(box.height, 24),
+            multiline,
+            numeric: /\.(cbt1|cbt2|exam|lastCum)$/.test(field),
+            max: inlineMax(field),
+        });
+        return true;
+    };
+
+    const commitInline = (valueOverride?: string) => {
+        if (!inline) return;
+        const current = inline;
+        setInline(null);
+        onFieldCommit?.(current.field, valueOverride ?? current.value);
+    };
+
     /** Click-to-edit affordance only; all printed dimensions stay untouched. */
     const cellProps = (field: string) => {
-        if (!onFieldClick) return {};
+        const canInline = Boolean(onFieldCommit) && isInlineField(field);
+        if (!onFieldClick && !canInline) return {};
         return {
-            onClick: () => onFieldClick(field),
+            onClick: (event: any) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (!canInline || !startInline(field, event.currentTarget)) {
+                    onFieldClick?.(field);
+                }
+            },
             role: "button",
             tabIndex: 0,
-            onKeyDown: (event: { key: string; preventDefault: () => void }) => {
+            onKeyDown: (event: any) => {
                 if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
-                    onFieldClick(field);
+                    if (!canInline || !startInline(field, event.currentTarget)) {
+                        onFieldClick?.(field);
+                    }
                 }
             },
             "aria-label": `Edit ${field.replace(/\./g, " ")}`,
@@ -280,15 +385,18 @@ export default function ReportCard({
     };
 
     const cellClass = (field: string) => {
-        if (!onFieldClick) return "";
+        const canInline = Boolean(onFieldCommit) && isInlineField(field);
+        if (!onFieldClick && !canInline) return "";
         const active = activeField === field;
-        return `cursor-pointer transition-colors hover:bg-brand-50/60 ${active ? "outline outline-2 -outline-offset-2 outline-brand-500" : ""
-            }`;
+        return `${canInline ? "cursor-text" : "cursor-pointer"} transition-colors hover:bg-brand-50/60 ${
+            active ? "outline outline-2 -outline-offset-2 outline-brand-500" : ""
+        }`;
     };
 
     return (
         <div
-            className="mx-auto box-border w-[794px] bg-white p-[11px] text-black print:m-0"
+            ref={sheetRef}
+            className="relative mx-auto box-border w-[794px] bg-white p-[11px] text-black print:m-0"
             style={{ fontFamily: '"Times New Roman", Times, "Liberation Serif", serif' }}
         >
             {/* page border */}
@@ -610,6 +718,78 @@ export default function ReportCard({
                     </p>
                 </footer>
             </div>
+            {inline &&
+                (inline.multiline ? (
+                    <textarea
+                        autoFocus
+                        value={inline.value}
+                        aria-label={`Edit ${inline.field.replace(/\./g, " ")}`}
+                        onChange={(event) => setInline({ ...inline, value: event.target.value })}
+                        onFocus={(event) => event.currentTarget.select()}
+                        onBlur={() => {
+                            if (cancelInlineRef.current) {
+                                cancelInlineRef.current = false;
+                                return;
+                            }
+                            commitInline();
+                        }}
+                        onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                                event.preventDefault();
+                                cancelInlineRef.current = true;
+                                setInline(null);
+                            }
+                            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                                event.preventDefault();
+                                commitInline();
+                            }
+                        }}
+                        style={{
+                            left: inline.left,
+                            top: inline.top,
+                            width: inline.width,
+                            height: inline.height,
+                        }}
+                        className="absolute z-30 resize-none overflow-auto border-2 border-brand-500 bg-white px-1 py-0.5 text-[12px] leading-[15px] text-black shadow-lg outline-none print:hidden"
+                    />
+                ) : (
+                    <input
+                        autoFocus
+                        type={inline.numeric ? "number" : "text"}
+                        min={inline.numeric ? 0 : undefined}
+                        max={inline.max}
+                        step={inline.numeric ? "any" : undefined}
+                        value={inline.value}
+                        aria-label={`Edit ${inline.field.replace(/\./g, " ")}`}
+                        onChange={(event) => setInline({ ...inline, value: event.target.value })}
+                        onFocus={(event) => event.currentTarget.select()}
+                        onBlur={() => {
+                            if (cancelInlineRef.current) {
+                                cancelInlineRef.current = false;
+                                return;
+                            }
+                            commitInline();
+                        }}
+                        onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                                event.preventDefault();
+                                cancelInlineRef.current = true;
+                                setInline(null);
+                            }
+                            if (event.key === "Enter") {
+                                event.preventDefault();
+                                commitInline();
+                            }
+                        }}
+                        style={{
+                            left: inline.left,
+                            top: inline.top,
+                            width: inline.width,
+                            height: inline.height,
+                        }}
+                        className="absolute z-30 border-2 border-brand-500 bg-white px-1 text-[12px] font-semibold text-black shadow-lg outline-none print:hidden"
+                    />
+                ))}
         </div>
     );
 }

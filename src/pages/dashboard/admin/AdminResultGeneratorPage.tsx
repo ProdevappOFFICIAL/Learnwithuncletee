@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Printer, Upload } from 'lucide-react';
+import { Download, FilePlus2, Printer, Upload } from 'lucide-react';
 import { ErrorState, LoadingSkeleton, PageHeader } from '@/components/dashboard/DashboardUI';
 import { apiDownload, apiGet, apiPost } from '@/lib/api';
 import { useAcademicSettings } from '@/lib/academic';
@@ -12,6 +12,7 @@ import { AdminResultGeneratorBottomPanel } from './result-generator/AdminResultG
 import { ImportResultsModal } from './result-generator/ImportResultsModal';
 import {
   applyPreviousTermScores,
+  autoMapSources,
   bestSubjectMatch,
   blankDraft,
   cardToDraft,
@@ -283,12 +284,31 @@ export default function AdminResultGeneratorPage() {
       nextDraft = previousTerm
         ? applyPreviousTermScores(nextDraft, previousCard, Boolean(cardResponse.data))
         : applyPreviousTermScores(nextDraft, null, false);
+      // CBT 1 / CBT 2 / Exam results are separate sittings. Match the exam
+      // names (e.g. "JSS1 CBT 1") and fill the matching score columns.
+      const auto = autoMapSources(nextDraft, sources, { onlyBlank: Boolean(cardResponse.data) });
+      nextDraft = auto.draft;
       setLoadedDraft(nextDraft);
       setSourceResults(sources);
       setSelectedSourceKey(sources[0]?.key ?? '');
       void fetchAttendance(student.id);
+      const columnLabel: Record<string, string> = {
+        cbt1: 'CBT 1',
+        cbt2: 'CBT 2',
+        exam: 'Exam',
+        lastCum: 'Last Cum.',
+      };
+      const autoNote =
+        auto.mapped > 0
+          ? `Auto-mapped ${auto.columns.map((column) => columnLabel[column]).join(', ')} from ${auto.sourcesUsed.join(', ')}.`
+          : '';
       if (options.successMessage) {
-        setNotice({ text: `Loaded ${student.user_name}.`, tone: 'ok' });
+        setNotice({
+          text: `Loaded ${student.user_name}.${autoNote ? ` ${autoNote}` : ''}`,
+          tone: 'ok',
+        });
+      } else if (autoNote) {
+        setNotice({ text: autoNote, tone: 'ok' });
       }
     } catch (error: any) {
       if (requestId !== requestRef.current) return;
@@ -471,6 +491,48 @@ export default function AdminResultGeneratorPage() {
     setRightOpen(true);
   };
 
+  /** Commit a value typed directly into a printed box on the sheet. */
+  const commitInlineField = (field: string, value: string) => {
+    if (!draft) return;
+    const subjectField = /^subject\.(\d+)\.(label|cbt1|cbt2|exam|lastCum)$/.exec(field);
+    if (subjectField) {
+      const index = Number(subjectField[1]);
+      const part = subjectField[2] as 'label' | 'cbt1' | 'cbt2' | 'exam' | 'lastCum';
+      if (part === 'label') {
+        const lines = value
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean);
+        patchSubject(index, { lines: lines.length ? lines : draft.subjects[index]?.lines ?? ['SUBJECT'] });
+      } else {
+        const max = part === 'exam' ? 60 : part === 'lastCum' ? 100 : 20;
+        const raw = value.trim();
+        const parsed = raw === '' ? null : Number(raw);
+        if (parsed !== null && !Number.isFinite(parsed)) return;
+        patchSubject(index, { [part]: parsed === null ? null : Math.max(0, Math.min(max, parsed)) } as Partial<
+          ReportCardDraft['subjects'][number]
+        >);
+      }
+      setSelectedField(field as ReportField);
+      return;
+    }
+
+    const textFields: Record<string, (next: string) => void> = {
+      studentName: (next) => patchDraft({ studentName: next }),
+      admissionNumber: (next) => patchDraft({ admissionNumber: next }),
+      className: (next) => patchDraft({ className: next }),
+      classTeacherRemark: (next) => patchDraft({ classTeacherRemark: next }),
+      principalComment: (next) => patchDraft({ principalComment: next }),
+      newsLetter: (next) => patchDraft({ newsLetter: next }),
+      'affective.puntuality': (next) => patchDraft({ affectivePuntuality: next }),
+      'affective.respect': (next) => patchDraft({ affectiveRespect: next }),
+      'psychomotor.handwriting': (next) => patchDraft({ psychomotorHandwriting: next }),
+      'psychomotor.recreation': (next) => patchDraft({ psychomotorRecreation: next }),
+    };
+    textFields[field]?.(value);
+    setSelectedField(field as ReportField);
+  };
+
   const selectVariant = (next: ReportVariant) => {
     if (next === variant) return;
     const hasScores = draft?.subjects.some(
@@ -620,6 +682,68 @@ export default function AdminResultGeneratorPage() {
     }
   };
 
+  const startBlankCard = async () => {
+    if (!(await saveBeforeLeaving())) return;
+    if (!session || !term) {
+      setNotice({ text: 'The current session and term are not set in Settings yet.', tone: 'error' });
+      return;
+    }
+    setMode('live');
+    setSelectedStudent(null);
+    setImportedRow(null);
+    setSelectedImportKey('');
+    setSourceResults([]);
+    setSelectedSourceKey('');
+    setAttendance(null);
+    setAttendanceError(null);
+    setLoadedDraft(blankDraft('', variant, session, term, null));
+    setNotice({
+      text: 'Blank result card created. Click any box on the sheet to type directly, then attach a pupil to save it.',
+      tone: 'ok',
+    });
+  };
+
+  const clearStudentResult = () => {
+    if (!draft) return;
+    if (
+      !window.confirm(
+        'Clear all scores, attendance and comments on this result card? The pupil stays selected.',
+      )
+    ) {
+      return;
+    }
+    setDraft({
+      ...draft,
+      subjects: draft.subjects.map((subject) =>
+        recalcSubject(
+          {
+            ...subject,
+            cbt1: null,
+            cbt2: null,
+            exam: null,
+            lastCum: null,
+            overall: null,
+          },
+          {},
+        ),
+      ),
+      present: undefined,
+      absent: undefined,
+      totalSchoolDays: undefined,
+      classTeacherRemark: '',
+      principalComment: '',
+      newsLetter: '',
+      nextTermBegins: '',
+      affectivePuntuality: '',
+      affectiveRespect: '',
+      psychomotorHandwriting: '',
+      psychomotorRecreation: '',
+    });
+    setAttendance(null);
+    markDirty();
+    setNotice({ text: 'Scores, attendance and comments cleared. Save to keep the cleared card.', tone: 'ok' });
+  };
+
   const exportCards = async (all: boolean) => {
     if (!all && !draft?.studentId) {
       setNotice({ text: 'Select a pupil first, or use Export all.', tone: 'error' });
@@ -698,6 +822,13 @@ export default function AdminResultGeneratorPage() {
           text="Build a printable result-notification sheet from live results or an imported Excel workbook. Click any box on the sheet to edit it in the inspector."
           actions={
             <>
+              <button
+                type="button"
+                onClick={() => void startBlankCard()}
+                className="inline-flex min-h-11 items-center rounded border border-line bg-white px-4 py-2.5 text-sm font-bold hover:border-brand-500 hover:text-brand-700"
+              >
+                <FilePlus2 aria-hidden="true" size={15} className="mr-2" /> Blank card
+              </button>
               <button
                 type="button"
                 onClick={() => setImportOpen(true)}
@@ -792,26 +923,21 @@ export default function AdminResultGeneratorPage() {
                 {rightOpen ? '▶' : '◀'} Inspector
               </button>
               <span className="mx-1 hidden h-6 w-px bg-line sm:block" />
-              <div className="flex flex-wrap gap-1" role="group" aria-label="Report card variant">
-                {VARIANT_ORDER.map((item) => {
-                  const active = item === variant;
-                  return (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => selectVariant(item)}
-                      aria-pressed={active}
-                      className={`min-h-9 rounded border px-2.5 text-[11px] font-bold transition-colors ${
-                        active
-                          ? 'border-brand-500 bg-brand-50 text-brand-900'
-                          : 'border-line bg-white text-muted hover:border-brand-300 hover:text-ink'
-                      }`}
-                    >
+              <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-muted">
+                Template
+                <select
+                  value={variant}
+                  onChange={(event) => selectVariant(event.target.value as ReportVariant)}
+                  aria-label="Report card template"
+                  className="min-h-9 rounded border border-line bg-white px-2 text-[11px] font-bold normal-case tracking-normal text-ink outline-none focus:border-brand-500"
+                >
+                  {VARIANT_ORDER.map((item) => (
+                    <option key={item} value={item}>
                       {VARIANT_LABELS[item]}
-                    </button>
-                  );
-                })}
-              </div>
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <span
@@ -886,6 +1012,7 @@ export default function AdminResultGeneratorPage() {
               nextTermBegins={displayDraft.nextTermBegins}
               activeField={selectedField}
               onFieldClick={draft ? handleFieldClick : undefined}
+              onFieldCommit={draft ? commitInlineField : undefined}
             />
           </div>
         </main>
@@ -922,6 +1049,7 @@ export default function AdminResultGeneratorPage() {
         onPrint={() => window.print()}
         onExport={() => void exportCards(false)}
         onReset={() => void resetCurrent()}
+        onClear={clearStudentResult}
       />
 
       <ImportResultsModal open={importOpen} onClose={() => setImportOpen(false)} onImported={onImported} />
