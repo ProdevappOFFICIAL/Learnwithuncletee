@@ -656,7 +656,7 @@ export default function AdminResultGeneratorPage() {
   const saveBeforeLeaving = async () => {
     if (!dirty) return true;
     if (!draft?.studentId) {
-      setNotice({ text: 'Attach this imported row to a pupil before switching.', tone: 'error' });
+      setNotice({ text: 'Attach this card to a pupil before switching, or clear it first.', tone: 'error' });
       return false;
     }
     return saveDraft(true);
