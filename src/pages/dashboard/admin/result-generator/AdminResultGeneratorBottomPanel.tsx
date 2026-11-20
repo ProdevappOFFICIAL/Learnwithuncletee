@@ -1,4 +1,4 @@
-import { Download, Eraser, Printer, Save, Trash2 } from 'lucide-react';
+import { Download, Eraser, ImageDown, Printer, Save, Trash2 } from 'lucide-react';
 import type { ReportCardDraft } from './types';
 import { cTotalOf, totalOf, VARIANT_LABELS } from './helpers';
 
@@ -7,9 +7,11 @@ interface AdminResultGeneratorBottomPanelProps {
   dirty: boolean;
   saving: boolean;
   exporting: boolean;
+  downloadingImage?: boolean;
   onSave: () => void;
   onPrint: () => void;
   onExport: () => void;
+  onDownloadImage: () => void;
   onReset: () => void;
   onClear: () => void;
 }
@@ -19,9 +21,11 @@ export const AdminResultGeneratorBottomPanel = ({
   dirty,
   saving,
   exporting,
+  downloadingImage,
   onSave,
   onPrint,
   onExport,
+  onDownloadImage,
   onReset,
   onClear,
 }: AdminResultGeneratorBottomPanelProps) => {
@@ -103,6 +107,15 @@ export const AdminResultGeneratorBottomPanel = ({
             className="inline-flex min-h-10 items-center gap-1.5 rounded border border-line px-3 text-xs font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-40"
           >
             <Download size={13} aria-hidden="true" /> {exporting ? 'Exporting...' : 'Excel'}
+          </button>
+          <button
+            type="button"
+            onClick={onDownloadImage}
+            disabled={!draft || downloadingImage}
+            className="inline-flex min-h-10 items-center gap-1.5 rounded border border-line px-3 text-xs font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-40"
+            title="Download this result card as a PNG image"
+          >
+            <ImageDown size={13} aria-hidden="true" /> {downloadingImage ? 'Preparing...' : 'Image'}
           </button>
           <button
             type="button"

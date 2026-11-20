@@ -4,6 +4,7 @@ import { Download, FilePlus2, Printer, Upload } from 'lucide-react';
 import { ErrorState, LoadingSkeleton, PageHeader } from '@/components/dashboard/DashboardUI';
 import { apiDownload, apiGet, apiPost } from '@/lib/api';
 import { useAcademicSettings } from '@/lib/academic';
+import { downloadNodeAsPng } from '@/lib/studentIdCard';
 import type { ClassItem, StudentRow } from '@/data/dashboard';
 import ReportCard, { type ReportSubject } from '@/components/ui/ReportCard';
 import { AdminResultGeneratorLeftPanel } from './result-generator/AdminResultGeneratorLeftPanel';
@@ -89,6 +90,7 @@ export default function AdminResultGeneratorPage() {
   const attendanceRequestRef = useRef(0);
   const editRevisionRef = useRef(0);
   const lastAutosaveErrorRef = useRef<string | null>(null);
+  const reportSheetRef = useRef<HTMLDivElement>(null);
   const academicQuery = useAcademicSettings();
   // The generator is locked to the current period chosen in Settings.
   const session = academicQuery.data?.data.session ?? '';
@@ -116,6 +118,7 @@ export default function AdminResultGeneratorPage() {
   const [attaching, setAttaching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [downloadingImage, setDownloadingImage] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [notice, setNotice] = useState<{ text: string; tone: 'ok' | 'error' } | null>(null);
 
@@ -778,6 +781,38 @@ export default function AdminResultGeneratorPage() {
     }
   };
 
+  const downloadReportImage = async () => {
+    const node = reportSheetRef.current;
+    if (!node) {
+      setNotice({ text: 'The result card is not ready yet.', tone: 'error' });
+      return;
+    }
+    setDownloadingImage(true);
+    setNotice(null);
+    try {
+      // Commit any open inline editor before capturing so the PNG shows the
+      // printed value, not the editing input.
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      await new Promise((resolve) => window.setTimeout(resolve, 150));
+      const name =
+        draft?.studentName ||
+        effectiveStudent?.user_name ||
+        `${VARIANT_LABELS[variant]}-result-card`;
+      await downloadNodeAsPng(node, {
+        fileName: `report-card-${name}-${draft?.term ?? term}-${draft?.session ?? session}`,
+        pixelRatio: 2.5,
+      });
+      setNotice({ text: 'Downloaded the result card as a PNG image.', tone: 'ok' });
+    } catch (error: any) {
+      setNotice({
+        text: error?.message ?? 'Could not download the result card image.',
+        tone: 'error',
+      });
+    } finally {
+      setDownloadingImage(false);
+    }
+  };
+
   const onImported = (detail: ReportCardImportDetail) => {
     setImportOpen(false);
     setMode('import');
@@ -986,34 +1021,37 @@ export default function AdminResultGeneratorPage() {
               selectionBusy ? 'opacity-60' : ''
             }`}
           >
-            <ReportCard
-              variant={variant}
-              term={draft?.term ?? term}
-              session={draft?.session ?? session}
-              studentName={displayDraft.studentName}
-              admissionNumber={displayDraft.admissionNumber}
-              className={displayDraft.className}
-              photoUrl={displayDraft.photoUrl}
-              subjects={previewSubjects}
-              present={displayDraft.present}
-              absent={displayDraft.absent}
-              totalSchoolDays={displayDraft.totalSchoolDays}
-              affective={{
-                puntuality: displayDraft.affectivePuntuality,
-                respect: displayDraft.affectiveRespect,
-              }}
-              psychomotor={{
-                handwriting: displayDraft.psychomotorHandwriting,
-                recreation: displayDraft.psychomotorRecreation,
-              }}
-              classTeacherRemark={displayDraft.classTeacherRemark}
-              principalComment={displayDraft.principalComment}
-              newsLetter={displayDraft.newsLetter}
-              nextTermBegins={displayDraft.nextTermBegins}
-              activeField={selectedField}
-              onFieldClick={draft ? handleFieldClick : undefined}
-              onFieldCommit={draft ? commitInlineField : undefined}
-            />
+            <div ref={reportSheetRef} className="mx-auto w-[794px]">
+              <ReportCard
+                variant={variant}
+                term={draft?.term ?? term}
+                session={draft?.session ?? session}
+                studentName={displayDraft.studentName}
+                admissionNumber={displayDraft.admissionNumber}
+                className={displayDraft.className}
+                photoUrl={displayDraft.photoUrl}
+                subjects={previewSubjects}
+                present={displayDraft.present}
+                absent={displayDraft.absent}
+                totalSchoolDays={displayDraft.totalSchoolDays}
+                affective={{
+                  puntuality: displayDraft.affectivePuntuality,
+                  respect: displayDraft.affectiveRespect,
+                }}
+                psychomotor={{
+                  handwriting: displayDraft.psychomotorHandwriting,
+                  recreation: displayDraft.psychomotorRecreation,
+                }}
+                classTeacherRemark={displayDraft.classTeacherRemark}
+                principalComment={displayDraft.principalComment}
+                newsLetter={displayDraft.newsLetter}
+                nextTermBegins={displayDraft.nextTermBegins}
+                grading={academicQuery.data?.data.grading}
+                activeField={selectedField}
+                onFieldClick={draft ? handleFieldClick : undefined}
+                onFieldCommit={draft ? commitInlineField : undefined}
+              />
+            </div>
           </div>
         </main>
 
@@ -1045,9 +1083,11 @@ export default function AdminResultGeneratorPage() {
         dirty={dirty}
         saving={saving}
         exporting={exporting}
+        downloadingImage={downloadingImage}
         onSave={() => void saveDraft()}
         onPrint={() => window.print()}
         onExport={() => void exportCards(false)}
+        onDownloadImage={() => void downloadReportImage()}
         onReset={() => void resetCurrent()}
         onClear={clearStudentResult}
       />

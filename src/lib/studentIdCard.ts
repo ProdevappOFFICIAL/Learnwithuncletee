@@ -34,7 +34,7 @@ function buildInlineFontStyle(): HTMLStyleElement {
   return style;
 }
 
-export async function downloadStudentIdCard(
+export async function downloadNodeAsPng(
   node: HTMLElement,
   { fileName, pixelRatio = 3 }: { fileName: string; pixelRatio?: number },
 ) {
@@ -88,4 +88,7 @@ export async function downloadStudentIdCard(
   link.click();
   link.remove();
 }
+
+/** Backwards-compatible name for the ID-card screen. */
+export const downloadStudentIdCard = downloadNodeAsPng;
 

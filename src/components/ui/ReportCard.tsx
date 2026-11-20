@@ -1,4 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
+import { gradeBandFor, type GradingScale } from "@/lib/academic";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -60,6 +61,8 @@ export interface ReportCardProps {
     principalComment?: string;
     newsLetter?: string;
     nextTermBegins?: string;
+    /** Settings grading bands used for the Overall Total letter suffix. */
+    grading?: GradingScale;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -165,6 +168,8 @@ export const REPORT_CARD_VARIANTS: ReportCardVariantPreset[] = [
 
 const td = "border border-black px-[7px] align-middle";
 
+const DEFAULT_GRADING: GradingScale = { a: 75, b: 65, c: 55, d: 45, f: 0 };
+
 const fmt = (v?: number) => (v === undefined || Number.isNaN(v) ? "" : String(v));
 
 const fmtDash = (v?: number) => (v === undefined || v === null || Number.isNaN(v) ? "—" : String(v));
@@ -256,6 +261,7 @@ export default function ReportCard({
     principalComment = "",
     newsLetter = "",
     nextTermBegins = "",
+    grading = DEFAULT_GRADING,
 }: ReportCardProps) {
     const preset = REPORT_CARD_VARIANTS.find((item) => item.id === variant) ?? REPORT_CARD_VARIANTS[0];
     const rows = subjects ?? preset.subjects;
@@ -264,6 +270,11 @@ export default function ReportCard({
     const resolvedHeaderSrc = headerSrc ?? preset.headerSrc;
     const recreation = psychomotor.recreation ?? psychomotor.sports;
     const termLabel = term ? term.replace(/\s*term\s*$/i, "").toUpperCase() : "_____________";
+    const overallWithGrade = (subject: ReportSubject) => {
+        const overall = overallOf(subject);
+        if (overall === undefined) return "—";
+        return `${overall}${gradeBandFor(overall, grading).grade}`;
+    };
 
     const sheetRef = useRef<HTMLDivElement>(null);
     const cancelInlineRef = useRef(false);
@@ -602,7 +613,7 @@ export default function ReportCard({
                                 className={`${td} ${cellClass(`subject.${index}.overall`)}`}
                                 {...cellProps(`subject.${index}.overall`)}
                             >
-                                {fmtDash(overallOf(s))}
+                                {overallWithGrade(s)}
                             </td>
                         </tr>
                     ))}
