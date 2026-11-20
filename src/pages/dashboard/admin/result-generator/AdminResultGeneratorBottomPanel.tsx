@@ -91,7 +91,7 @@ export const AdminResultGeneratorBottomPanel = ({
           <button
             type="button"
             onClick={onPrint}
-            disabled={!draft?.studentId}
+            disabled={!draft}
             className="inline-flex min-h-10 items-center gap-1.5 rounded border border-line px-3 text-xs font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-40"
           >
             <Printer size={13} aria-hidden="true" /> Print / PDF
