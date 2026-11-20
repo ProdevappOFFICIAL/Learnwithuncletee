@@ -187,7 +187,7 @@ const asArtifact = (value: unknown): ChatArtifact | null => {
   if (!value || typeof value !== 'object') return null;
   const record = value as Record<string, unknown>;
   if (typeof record.type !== 'string' || typeof record.id !== 'string') return null;
-  if (!['class', 'subject', 'exam', 'question', 'pupil', 'staff', 'report-card', 'deployment', 'exam-database', 'result'].includes(record.type)) {
+  if (!['class', 'subject', 'exam', 'question', 'pupil', 'staff', 'report-card', 'deployment', 'exam-database', 'result', 'omr'].includes(record.type)) {
     return null;
   }
   return {
@@ -223,6 +223,7 @@ export const artifactHref = (artifact: ChatArtifact): string | null => {
   if (artifact.type === 'report-card') return '/dashboard/admin/result-generator';
   if (artifact.type === 'deployment') return '/dashboard/admin/exams/deployments';
   if (artifact.type === 'exam-database') return `/dashboard/admin/database/${artifact.id}`;
+  if (artifact.type === 'omr') return '/dashboard/admin/ppt-marker';
   if (artifact.type === 'result') return '/dashboard/admin/exams/results';
   return null;
 };

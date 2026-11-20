@@ -8,6 +8,7 @@ import {
   streamAgentTurn,
   type AiChatMessage,
   type AiChatSessionSummary,
+  type AiAttachment,
   type AiStreamEvent,
   type AiToolCall,
 } from '@/lib/aiChat';
@@ -57,6 +58,7 @@ export function useAiChat(userId: string | undefined, enabled: boolean) {
   const [streaming, setStreaming] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
   const [draft, setDraftState] = useState('');
+  const [attachments, setAttachments] = useState<AiAttachment[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const streamErrorRef = useRef<string | null>(null);
   const activeIdRef = useRef('');
@@ -120,6 +122,7 @@ export function useAiChat(userId: string | undefined, enabled: boolean) {
     setStreamError(null);
     streamErrorRef.current = null;
     setDraftState('');
+    setAttachments([]);
   }, [userId]);
 
   const setDraft = useCallback(
@@ -129,6 +132,16 @@ export function useAiChat(userId: string | undefined, enabled: boolean) {
     },
     [userId],
   );
+
+  const addAttachments = useCallback((items: AiAttachment[]) => {
+    setAttachments((previous) => [...previous, ...items].slice(0, 4));
+  }, []);
+
+  const removeAttachment = useCallback((id: string) => {
+    setAttachments((previous) => previous.filter((item) => item.id !== id));
+  }, []);
+
+  const clearAttachments = useCallback(() => setAttachments([]), []);
 
   // Restore the last session + draft when the drawer mounts or the user changes.
   useEffect(() => {
@@ -293,17 +306,18 @@ export function useAiChat(userId: string | undefined, enabled: boolean) {
   );
 
   const runTurn = useCallback(
-    async (options: { message?: string; regenerate?: boolean }) => {
+    async (options: { message?: string; attachments?: AiAttachment[]; regenerate?: boolean }) => {
       if (!enabled || streamingRef.current) return;
       const text = String(options.message ?? '').trim();
-      if (!options.regenerate && !text) return;
+      const outgoingAttachments = options.regenerate ? [] : options.attachments ?? [];
+      if (!options.regenerate && !text && !outgoingAttachments.length) return;
       setStreamError(null);
       streamErrorRef.current = null;
 
       let sessionId = activeIdRef.current;
       if (!sessionId) {
         try {
-          const created = await createAiSession(text.slice(0, 64));
+          const created = await createAiSession((text || 'Image inspection').slice(0, 64));
           sessionId = created.id;
           setActiveId(sessionId);
           activeIdRef.current = sessionId;
@@ -316,7 +330,7 @@ export function useAiChat(userId: string | undefined, enabled: boolean) {
               updatedAt: created.updatedAt,
               lastMessageAt: created.lastMessageAt,
               messageCount: 1,
-              preview: text,
+              preview: text || 'Image inspection',
             },
             ...previous,
           ]);
@@ -339,8 +353,12 @@ export function useAiChat(userId: string | undefined, enabled: boolean) {
             id: `user-${Date.now()}`,
             sessionId,
             role: 'user',
-            content: text,
-            parts: null,
+            content: text || 'Please inspect the attached image.',
+            parts: {
+              version: 1,
+              steps: [],
+              ...(outgoingAttachments.length ? { attachments: outgoingAttachments } : {}),
+            },
             status: 'complete',
             model: null,
             usage: null,
@@ -354,6 +372,7 @@ export function useAiChat(userId: string | undefined, enabled: boolean) {
       setMessages((previous) => [...previous, blankAssistant(sessionId, assistantId)]);
       setStreaming(true);
       streamingRef.current = true;
+      setAttachments([]);
       const controller = new AbortController();
       abortRef.current = controller;
 
@@ -361,6 +380,7 @@ export function useAiChat(userId: string | undefined, enabled: boolean) {
         await streamAgentTurn({
           sessionId,
           message: text,
+          attachments: outgoingAttachments,
           regenerate: Boolean(options.regenerate),
           signal: controller.signal,
           onEvent: (event) => handleEvent(event, assistantId),
@@ -391,8 +411,8 @@ export function useAiChat(userId: string | undefined, enabled: boolean) {
   );
 
   const send = useCallback(
-    async (message: string) => {
-      await runTurn({ message });
+    async (message: string, files: AiAttachment[] = []) => {
+      await runTurn({ message, attachments: files });
     },
     [runTurn],
   );
@@ -444,6 +464,10 @@ export function useAiChat(userId: string | undefined, enabled: boolean) {
     streamError,
     draft,
     setDraft,
+    attachments,
+    addAttachments,
+    removeAttachment,
+    clearAttachments,
     send,
     stop,
     regenerate,

@@ -90,6 +90,26 @@ export const ChatMessage = ({
   if (message.role === 'user') {
     return (
       <div className="flex flex-col items-end gap-1">
+        {message.parts?.attachments?.length ? (
+          <div className="flex max-w-[88%] flex-wrap justify-end gap-2">
+            {message.parts.attachments.map((attachment) => (
+              <a
+                key={attachment.id}
+                href={attachment.url}
+                target="_blank"
+                rel="noreferrer"
+                className="group relative block overflow-hidden rounded border border-line bg-white shadow-sm"
+                title={attachment.name ?? 'Open image'}
+              >
+                <img
+                  src={attachment.url}
+                  alt={attachment.name ?? 'Attached image'}
+                  className="h-24 w-24 object-cover transition-transform group-hover:scale-105 sm:h-28 sm:w-28"
+                />
+              </a>
+            ))}
+          </div>
+        ) : null}
         <div className="max-w-[88%] whitespace-pre-wrap break-words rounded-2xl rounded-br-sm bg-brand-900 px-4 py-3 text-sm leading-6 text-white shadow-sm">
           {message.content}
         </div>

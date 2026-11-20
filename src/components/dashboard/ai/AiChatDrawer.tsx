@@ -13,6 +13,8 @@ import { useAuth } from '@/context/AuthContext';
 import { ChatComposer } from './ChatComposer';
 import { ChatSessionRail } from './ChatSessionRail';
 import { ChatThread } from './ChatThread';
+import { CameraCapture } from './CameraCapture';
+import { useChatUpload } from './useChatUpload';
 import { useAiChat } from './useAiChat';
 
 export type AiChatMode = 'closed' | 'minimized' | 'drawer' | 'full';
@@ -32,6 +34,9 @@ export const AiChatDrawer = ({
   const enabled = Boolean(user) && can('ai.use');
   const chat = useAiChat(user?.id, enabled);
   const [railOpen, setRailOpen] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const uploader = useChatUpload((message) => setAttachError(message));
 
   const activeTitle = useMemo(
     () => chat.sessions.find((session) => session.id === chat.activeId)?.title ?? 'New chat',
@@ -86,7 +91,18 @@ export const AiChatDrawer = ({
   };
 
   const sendDraft = () => {
-    void chat.send(chat.draft);
+    void chat.send(chat.draft, chat.attachments);
+  };
+
+  const uploadImages = async (files: File[]) => {
+    setAttachError(null);
+    const uploaded = await uploader.uploadFiles(files);
+    if (uploaded.length) chat.addAttachments(uploaded);
+  };
+
+  const captureImage = async (file: File) => {
+    setCameraOpen(false);
+    await uploadImages([file]);
   };
 
   const chooseSuggestion = (text: string) => {
@@ -98,6 +114,7 @@ export const AiChatDrawer = ({
 
   const close = () => {
     if (chat.streaming) chat.stop();
+    setCameraOpen(false);
     onClose();
   };
 
@@ -226,6 +243,11 @@ export const AiChatDrawer = ({
         onRegenerate={() => void chat.regenerate()}
         onSuggestion={chooseSuggestion}
       />
+      {attachError && (
+        <p role="alert" className="mx-4 mb-2 border-l-2 border-rose-400 bg-rose-50 px-3 py-2 text-xs text-rose-800 sm:mx-6">
+          {attachError}
+        </p>
+      )}
       <ChatComposer
         value={chat.draft}
         onChange={chat.setDraft}
@@ -233,7 +255,13 @@ export const AiChatDrawer = ({
         onStop={chat.stop}
         streaming={chat.streaming}
         autoFocus={open}
+        attachments={chat.attachments}
+        onRemoveAttachment={chat.removeAttachment}
+        onUploadFiles={uploadImages}
+        uploading={uploader.uploading}
+        onOpenCamera={() => setCameraOpen(true)}
       />
+      <CameraCapture open={cameraOpen} busy={uploader.uploading} onClose={() => setCameraOpen(false)} onCapture={captureImage} />
     </div>
   );
 
@@ -273,7 +301,13 @@ export const AiChatDrawer = ({
           onSend={sendDraft}
           onStop={chat.stop}
           streaming={chat.streaming}
+          attachments={chat.attachments}
+          onRemoveAttachment={chat.removeAttachment}
+          onUploadFiles={uploadImages}
+          uploading={uploader.uploading}
+          onOpenCamera={() => setCameraOpen(true)}
         />
+        <CameraCapture open={cameraOpen} busy={uploader.uploading} onClose={() => setCameraOpen(false)} onCapture={captureImage} />
       </div>
     );
   }

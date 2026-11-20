@@ -17,6 +17,9 @@ import { API_BASE, tokenStore } from '@/lib/api';
 // Endpoint names are validated at runtime by the /api/uploadthing handler.
 const { useUploadThing } = generateReactHelpers<any>({ url: `${API_BASE}/uploadthing` });
 
+/** Shared UploadThing hook for bespoke controls (icon buttons, camera capture). */
+export const useAppUploadThing = useUploadThing;
+
 export type UploadEndpoint =
   | 'avatarUploader'
   | 'assignmentUploader'

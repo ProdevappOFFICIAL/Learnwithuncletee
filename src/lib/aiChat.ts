@@ -10,6 +10,14 @@ export interface AiToolCall {
   startedAt?: number;
 }
 
+export interface AiAttachment {
+  id: string;
+  url: string;
+  name?: string;
+  mimeType?: string;
+  size?: number;
+}
+
 export interface AiStep {
   index: number;
   status: 'running' | 'done' | 'error';
@@ -22,6 +30,7 @@ export interface AiMessageParts {
   version: 1;
   steps: AiStep[];
   reasoning?: string;
+  attachments?: AiAttachment[];
 }
 
 export interface AiChatMessage {
@@ -107,6 +116,7 @@ export const getAiToolCatalog = async () =>
 export async function streamAgentTurn(options: {
   sessionId?: string;
   message?: string;
+  attachments?: AiAttachment[];
   regenerate?: boolean;
   signal?: AbortSignal;
   onEvent: (event: AiStreamEvent) => void;
@@ -120,6 +130,7 @@ export async function streamAgentTurn(options: {
     body: JSON.stringify({
       sessionId: options.sessionId,
       message: options.message,
+      attachments: options.attachments,
       regenerate: options.regenerate,
     }),
     signal: options.signal,

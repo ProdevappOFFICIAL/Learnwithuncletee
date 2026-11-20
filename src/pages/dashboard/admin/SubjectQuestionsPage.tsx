@@ -7,7 +7,7 @@ import { useAcademicSettings } from '@/lib/academic';
 import { usePagedList } from '@/lib/pagedQuery';
 import { UploadButton } from '@/lib/uploadthing';
 import { ROUTES } from '@/routes/paths';
-import { HelpCircle, Paperclip, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { HelpCircle, LoaderCircle, Paperclip, Pencil, Plus, Sparkles, Trash2, X } from 'lucide-react';
 
 const QuestionEditor = lazy(() => import('@/lib/mdxEditor').then((m) => ({ default: m.NewsEditor })));
 const QuestionContent = lazy(() => import('@/lib/mdxEditor').then((m) => ({ default: m.NewsContent })));
@@ -65,6 +65,7 @@ export const SubjectQuestionsPage = () => {
   const [form, setForm] = useState(EMPTY_FORM);
   const [editorKey, setEditorKey] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [fixing, setFixing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const set = (patch: Partial<typeof EMPTY_FORM>) => setForm((f) => ({ ...f, ...patch }));
@@ -91,6 +92,25 @@ export const SubjectQuestionsPage = () => {
     setForm((f) => ({ ...f, incorrect: f.incorrect.filter((_, i) => i !== index) }));
 
   const nonEmptyOptions = () => form.incorrect.map((s) => s.trim()).filter(Boolean);
+
+  const fixEnglish = async () => {
+    if (!form.question.trim()) {
+      setNotice('Write the question first, then let AI correct it.');
+      return;
+    }
+    setFixing(true);
+    setNotice(null);
+    try {
+      const res = await apiPost<{ corrected: string }>('/ai/agent/correct-text', { text: form.question });
+      set({ question: res.data.corrected });
+      setEditorKey((k) => k + 1);
+      setNotice('Question text corrected. Review the wording, then save.');
+    } catch (err: any) {
+      setNotice(err?.message ?? 'AI correction failed');
+    } finally {
+      setFixing(false);
+    }
+  };
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,7 +227,23 @@ export const SubjectQuestionsPage = () => {
               </select>
             </label>
             <div>
-              <p className="text-sm font-semibold">Question text</p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold">Question text</p>
+                <button
+                  type="button"
+                  onClick={fixEnglish}
+                  disabled={fixing || !form.question.trim()}
+                  title="Fix spelling and grammar with AI"
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded border border-line bg-white px-3 text-[11px] font-bold text-brand-800 hover:border-brand-500 hover:bg-brand-50 disabled:opacity-50"
+                >
+                  {fixing ? (
+                    <LoaderCircle size={13} className="animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Sparkles size={13} aria-hidden="true" />
+                  )}
+                  {fixing ? 'Correcting…' : 'AI correct'}
+                </button>
+              </div>
               <div className="mt-2">
                 <Suspense fallback={<LoadingSkeleton rows={3} />}>
                   <QuestionEditor key={editorKey} initialValue={form.question} onChange={(md) => set({ question: md })} />
