@@ -9,6 +9,9 @@ import type {
   SourceSubject,
 } from './types';
 
+/** Canonical template subject -> extra acronyms/names added by staff. */
+export type SubjectAliasMap = Record<string, string[]>;
+
 export const VARIANT_LABELS: Record<ReportVariant, string> = {
   junior: 'Junior Section',
   'senior-science': 'Senior Science Section',
@@ -248,6 +251,7 @@ export const applyPreviousTermScores = (
   draft: ReportCardDraft,
   previousCard: GeneratedReportCard | null,
   onlyBlank = false,
+  aliases?: SubjectAliasMap,
 ): ReportCardDraft => {
   const previousSubjects = previousCard?.subjects ?? [];
   const firstTerm = /first/i.test(draft.term);
@@ -259,7 +263,7 @@ export const applyPreviousTermScores = (
       }
       const previous =
         previousSubjects.find(
-          (item) => item.lines.join(' ').toLowerCase() === subject.lines.join(' ').toLowerCase(),
+          (item) => subjectMatches(subject.lines, item.lines.join(' '), aliases) >= 40,
         ) ?? previousSubjects[index];
       const previousOverall = previous?.overall ?? null;
       const lastCum =
@@ -292,72 +296,101 @@ const normalizeWords = (value: string) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+/** Human-friendly storage form for a staff-added acronym (punctuation removed). */
+export const normalizeSubjectAlias = (value: string) =>
+  value
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9 ]+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 /**
- * Canonical subject names and the acronyms used by the exam engine. The
- * printable report card, imported workbooks and the exam DB all spell subjects
- * differently, so both sides are normalised to the same name before matching.
- * Acronyms come from the school's official subject list.
+ * Canonical full-name aliases only. Acronyms (ENG, BUS, CHS, …) are NOT fixed
+ * here: staff add them in the Subject Mapper and the saved map is used for
+ * every auto-map.
  */
 const SUBJECT_ALIASES: Array<[RegExp, string]> = [
-  [/\bACC(?:OUNT(?:ING)?)?\b/, 'ACCOUNTING'],
-  [/\bAGR(?:IC(?:ULTURE)?)?\b/, 'AGRICULTURE'],
-  [/\bBIO(?:LOGY)?\b/, 'BIOLOGY'],
-  [/\bBUS(?:INESS(?:\s+STUDIES)?)?\b/, 'BUSINESS STUDIES'],
-  [/\bCHM(?:ISTRY)?\b|\bCHEM(?:ISTRY)?\b/, 'CHEMISTRY'],
+  [/\bACCOUNT(?:ING)?\b/, 'ACCOUNTING'],
+  [/\bAGRICULTURE\b/, 'AGRICULTURE'],
+  [/\bBIOLOGY\b/, 'BIOLOGY'],
+  [/\bBUSINESS(?:\s+STUDIES)?\b/, 'BUSINESS STUDIES'],
+  [/\bCHEMISTRY\b/, 'CHEMISTRY'],
   [
-    /\bCRS\b|\bCHRIST(?:AIN|IAN).*RELIGIOUS.*\b|\bRELIGIOUS(?:\s+STUDIES)?\b/,
+    /\bCHRIST(?:AIN|IAN).*RELIGIOUS.*\b|\bRELIGIOUS(?:\s+STUDIES)?\b/,
     'CHRISTIAN RELIGIOUS STUDIES',
   ],
-  [/\bCIV(?:IC(?:\s+EDUCATION)?)?\b/, 'CIVIC EDUCATION'],
-  [/\bCOM(?:MERCE|MERCIAL)?\b/, 'COMMERCE'],
-  [/\bCCA\b|\bCULTURAL.*CREATIVE.*\b/, 'CULTURAL AND CREATIVE ARTS'],
-  [
-    /\bDIT\b|\bDIGITAL.*TECHNOLOG(?:Y|IES)\b/,
-    'DIGITAL TECHNOLOGIES',
-  ],
-  [/\bECO(?:NOMIC(?:S)?)?\b/, 'ECONOMICS'],
-  [/\bENG(?:LISH)?\b/, 'ENGLISH'],
-  [/\bFRE(?:NCH)?\b/, 'FRENCH LANGUAGE'],
-  [/\bGEO(?:GRAPHY)?\b|\bGEOG(?:RAPHY)?\b/, 'GEOGRAPHY'],
-  [/\bGOV(?:ERNMENT|T)?\b/, 'GOVERNMENT'],
-  [/\bHIS(?:T(?:ORY)?)?\b/, 'HISTORY'],
-  [
-    /\bITS\b|\bINT\b|\bINTERMEDIATE.*SCIENCE\b|\bBASIC.*SCIENCE\b/,
-    'INTERMEDIATE SCIENCE',
-  ],
-  [/\bLIT(?:ER(?:ATURE|ARY)?)?\b/, 'LITERATURE'],
-  [/\bMAR(?:KETING)?\b|\bMKT\b/, 'MARKETING'],
-  [/\bMTH\b/, 'MATHEMATICS AND FURTHER MATHEMATICS'],
-  [/\bMAT(?:HS?|HEMATICS)?\b/, 'MATHEMATICS'],
-  [
-    /\bPHE\b|\bPHYSICAL.*HEALTH.*\b/,
-    'PHYSICAL AND HEALTH EDUCATION',
-  ],
-  [/\bPHY(?:SICS)?\b/, 'PHYSICS'],
-  [
-    /\bSCS\b|\bSOCIAL.*CITIZEN.*\b/,
-    'SOCIAL AND CITIZENSHIP STUDIES',
-  ],
-  [/\bTRA(?:DE)?\b/, 'TRADE'],
-  [/\bYOR(?:UBA)?\b/, 'YORUBA LANGUAGE'],
+  [/\bCIVIC(?:\s+EDUCATION)?\b/, 'CIVIC EDUCATION'],
+  [/\bCOMMERCE\b|\bCOMMERCIAL\b/, 'COMMERCE'],
+  [/\bCULTURAL.*CREATIVE.*\b/, 'CULTURAL AND CREATIVE ARTS'],
+  [/\bDIGITAL.*TECHNOLOG(?:Y|IES)\b/, 'DIGITAL TECHNOLOGIES'],
+  [/\bECONOMIC(?:S)?\b/, 'ECONOMICS'],
+  [/\bENGLISH\b/, 'ENGLISH'],
+  [/\bFRENCH(?:\s+LANGUAGE)?\b/, 'FRENCH LANGUAGE'],
+  [/\bGEOGRAPHY\b/, 'GEOGRAPHY'],
+  [/\bGOVERNMENT\b/, 'GOVERNMENT'],
+  [/\bHISTORY\b/, 'HISTORY'],
+  [/\bINTERMEDIATE.*SCIENCE\b|\bBASIC.*SCIENCE\b/, 'INTERMEDIATE SCIENCE'],
+  [/\bLITERATURE\b|\bLITERARY\b/, 'LITERATURE'],
+  [/\bMARKETING\b/, 'MARKETING'],
+  [/\bMATHEMATICS\b|\bMATHS\b/, 'MATHEMATICS'],
+  [/\bPHYSICAL.*HEALTH.*\b/, 'PHYSICAL AND HEALTH EDUCATION'],
+  [/\bPHYSICS\b/, 'PHYSICS'],
+  [/\bSOCIAL.*CITIZEN.*\b/, 'SOCIAL AND CITIZENSHIP STUDIES'],
+  [/\bTRADE\b/, 'TRADE'],
+  [/\bYORUBA(?:\s+LANGUAGE)?\b/, 'YORUBA LANGUAGE'],
 ];
 
-const aliasOf = (value: string) => {
+const aliasOf = (value: string, aliases?: SubjectAliasMap) => {
   const normalized = normalizeWords(value);
+
+  // Staff-added mappings take precedence: e.g. EGS/EAG -> ENGLISH.
+  for (const [canonical, aliasList] of Object.entries(aliases ?? {})) {
+    const canonicalNormalized = normalizeWords(canonical);
+    if (!canonicalNormalized) continue;
+    if (normalized === canonicalNormalized) return canonicalNormalized;
+    if (
+      (aliasList ?? []).some((alias) => {
+        const aliasNormalized = normalizeWords(alias);
+        return (
+          aliasNormalized &&
+          (normalized === aliasNormalized || normalized.startsWith(`${aliasNormalized} `))
+        );
+      })
+    ) {
+      return canonicalNormalized;
+    }
+  }
+
   // Further mathematics is a separate subject from plain mathematics. Check
-  // this before the generic MATHEMATICS alias so "FURTHER MATHS" and "MTH1"
-  // do not collapse into "MATHEMATICS".
+  // this before the generic MATHEMATICS alias so "FURTHER MATHS", "F/MATHS"
+  // and "MTH1" do not collapse into "MATHEMATICS".
   if (
     /\bFURTHER\b/.test(normalized) ||
-    /^MTH$/.test(normalized) ||
-    /^F$/.test(normalized)
+    /\bF\s*MAT(?:HS?|HEMATICS)?\b/.test(normalized)
   ) {
     return 'MATHEMATICS AND FURTHER MATHEMATICS';
   }
+
   for (const [pattern, alias] of SUBJECT_ALIASES) {
     if (pattern.test(normalized)) return alias;
   }
   return normalized;
+};
+
+export const canonicalSubjectName = (subjectLines: string[]) =>
+  aliasOf(subjectLines.join(' '));
+
+/** Every canonical subject that appears in any report-card template. */
+export const templateSubjectNames = () => {
+  const names = new Set<string>();
+  for (const variant of REPORT_CARD_VARIANTS) {
+    for (const subject of variant.subjects) {
+      const name = canonicalSubjectName(subject.lines);
+      if (name) names.add(name);
+    }
+  }
+  return [...names].sort((a, b) => a.localeCompare(b));
 };
 
 /**
@@ -391,9 +424,13 @@ const meaningfulWords = (value: string) =>
       .filter((word) => word.length > 2 && !GENERIC_SUBJECT_WORDS.has(word)),
   );
 
-export const subjectMatches = (reportLines: string[], sourceName: string) => {
-  const report = aliasOf(reportLines.join(' '));
-  const source = aliasOf(sourceName);
+export const subjectMatches = (
+  reportLines: string[],
+  sourceName: string,
+  aliases?: SubjectAliasMap,
+) => {
+  const report = aliasOf(reportLines.join(' '), aliases);
+  const source = aliasOf(sourceName, aliases);
   if (!report || !source) return 0;
   if (report === source) return 100;
   // Plain Mathematics and Further Mathematics are separate subjects even
@@ -410,13 +447,54 @@ export const subjectMatches = (reportLines: string[], sourceName: string) => {
   return overlap * 40;
 };
 
-export const bestSubjectMatch = (subject: GeneratedSubject, sources: SourceSubject[]) => {
+export const bestSubjectMatch = (
+  subject: GeneratedSubject,
+  sources: SourceSubject[],
+  aliases?: SubjectAliasMap,
+) => {
   let best: { source: SourceSubject; score: number } | null = null;
   for (const source of sources) {
-    const score = subjectMatches(subject.lines, source.name);
+    const score = subjectMatches(subject.lines, source.name, aliases);
     if (!best || score > best.score) best = { source, score };
   }
   return best && best.score >= 40 ? best.source : null;
+};
+
+/**
+ * Keep the template's printed subject rows. Saved-card scores are copied into
+ * the matching template row through the subject mapper, so an acronym row from
+ * an older auto-map can never replace the template format.
+ */
+export const templateDraftSubjects = (
+  variant: ReportVariant,
+  savedSubjects: GeneratedSubject[],
+  aliases?: SubjectAliasMap,
+): GeneratedSubject[] => {
+  const template = presetSubjects(variant);
+  const used = new Set<number>();
+  return template.map((row) => {
+    let bestIndex = -1;
+    let bestScore = 0;
+    savedSubjects.forEach((saved, index) => {
+      if (used.has(index)) return;
+      const score = subjectMatches(row.lines, saved.lines.join(' '), aliases);
+      if (score > bestScore) {
+        bestScore = score;
+        bestIndex = index;
+      }
+    });
+    if (bestIndex < 0 || bestScore < 40) return row;
+    used.add(bestIndex);
+    const saved = savedSubjects[bestIndex];
+    return recalcSubject(row, {
+      cbt1: saved.cbt1 ?? null,
+      cbt2: saved.cbt2 ?? null,
+      exam: saved.exam ?? null,
+      lastCum: saved.lastCum ?? null,
+      sourceSubjectId: saved.sourceSubjectId ?? null,
+      sourceSubjectName: saved.sourceSubjectName ?? null,
+    });
+  });
 };
 
 export const sourcePercentage = (source: SourceSubject) => {
@@ -479,7 +557,7 @@ export const columnForExamName = (name: string): ScoreColumn | null => {
 export const autoMapSources = (
   draft: ReportCardDraft,
   sources: SourceResult[],
-  options: { onlyBlank?: boolean } = {},
+  options: { onlyBlank?: boolean; aliases?: SubjectAliasMap } = {},
 ) => {
   const byColumn = new Map<ScoreColumn, SourceResult>();
   for (const source of sources) {
@@ -498,7 +576,7 @@ export const autoMapSources = (
       const source = byColumn.get(column);
       if (!source) continue;
       if (options.onlyBlank && next[column] != null) continue;
-      const match = bestSubjectMatch(next, source.subjects);
+      const match = bestSubjectMatch(next, source.subjects, options.aliases);
       if (!match) continue;
       const value = mappedScore(match, column);
       if (value == null) continue;

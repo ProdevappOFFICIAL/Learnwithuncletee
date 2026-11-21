@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, FilePlus2, Printer, Upload } from 'lucide-react';
+import { Download, FilePlus2, Menu, Printer, Save, SlidersHorizontal, Upload, UserRound, X } from 'lucide-react';
 import { ErrorState, LoadingSkeleton, PageHeader } from '@/components/dashboard/DashboardUI';
-import { apiDownload, apiGet, apiPost } from '@/lib/api';
+import { apiDownload, apiGet, apiPost, apiPut } from '@/lib/api';
 import { useAcademicSettings } from '@/lib/academic';
 import { downloadNodeAsPng } from '@/lib/studentIdCard';
 import type { ClassItem, StudentRow } from '@/data/dashboard';
@@ -24,8 +24,9 @@ import {
   previousTermOf,
   presetSubjects,
   recalcSubject,
-  subjectsFromSources,
+  templateDraftSubjects,
   VARIANT_LABELS,
+  type SubjectAliasMap,
 } from './result-generator/helpers';
 import type {
   AttendanceSummary,
@@ -49,6 +50,9 @@ interface TestResultRow {
 }
 
 const VARIANT_ORDER = Object.keys(VARIANT_LABELS) as ReportVariant[];
+
+const isDesktopViewport = () =>
+  typeof window !== 'undefined' && window.matchMedia('(min-width: 1280px)').matches;
 
 const sourceFromResult = (row: TestResultRow, origin: 'ONLINE' | 'OFFLINE'): SourceResult => ({
   key: `${origin}:${row.id}`,
@@ -96,8 +100,10 @@ export default function AdminResultGeneratorPage() {
   const session = academicQuery.data?.data.session ?? '';
   const term = academicQuery.data?.data.term ?? '';
   const [variant, setVariant] = useState<ReportVariant>('junior');
-  const [leftOpen, setLeftOpen] = useState(true);
-  const [rightOpen, setRightOpen] = useState(true);
+  const [isDesktop, setIsDesktop] = useState(isDesktopViewport);
+  const [leftOpen, setLeftOpen] = useState(isDesktopViewport);
+  const [rightOpen, setRightOpen] = useState(isDesktopViewport);
+  const [actionsOpen, setActionsOpen] = useState(false);
   const [mode, setMode] = useState<'live' | 'import'>('live');
   const [studentSearch, setStudentSearch] = useState('');
   const [studentQuery, setStudentQuery] = useState('');
@@ -150,6 +156,15 @@ export default function AdminResultGeneratorPage() {
     enabled: Boolean(selectedImportId),
     staleTime: 60_000,
   });
+  const aliasesQuery = useQuery({
+    queryKey: ['subject-aliases'],
+    queryFn: async () => (await apiGet<SubjectAliasMap>('/settings/subject-aliases')).data,
+    staleTime: 60_000,
+  });
+
+  const subjectAliases = aliasesQuery.data ?? {};
+  const subjectAliasesRef = useRef<SubjectAliasMap>({});
+  subjectAliasesRef.current = subjectAliases;
 
   const classes = classesQuery.data ?? [];
   const students = studentsQuery.data ?? [];
@@ -191,6 +206,49 @@ export default function AdminResultGeneratorPage() {
       setNotice({ text: 'Could not load pupils.', tone: 'error' });
     }
   }, [studentsQuery.isError]);
+
+  // Below xl the two side panels become slide-over drawers; above xl they sit
+  // inline as before. Keep the rails open when returning to a desktop width.
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1280px)');
+    const onChange = (event: MediaQueryListEvent) => {
+      setIsDesktop(event.matches);
+      if (event.matches) {
+        setLeftOpen(true);
+        setRightOpen(true);
+        setActionsOpen(false);
+      } else {
+        setLeftOpen(false);
+        setRightOpen(false);
+      }
+    };
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  const toggleLeftPanel = () => {
+    const next = !leftOpen;
+    setLeftOpen(next);
+    if (!isDesktop) {
+      setRightOpen(false);
+      setActionsOpen(false);
+    }
+  };
+
+  const toggleRightPanel = () => {
+    const next = !rightOpen;
+    setRightOpen(next);
+    if (!isDesktop) {
+      setLeftOpen(false);
+      setActionsOpen(false);
+    }
+  };
+
+  const openActions = () => {
+    setLeftOpen(false);
+    setRightOpen(false);
+    setActionsOpen(true);
+  };
 
   const setLoadedDraft = (next: ReportCardDraft) => {
     setDraft(next);
@@ -277,23 +335,42 @@ export default function AdminResultGeneratorPage() {
         loadSources(student.id, nextSession, nextTerm).catch(() => []),
       ]);
       if (requestId !== requestRef.current) return;
+      // Always start from the printed template rows. Saved scores are copied
+      // into those fixed subject names through the mapper; result acronyms
+      // never replace or rename a template row.
       let nextDraft = cardResponse.data ? cardToDraft(cardResponse.data) : base;
-      // Subject rows come from the pupil's result subjects for this period;
-      // the template preset is only used when there are no result subjects.
-      if (!cardResponse.data) {
-        const dynamicSubjects = subjectsFromSources(sources);
-        if (dynamicSubjects.length) nextDraft = { ...nextDraft, subjects: dynamicSubjects };
-      }
+      nextDraft = {
+        ...nextDraft,
+        subjects: templateDraftSubjects(
+          nextDraft.variant,
+          cardResponse.data ? nextDraft.subjects : [],
+          subjectAliasesRef.current,
+        ),
+      };
       nextDraft = previousTerm
-        ? applyPreviousTermScores(nextDraft, previousCard, Boolean(cardResponse.data))
-        : applyPreviousTermScores(nextDraft, null, false);
+        ? applyPreviousTermScores(
+            nextDraft,
+            previousCard,
+            Boolean(cardResponse.data),
+            subjectAliasesRef.current,
+          )
+        : applyPreviousTermScores(
+            nextDraft,
+            null,
+            false,
+            subjectAliasesRef.current,
+          );
       // CBT 1 / CBT 2 / Exam results are separate sittings. Match the exam
       // names (e.g. "JSS1 CBT 1") and fill the matching score columns.
-      const auto = autoMapSources(nextDraft, sources, { onlyBlank: Boolean(cardResponse.data) });
+      const auto = autoMapSources(nextDraft, sources, {
+        onlyBlank: Boolean(cardResponse.data),
+        aliases: subjectAliasesRef.current,
+      });
       nextDraft = auto.draft;
       setLoadedDraft(nextDraft);
       setSourceResults(sources);
       setSelectedSourceKey(sources[0]?.key ?? '');
+      if (!isDesktop) setLeftOpen(false);
       void fetchAttendance(student.id);
       const columnLabel: Record<string, string> = {
         cbt1: 'CBT 1',
@@ -392,25 +469,30 @@ export default function AdminResultGeneratorPage() {
         /* keep imported draft */
       }
     }
-    if (!hasSavedCard) {
-      const dynamicSubjects = subjectsFromSources([
-        {
-          key: `import:${row.key}`,
-          origin: 'IMPORT',
-          examName: row.examName || 'Imported results',
-          subjects: row.subjects,
-        },
-      ]);
-      if (dynamicSubjects.length) nextDraft = { ...nextDraft, subjects: dynamicSubjects };
-    }
+    // Keep the template's subject names. Imported acronyms are mapped into
+    // those rows by autoMapSources, not turned into replacement rows.
+    nextDraft = {
+      ...nextDraft,
+      subjects: templateDraftSubjects(
+        nextDraft.variant,
+        hasSavedCard ? nextDraft.subjects : [],
+        subjectAliasesRef.current,
+      ),
+    };
     nextDraft = previousTerm
-      ? applyPreviousTermScores(nextDraft, previousCard, hasSavedCard)
-      : applyPreviousTermScores(nextDraft, null, false);
+      ? applyPreviousTermScores(
+          nextDraft,
+          previousCard,
+          hasSavedCard,
+          subjectAliasesRef.current,
+        )
+      : applyPreviousTermScores(
+          nextDraft,
+          null,
+          false,
+          subjectAliasesRef.current,
+        );
 
-    if (requestId !== requestRef.current) return;
-    setSelectedStudent(student);
-    setLoadedDraft(nextDraft);
-    if (row.matchedStudentId) void fetchAttendance(row.matchedStudentId);
     const source: SourceResult = {
       key: `import:${row.key}`,
       origin: 'IMPORT',
@@ -418,8 +500,18 @@ export default function AdminResultGeneratorPage() {
       overallScore: row.overallScore,
       subjects: row.subjects,
     };
+    nextDraft = autoMapSources(nextDraft, [source], {
+      onlyBlank: true,
+      aliases: subjectAliasesRef.current,
+    }).draft;
+
+    if (requestId !== requestRef.current) return;
+    setSelectedStudent(student);
+    setLoadedDraft(nextDraft);
+    if (row.matchedStudentId) void fetchAttendance(row.matchedStudentId);
     setSourceResults([source]);
     setSelectedSourceKey(source.key);
+    if (!isDesktop) setLeftOpen(false);
     setSelectionBusy(false);
     setNotice({
       text: row.matchedStudentId
@@ -466,6 +558,37 @@ export default function AdminResultGeneratorPage() {
     setDirty(true);
   };
 
+  const saveSubjectAliases = async (next: SubjectAliasMap) => {
+    const response = await apiPut<SubjectAliasMap>('/settings/subject-aliases', {
+      aliases: next,
+    });
+    const saved = response.data ?? next;
+    queryClient.setQueryData(['subject-aliases'], saved);
+    subjectAliasesRef.current = saved;
+
+    // Apply the new mapping to any blank score boxes on the sheet that is
+    // already open. Existing typed/saved scores are preserved.
+    if (draft) {
+      const auto = autoMapSources(draft, sourceResults, {
+        onlyBlank: true,
+        aliases: saved,
+      });
+      if (auto.mapped > 0) {
+        setDraft(auto.draft);
+        markDirty();
+        setNotice({
+          text: `Subject mappings saved. Filled ${auto.mapped} blank score(s) with the new mapping.`,
+          tone: 'ok',
+        });
+        return;
+      }
+    }
+    setNotice({
+      text: 'Subject mappings saved. They apply to every auto-map.',
+      tone: 'ok',
+    });
+  };
+
   const patchDraft = (patch: Partial<ReportCardDraft>) => {
     setDraft((previous) => {
       if (!previous) return previous;
@@ -492,6 +615,10 @@ export default function AdminResultGeneratorPage() {
     if (!draft) return;
     setSelectedField(field as ReportField);
     setRightOpen(true);
+    if (!isDesktop) {
+      setLeftOpen(false);
+      setActionsOpen(false);
+    }
   };
 
   /** Commit a value typed directly into a printed box on the sheet. */
@@ -582,7 +709,7 @@ export default function AdminResultGeneratorPage() {
       return {
         ...previous,
         subjects: previous.subjects.map((subject) => {
-          const match = bestSubjectMatch(subject, source.subjects);
+          const match = bestSubjectMatch(subject, source.subjects, subjectAliasesRef.current);
           if (!match) return subject;
           const lastCum = mappedScore(match, 'lastCum');
           return recalcSubject(
@@ -830,6 +957,56 @@ export default function AdminResultGeneratorPage() {
   const previewSubjects: ReportSubject[] = draft ? draftToReportSubjects(draft) : draftToReportSubjects(previewDraft);
   const sourceForPanel = sourceResults.find((item) => item.key === selectedSourceKey) ?? sourceResults[0] ?? null;
 
+  const topActionButtons = (
+    <>
+      <button
+        type="button"
+        onClick={() => void startBlankCard()}
+        className="inline-flex min-h-11 items-center justify-center rounded border border-line bg-white px-4 py-2.5 text-sm font-bold hover:border-brand-500 hover:text-brand-700"
+      >
+        <FilePlus2 aria-hidden="true" size={15} className="mr-2" /> Blank card
+      </button>
+      <button
+        type="button"
+        onClick={() => setImportOpen(true)}
+        className="inline-flex min-h-11 items-center justify-center rounded border border-line bg-white px-4 py-2.5 text-sm font-bold hover:border-brand-500 hover:text-brand-700"
+      >
+        <Upload aria-hidden="true" size={15} className="mr-2" /> Import Excel
+      </button>
+      <button
+        type="button"
+        onClick={() => void exportCards(true)}
+        disabled={exporting}
+        className="inline-flex min-h-11 items-center justify-center rounded border border-line bg-white px-4 py-2.5 text-sm font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-50"
+      >
+        <Download aria-hidden="true" size={15} className="mr-2" /> Export all
+      </button>
+      <button
+        type="button"
+        onClick={() => window.print()}
+        className="inline-flex min-h-11 items-center justify-center rounded border border-line bg-white px-4 py-2.5 text-sm font-bold hover:border-brand-500 hover:text-brand-700"
+      >
+        <Printer aria-hidden="true" size={15} className="mr-2" /> Print
+      </button>
+    </>
+  );
+
+  const bottomPanel = (
+    <AdminResultGeneratorBottomPanel
+      draft={draft}
+      dirty={dirty}
+      saving={saving}
+      exporting={exporting}
+      downloadingImage={downloadingImage}
+      onSave={() => void saveDraft()}
+      onPrint={() => window.print()}
+      onExport={() => void exportCards(false)}
+      onDownloadImage={() => void downloadReportImage()}
+      onReset={() => void resetCurrent()}
+      onClear={clearStudentResult}
+    />
+  );
+
   if (academicQuery.isPending) {
     return (
       <div className="space-y-6">
@@ -849,46 +1026,23 @@ export default function AdminResultGeneratorPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-24 xl:pb-0">
       <div className="print:hidden">
-        <PageHeader
-          eyebrow="Reports"
-          title="Result Generator"
-          text="Build a printable result-notification sheet from live results or an imported Excel workbook. Click any box on the sheet to edit it in the inspector."
-          actions={
-            <>
-              <button
-                type="button"
-                onClick={() => void startBlankCard()}
-                className="inline-flex min-h-11 items-center rounded border border-line bg-white px-4 py-2.5 text-sm font-bold hover:border-brand-500 hover:text-brand-700"
-              >
-                <FilePlus2 aria-hidden="true" size={15} className="mr-2" /> Blank card
-              </button>
-              <button
-                type="button"
-                onClick={() => setImportOpen(true)}
-                className="inline-flex min-h-11 items-center rounded border border-line bg-white px-4 py-2.5 text-sm font-bold hover:border-brand-500 hover:text-brand-700"
-              >
-                <Upload aria-hidden="true" size={15} className="mr-2" /> Import Excel
-              </button>
-              <button
-                type="button"
-                onClick={() => void exportCards(true)}
-                disabled={exporting}
-                className="inline-flex min-h-11 items-center rounded border border-line bg-white px-4 py-2.5 text-sm font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-50"
-              >
-                <Download aria-hidden="true" size={15} className="mr-2" /> Export all
-              </button>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="inline-flex min-h-11 items-center rounded border border-line bg-white px-4 py-2.5 text-sm font-bold hover:border-brand-500 hover:text-brand-700"
-              >
-                <Printer aria-hidden="true" size={15} className="mr-2" /> Print
-              </button>
-            </>
-          }
-        />
+        <div className="mb-3 xl:hidden">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-brand-700">Reports</p>
+          <h1 className="mt-1 font-display text-2xl font-extrabold text-ink">Result Generator</h1>
+          <p className="mt-1 text-xs leading-5 text-muted">
+            Select a pupil, then tap any box on the sheet to edit it.
+          </p>
+        </div>
+        <div className="hidden xl:block">
+          <PageHeader
+            eyebrow="Reports"
+            title="Result Generator"
+            text="Build a printable result-notification sheet from live results or an imported Excel workbook. Click any box on the sheet to edit it in the inspector."
+            actions={topActionButtons}
+          />
+        </div>
       </div>
 
       {notice && (
@@ -904,11 +1058,30 @@ export default function AdminResultGeneratorPage() {
         </p>
       )}
 
+      {!isDesktop && (leftOpen || rightOpen) && (
+        <button
+          type="button"
+          aria-label="Close side panels"
+          onClick={() => {
+            setLeftOpen(false);
+            setRightOpen(false);
+          }}
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px] xl:hidden print:hidden"
+        />
+      )}
+
       <div className="flex flex-col gap-3 xl:flex-row xl:items-start">
-        <AdminResultGeneratorLeftPanel
-          open={leftOpen}
-          onToggle={() => setLeftOpen((value) => !value)}
-          mode={mode}
+        <div
+          className={
+            leftOpen
+              ? 'fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[min(90vw,360px)] max-w-full flex-col overflow-y-auto overscroll-contain bg-white shadow-2xl xl:static xl:z-auto xl:h-auto xl:w-auto xl:overflow-visible xl:bg-transparent xl:shadow-none print:hidden'
+              : 'hidden xl:block'
+          }
+        >
+          <AdminResultGeneratorLeftPanel
+            open={leftOpen}
+            onToggle={toggleLeftPanel}
+            mode={mode}
           onModeChange={setMode}
           search={studentSearch}
           onSearchChange={setStudentSearch}
@@ -935,24 +1108,27 @@ export default function AdminResultGeneratorPage() {
           importRowsLoading={importDetailQuery.isPending || importDetailQuery.isFetching}
           selectedImportKey={selectedImportKey}
           onSelectImportRow={(row) => void selectImportRow(row)}
-          onOpenImport={() => setImportOpen(true)}
-        />
+            onOpenImport={() => setImportOpen(true)}
+          />
+        </div>
 
-        <main className="min-w-0 flex-1 space-y-3">
+        <main className="min-w-0 flex-1 space-y-3 pb-20 xl:pb-0">
           <div className="flex flex-wrap items-center justify-between gap-2 border border-line bg-white px-3 py-2 print:hidden">
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => setLeftOpen((value) => !value)}
-                className="inline-flex min-h-9 items-center gap-1 rounded border border-line px-2.5 text-[11px] font-bold text-muted hover:border-brand-500 hover:text-ink"
+                onClick={toggleLeftPanel}
+                aria-expanded={leftOpen}
+                className="hidden min-h-9 items-center gap-1 rounded border border-line px-2.5 text-[11px] font-bold text-muted hover:border-brand-500 hover:text-ink xl:inline-flex"
                 title={leftOpen ? 'Collapse pupils panel' : 'Open pupils panel'}
               >
                 {leftOpen ? '◀' : '▶'} Pupils
               </button>
               <button
                 type="button"
-                onClick={() => setRightOpen((value) => !value)}
-                className="inline-flex min-h-9 items-center gap-1 rounded border border-line px-2.5 text-[11px] font-bold text-muted hover:border-brand-500 hover:text-ink"
+                onClick={toggleRightPanel}
+                aria-expanded={rightOpen}
+                className="hidden min-h-9 items-center gap-1 rounded border border-line px-2.5 text-[11px] font-bold text-muted hover:border-brand-500 hover:text-ink xl:inline-flex"
                 title={rightOpen ? 'Collapse inspector' : 'Open inspector'}
               >
                 {rightOpen ? '▶' : '◀'} Inspector
@@ -1053,44 +1229,113 @@ export default function AdminResultGeneratorPage() {
               />
             </div>
           </div>
+          <p className="text-center text-[10px] font-semibold text-muted xl:hidden print:hidden">
+            Swipe sideways to see the full result sheet.
+          </p>
         </main>
 
-        <AdminResultGeneratorRightPanel
-          open={rightOpen}
-          onToggle={() => setRightOpen((value) => !value)}
-          draft={displayDraft}
-          selectedField={selectedField}
-          onSelectField={setSelectedField}
-          onPatchDraft={patchDraft}
-          onPatchSubject={patchSubject}
-          sourceResults={sourceResults}
-          selectedSourceKey={selectedSourceKey}
-          onSourceChange={setSelectedSourceKey}
-          onCalculateAttendance={() => void calculateAttendance()}
-          attendanceBusy={attendanceBusy}
-          attendanceError={attendanceError}
-          attendance={attendance}
-          onAutoMap={autoMapScores}
-          profilePhotoUrl={effectiveStudent?.student?.photoUrl || effectiveStudent?.img || ''}
-          attachOptions={attachOptions}
-          onAttachStudent={(studentId) => void attachStudent(studentId)}
-          attaching={attaching}
-        />
+        <div
+          className={
+            rightOpen
+              ? 'fixed inset-y-0 right-0 z-50 flex h-[100dvh] w-[min(90vw,380px)] max-w-full flex-col overflow-y-auto overscroll-contain bg-white shadow-2xl xl:static xl:z-auto xl:h-auto xl:w-auto xl:overflow-visible xl:bg-transparent xl:shadow-none print:hidden'
+              : 'hidden xl:block'
+          }
+        >
+          <AdminResultGeneratorRightPanel
+            open={rightOpen}
+            onToggle={toggleRightPanel}
+            draft={displayDraft}
+            selectedField={selectedField}
+            onSelectField={setSelectedField}
+            onPatchDraft={patchDraft}
+            onPatchSubject={patchSubject}
+            sourceResults={sourceResults}
+            selectedSourceKey={selectedSourceKey}
+            onSourceChange={setSelectedSourceKey}
+            onCalculateAttendance={() => void calculateAttendance()}
+            attendanceBusy={attendanceBusy}
+            attendanceError={attendanceError}
+            attendance={attendance}
+            onAutoMap={autoMapScores}
+            profilePhotoUrl={effectiveStudent?.student?.photoUrl || effectiveStudent?.img || ''}
+            attachOptions={attachOptions}
+            onAttachStudent={(studentId) => void attachStudent(studentId)}
+            attaching={attaching}
+            subjectAliases={subjectAliases}
+            onSaveSubjectAliases={saveSubjectAliases}
+          />
+        </div>
       </div>
 
-      <AdminResultGeneratorBottomPanel
-        draft={draft}
-        dirty={dirty}
-        saving={saving}
-        exporting={exporting}
-        downloadingImage={downloadingImage}
-        onSave={() => void saveDraft()}
-        onPrint={() => window.print()}
-        onExport={() => void exportCards(false)}
-        onDownloadImage={() => void downloadReportImage()}
-        onReset={() => void resetCurrent()}
-        onClear={clearStudentResult}
-      />
+      <div className="hidden xl:block print:hidden">{bottomPanel}</div>
+
+      {/* Mobile action bar: panels and the full action list open as drawers. */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 px-2 pb-2 pt-2 shadow-[0_-4px_16px_rgba(31,61,43,0.08)] backdrop-blur xl:hidden print:hidden">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={toggleLeftPanel}
+            aria-expanded={leftOpen}
+            className="inline-flex min-h-10 flex-1 items-center justify-center gap-1 rounded border border-line bg-white px-1.5 text-[11px] font-bold text-brand-800 hover:border-brand-500 hover:bg-brand-50"
+          >
+            <UserRound size={14} aria-hidden="true" /> Pupils
+          </button>
+          <button
+            type="button"
+            onClick={toggleRightPanel}
+            aria-expanded={rightOpen}
+            className="inline-flex min-h-10 flex-1 items-center justify-center gap-1 rounded border border-line bg-white px-1.5 text-[11px] font-bold text-brand-800 hover:border-brand-500 hover:bg-brand-50"
+          >
+            <SlidersHorizontal size={14} aria-hidden="true" /> Inspector
+          </button>
+          <button
+            type="button"
+            onClick={openActions}
+            className="inline-flex min-h-10 flex-1 items-center justify-center gap-1 rounded border border-line bg-white px-1.5 text-[11px] font-bold text-brand-800 hover:border-brand-500 hover:bg-brand-50"
+          >
+            <Menu size={14} aria-hidden="true" /> Actions
+          </button>
+          <button
+            type="button"
+            onClick={() => void saveDraft()}
+            disabled={!draft?.studentId || saving}
+            className="inline-flex min-h-10 flex-1 items-center justify-center gap-1 rounded bg-brand-500 px-1.5 text-[11px] font-bold text-white hover:bg-brand-700 disabled:opacity-50"
+          >
+            <Save size={14} aria-hidden="true" /> {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+
+      {!isDesktop && actionsOpen && (
+        <div className="fixed inset-0 z-50 xl:hidden print:hidden">
+          <button
+            type="button"
+            aria-label="Close result actions"
+            onClick={() => setActionsOpen(false)}
+            className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
+          />
+          <div className="absolute inset-x-0 bottom-0 max-h-[88dvh] overflow-y-auto overscroll-contain border-t border-line bg-white px-3 pb-3 pt-2 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div>
+                <p className="font-display text-base font-extrabold text-ink">Result actions</p>
+                <p className="text-[11px] text-muted">
+                  Save, print, export or start a blank card.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActionsOpen(false)}
+                aria-label="Close result actions"
+                className="rounded border border-line p-2 text-muted hover:border-brand-300 hover:text-ink"
+              >
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="mb-3 grid grid-cols-2 gap-2">{topActionButtons}</div>
+            {bottomPanel}
+          </div>
+        </div>
+      )}
 
       <ImportResultsModal open={importOpen} onClose={() => setImportOpen(false)} onImported={onImported} />
 

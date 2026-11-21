@@ -80,7 +80,7 @@ export const AdminResultGeneratorLeftPanel = ({
 
   return (
     <aside className="flex w-full shrink-0 flex-col border border-line bg-white lg:w-[300px] print:hidden">
-      <div className="flex items-center justify-between border-b border-line px-4 py-3">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-white px-4 py-3 xl:static">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[.18em] text-brand-700">Sources</p>
           <p className="font-display text-sm font-extrabold text-ink">Pupils &amp; imports</p>
@@ -160,7 +160,7 @@ export const AdminResultGeneratorLeftPanel = ({
             </button>
           </form>
 
-          <div className="scroll-db max-h-[520px] flex-1 overflow-y-auto">
+          <div className="scroll-db max-h-none flex-1 overflow-visible xl:max-h-[520px] xl:overflow-y-auto">
             {studentsLoading ? (
               <p className="px-4 py-5 text-xs text-muted">Loading pupils...</p>
             ) : students.length === 0 ? (
@@ -265,7 +265,7 @@ export const AdminResultGeneratorLeftPanel = ({
             )}
           </div>
 
-          <div className="scroll-db max-h-[520px] flex-1 overflow-y-auto">
+          <div className="scroll-db max-h-none flex-1 overflow-visible xl:max-h-[520px] xl:overflow-y-auto">
             {importRowsLoading ? (
               <p className="px-4 py-5 text-xs text-muted">Loading imported rows...</p>
             ) : !selectedImportId ? (

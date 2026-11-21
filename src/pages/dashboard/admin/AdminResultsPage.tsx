@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, StatTile } from '@/components/dashboard/DashboardUI';
+import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pill, StatTile, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
 import { useResource } from '@/context/AuthContext';
 import { apiDelete, apiPost } from '@/lib/api';
 import { UploadButton } from '@/lib/uploadthing';
@@ -12,6 +12,16 @@ interface ClassRow extends GradeData {
   studentCode: string;
 }
 
+interface ExamAttemptRow {
+  id: string;
+  overallScore: number;
+  attempted_questions: number;
+  total_questions: number;
+  date: string;
+  user?: { user_name: string; user_email: string; class?: { name: string } | null };
+  exam?: { exam_name: string };
+}
+
 //const SUBJECTS = ['Mathematics', 'English Language', 'Basic Science', 'Social Studies', 'ICT', 'Civic Education'];
 
 export const AdminResultsPage = () => {
@@ -21,6 +31,7 @@ export const AdminResultsPage = () => {
   const [session, setSession] = useState('2025/2026');
   const [term, setTerm] = useState('First Term');
   const [docStudentId, setDocStudentId] = useState('');
+  const [examType, setExamType] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const selectClass = 'min-h-11 rounded border border-line bg-white px-3 text-sm font-bold';
@@ -33,6 +44,27 @@ export const AdminResultsPage = () => {
   const results = useResource<ClassRow[]>('/school-results/class', { subject, className: effectiveClass, session, term });
   const pupils = useResource<StudentRow[]>('/students', { className: effectiveClass, limit: 100 });
   const docs = useResource<ResultDocData[]>('/result-documents', { className: effectiveClass, session, term });
+  const classId = (classesRes.data ?? []).find((item) => item.name === effectiveClass)?.id;
+  const onlineAttempts = useResource<ExamAttemptRow[]>('/results', {
+    classId,
+    session,
+    term,
+    examType: examType || undefined,
+    limit: 50,
+  });
+  const offlineAttempts = useResource<ExamAttemptRow[]>('/offline-results', {
+    classId,
+    session,
+    term,
+    examType: examType || undefined,
+    limit: 50,
+  });
+  const attempts: Array<ExamAttemptRow & { origin: 'ONLINE' | 'OFFLINE' }> = [
+    ...(onlineAttempts.data ?? []).map((row) => ({ ...row, origin: 'ONLINE' as const })),
+    ...(offlineAttempts.data ?? []).map((row) => ({ ...row, origin: 'OFFLINE' as const })),
+  ].sort((a, b) => +new Date(b.date) - +new Date(a.date));
+  const attemptsLoading = onlineAttempts.loading || offlineAttempts.loading;
+  const attemptsError = onlineAttempts.error || offlineAttempts.error;
   const [docTitle, setDocTitle] = useState('');
   const [docUrl, setDocUrl] = useState('');
 
@@ -191,6 +223,110 @@ export const AdminResultsPage = () => {
               </li>
             ))}
           </ul>
+        )}
+      </Card>
+
+      <Card>
+        <CardHead
+          title="Exam attempts"
+          sub={`${effectiveClass} · ${term}, ${session} · filter by exam name`}
+        />
+        <div className="flex flex-wrap items-end gap-3 border-b border-line px-5 py-4">
+          <label className="block text-sm font-semibold">
+            Exam type
+            <select
+              value={examType}
+              onChange={(e) => setExamType(e.target.value)}
+              className={`${selectClass} mt-2 block min-w-[180px]`}
+            >
+              <option value="">All exams</option>
+              <option value="cbt1">CBT 1</option>
+              <option value="cbt2">CBT 2</option>
+              <option value="exam">Examination</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              onlineAttempts.reload();
+              offlineAttempts.reload();
+            }}
+            className="min-h-11 rounded border border-line bg-white px-4 text-sm font-bold hover:border-brand-500 hover:text-brand-700"
+          >
+            Refresh
+          </button>
+          {examType && (
+            <button
+              type="button"
+              onClick={() => setExamType('')}
+              className="min-h-11 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink"
+            >
+              Clear filter
+            </button>
+          )}
+        </div>
+        {attemptsLoading ? (
+          <div className="px-5 py-5"><LoadingSkeleton rows={3} /></div>
+        ) : attemptsError ? (
+          <div className="px-5 py-5">
+            <ErrorState
+              message={attemptsError}
+              onRetry={() => {
+                onlineAttempts.reload();
+                offlineAttempts.reload();
+              }}
+            />
+          </div>
+        ) : attempts.length === 0 ? (
+          <div className="px-5 py-5">
+            <EmptyState message="No exam attempts match this class, period and exam type." />
+          </div>
+        ) : (
+          <TableWrap>
+            <table className="w-full min-w-[780px] text-left text-sm">
+              <thead>
+                <tr>
+                  <Th>Pupil</Th>
+                  <Th>Exam</Th>
+                  <Th>Class</Th>
+                  <Th>Mode</Th>
+                  <Th>Score</Th>
+                  <Th>Date</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {attempts.map((row) => (
+                  <tr key={`${row.origin}:${row.id}`}>
+                    <Td>
+                      <span className="font-bold">{row.user?.user_name ?? '—'}</span>
+                      <span className="block text-xs text-muted">{row.user?.user_email ?? ''}</span>
+                    </Td>
+                    <Td>{row.exam?.exam_name ?? '—'}</Td>
+                    <Td className="text-muted">{row.user?.class?.name ?? effectiveClass}</Td>
+                    <Td>
+                      <Pill tone={row.origin === 'OFFLINE' ? 'amber' : 'sky'}>
+                        {row.origin === 'OFFLINE' ? 'Offline' : 'Online'}
+                      </Pill>
+                    </Td>
+                    <Td>
+                      <Pill
+                        tone={
+                          row.overallScore >= 75
+                            ? 'emerald'
+                            : row.overallScore < 40
+                              ? 'rose'
+                              : 'sky'
+                        }
+                      >
+                        {Math.round(row.overallScore * 10) / 10}%
+                      </Pill>
+                    </Td>
+                    <Td className="text-muted">{new Date(row.date).toLocaleString()}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
         )}
       </Card>
 

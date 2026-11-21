@@ -28,6 +28,8 @@ import {
   type ReportField,
   type SourceResult,
 } from './types';
+import type { SubjectAliasMap } from './helpers';
+import { SubjectMapperPanel } from './SubjectMapperPanel';
 
 interface AdminResultGeneratorRightPanelProps {
   open: boolean;
@@ -49,6 +51,8 @@ interface AdminResultGeneratorRightPanelProps {
   attachOptions: SearchOption[];
   onAttachStudent: (studentId: string) => void;
   attaching: boolean;
+  subjectAliases: SubjectAliasMap;
+  onSaveSubjectAliases: (next: SubjectAliasMap) => Promise<void>;
 }
 
 const TEXT_FIELDS: Record<
@@ -127,6 +131,8 @@ export const AdminResultGeneratorRightPanel = ({
   attachOptions,
   onAttachStudent,
   attaching,
+  subjectAliases,
+  onSaveSubjectAliases,
 }: AdminResultGeneratorRightPanelProps) => {
   const subjectField = parseSubjectField(selectedField);
   const subject = subjectField ? draft.subjects[subjectField.index] : null;
@@ -157,7 +163,7 @@ export const AdminResultGeneratorRightPanel = ({
 
   return (
     <aside className="flex w-full shrink-0 flex-col border border-line bg-white lg:w-[360px] print:hidden">
-      <div className="flex items-center justify-between border-b border-line px-4 py-3">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-white px-4 py-3 xl:static">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[.18em] text-brand-700">Inspector</p>
           <p className="font-display text-sm font-extrabold text-ink">
@@ -174,7 +180,7 @@ export const AdminResultGeneratorRightPanel = ({
         </button>
       </div>
 
-      <div className="scroll-db max-h-[760px] space-y-4 overflow-y-auto px-4 py-4">
+      <div className="scroll-db max-h-none space-y-4 overflow-visible px-4 py-4 xl:max-h-[760px] xl:overflow-y-auto">
         {/* Source picker is always available: the inspector maps from it. */}
         <section className="space-y-2">
           <div className="flex items-center justify-between gap-2">
@@ -512,7 +518,7 @@ export const AdminResultGeneratorRightPanel = ({
                           <p className="text-[10px] font-bold uppercase tracking-[.15em] text-muted">
                             Map from imported/live result
                           </p>
-                          {bestSubjectMatch(subject, selectedSource.subjects) && (
+                          {bestSubjectMatch(subject, selectedSource.subjects, subjectAliases) && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800">
                               <Check size={11} aria-hidden="true" /> name match
                             </span>
@@ -521,7 +527,7 @@ export const AdminResultGeneratorRightPanel = ({
                         <div className="scroll-db max-h-56 space-y-1.5 overflow-y-auto pr-1">
                           {selectedSource.subjects.map((sourceSubject, index) => {
                             const value = mappedScore(sourceSubject, subjectField.part as 'cbt1' | 'cbt2' | 'exam' | 'lastCum');
-                            const matched = bestSubjectMatch(subject, [sourceSubject]);
+                            const matched = bestSubjectMatch(subject, [sourceSubject], subjectAliases);
                             return (
                               <button
                                 key={`${sourceSubject.name}-${index}`}
@@ -575,6 +581,20 @@ export const AdminResultGeneratorRightPanel = ({
             <p className="text-xs text-muted">Select another box on the sheet.</p>
           </section>
         )}
+
+        <details className="border-t border-line pt-4">
+          <summary className="cursor-pointer list-none">
+            <span className="text-[10px] font-bold uppercase tracking-[.15em] text-brand-700">
+              Subject mapper
+            </span>
+            <span className="mt-1 block text-[11px] font-normal leading-4 text-muted">
+              Add acronyms that auto-map into the fixed template subject names.
+            </span>
+          </summary>
+          <div className="mt-3">
+            <SubjectMapperPanel aliases={subjectAliases} onSave={onSaveSubjectAliases} />
+          </div>
+        </details>
 
         {!draft.studentId && attachOptions.length > 0 && selectedField && (
           <section className="space-y-2 border-t border-line pt-4">
