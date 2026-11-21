@@ -285,56 +285,129 @@ const normalizeWords = (value: string) =>
     .replace(/^\s*\d+[.)]?\s*/, '')
     .replace(/&/g, ' AND ')
     .replace(/[^A-Z0-9]+/g, ' ')
-    .replace(/\b(F|FURTHER|MATHS|MATHEMATICS)\b/g, ' MATHEMATICS ')
+    // Exam-engine subjects carry a class suffix (BUS1, CCA2, DIT1, …).
+    // Strip it from code-like tokens so they resolve to their acronym.
+    .replace(/\b([A-Z]{2,})[0-9]+\b/g, '$1')
     .replace(/\b(ST|SAINT)\b/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
+/**
+ * Canonical subject names and the acronyms used by the exam engine. The
+ * printable report card, imported workbooks and the exam DB all spell subjects
+ * differently, so both sides are normalised to the same name before matching.
+ * Acronyms come from the school's official subject list.
+ */
 const SUBJECT_ALIASES: Array<[RegExp, string]> = [
-  [/CHRISTAIN|CHRISTIAN|C R S|CRS|RELIGIOUS/, 'RELIGIOUS STUDIES'],
-  [/CULTURAL.*CREATIVE|C C A|CCA/, 'CULTURAL CREATIVE ARTS'],
-  [/DIGITAL|TECHNOLOGY|TECHNOLOGIES|COMPUTER|ICT/, 'DIGITAL TECHNOLOGIES'],
-  [/PHYSICAL.*HEALTH|P H E|PHE/, 'PHYSICAL HEALTH EDUCATION'],
-  [/SOCIAL.*CITIZEN|CIVIC/, 'CIVIC EDUCATION'],
-  [/INTERMEDIATE SCIENCE|BASIC SCIENCE/, 'BASIC SCIENCE'],
-  [/ACCOUNTING|ACCOUNT/, 'ACCOUNTING'],
-  [/COMMERCE|COMMERCIAL/, 'COMMERCE'],
-  [/LITERATURE|LITERARY/, 'LITERATURE'],
-  [/AGRICULTURE|AGRIC/, 'AGRICULTURE'],
-  [/ECONOMICS|ECONOMIC/, 'ECONOMICS'],
-  [/GOVERNMENT|GOVT/, 'GOVERNMENT'],
-  [/GEOGRAPHY|GEO/, 'GEOGRAPHY'],
-  [/BUSINESS/, 'BUSINESS STUDIES'],
-  [/HISTORY/, 'HISTORY'],
-  [/YORUBA/, 'YORUBA'],
-  [/FRENCH/, 'FRENCH'],
-  [/TRADE/, 'TRADE'],
-  [/ENGLISH/, 'ENGLISH'],
-  [/MATH/, 'MATHEMATICS'],
-  [/PHYSICS/, 'PHYSICS'],
-  [/CHEMISTRY/, 'CHEMISTRY'],
-  [/BIOLOGY/, 'BIOLOGY'],
-  [/MARKETING/, 'MARKETING'],
+  [/\bACC(?:OUNT(?:ING)?)?\b/, 'ACCOUNTING'],
+  [/\bAGR(?:IC(?:ULTURE)?)?\b/, 'AGRICULTURE'],
+  [/\bBIO(?:LOGY)?\b/, 'BIOLOGY'],
+  [/\bBUS(?:INESS(?:\s+STUDIES)?)?\b/, 'BUSINESS STUDIES'],
+  [/\bCHM(?:ISTRY)?\b|\bCHEM(?:ISTRY)?\b/, 'CHEMISTRY'],
+  [
+    /\bCRS\b|\bCHRIST(?:AIN|IAN).*RELIGIOUS.*\b|\bRELIGIOUS(?:\s+STUDIES)?\b/,
+    'CHRISTIAN RELIGIOUS STUDIES',
+  ],
+  [/\bCIV(?:IC(?:\s+EDUCATION)?)?\b/, 'CIVIC EDUCATION'],
+  [/\bCOM(?:MERCE|MERCIAL)?\b/, 'COMMERCE'],
+  [/\bCCA\b|\bCULTURAL.*CREATIVE.*\b/, 'CULTURAL AND CREATIVE ARTS'],
+  [
+    /\bDIT\b|\bDIGITAL.*TECHNOLOG(?:Y|IES)\b/,
+    'DIGITAL TECHNOLOGIES',
+  ],
+  [/\bECO(?:NOMIC(?:S)?)?\b/, 'ECONOMICS'],
+  [/\bENG(?:LISH)?\b/, 'ENGLISH'],
+  [/\bFRE(?:NCH)?\b/, 'FRENCH LANGUAGE'],
+  [/\bGEO(?:GRAPHY)?\b|\bGEOG(?:RAPHY)?\b/, 'GEOGRAPHY'],
+  [/\bGOV(?:ERNMENT|T)?\b/, 'GOVERNMENT'],
+  [/\bHIS(?:T(?:ORY)?)?\b/, 'HISTORY'],
+  [
+    /\bITS\b|\bINT\b|\bINTERMEDIATE.*SCIENCE\b|\bBASIC.*SCIENCE\b/,
+    'INTERMEDIATE SCIENCE',
+  ],
+  [/\bLIT(?:ER(?:ATURE|ARY)?)?\b/, 'LITERATURE'],
+  [/\bMAR(?:KETING)?\b|\bMKT\b/, 'MARKETING'],
+  [/\bMTH\b/, 'MATHEMATICS AND FURTHER MATHEMATICS'],
+  [/\bMAT(?:HS?|HEMATICS)?\b/, 'MATHEMATICS'],
+  [
+    /\bPHE\b|\bPHYSICAL.*HEALTH.*\b/,
+    'PHYSICAL AND HEALTH EDUCATION',
+  ],
+  [/\bPHY(?:SICS)?\b/, 'PHYSICS'],
+  [
+    /\bSCS\b|\bSOCIAL.*CITIZEN.*\b/,
+    'SOCIAL AND CITIZENSHIP STUDIES',
+  ],
+  [/\bTRA(?:DE)?\b/, 'TRADE'],
+  [/\bYOR(?:UBA)?\b/, 'YORUBA LANGUAGE'],
 ];
 
 const aliasOf = (value: string) => {
   const normalized = normalizeWords(value);
+  // Further mathematics is a separate subject from plain mathematics. Check
+  // this before the generic MATHEMATICS alias so "FURTHER MATHS" and "MTH1"
+  // do not collapse into "MATHEMATICS".
+  if (
+    /\bFURTHER\b/.test(normalized) ||
+    /^MTH$/.test(normalized) ||
+    /^F$/.test(normalized)
+  ) {
+    return 'MATHEMATICS AND FURTHER MATHEMATICS';
+  }
   for (const [pattern, alias] of SUBJECT_ALIASES) {
     if (pattern.test(normalized)) return alias;
   }
   return normalized;
 };
 
+/**
+ * Words that appear in many subject names. They must not count as a subject
+ * match on their own — e.g. "BUSINESS STUDIES" and "CHRISTIAN RELIGIOUS
+ * STUDIES" only share "STUDIES" and are different subjects.
+ */
+const GENERIC_SUBJECT_WORDS = new Set([
+  'AND',
+  'THE',
+  'OF',
+  'FOR',
+  'STUDIES',
+  'STUDY',
+  'EDUCATION',
+  'LANGUAGE',
+  'LANGUAGES',
+  'ARTS',
+  'ART',
+  'SCIENCE',
+  'TECHNOLOGY',
+  'TECHNOLOGIES',
+  'SUBJECT',
+  'GENERAL',
+]);
+
+const meaningfulWords = (value: string) =>
+  new Set(
+    value
+      .split(' ')
+      .filter((word) => word.length > 2 && !GENERIC_SUBJECT_WORDS.has(word)),
+  );
+
 export const subjectMatches = (reportLines: string[], sourceName: string) => {
   const report = aliasOf(reportLines.join(' '));
   const source = aliasOf(sourceName);
   if (!report || !source) return 0;
-  if (report === source || report.includes(source) || source.includes(report)) return 100;
-  const reportWords = new Set(report.split(' ').filter((word) => word.length > 2));
-  const sourceWords = new Set(source.split(' ').filter((word) => word.length > 2));
+  if (report === source) return 100;
+  // Plain Mathematics and Further Mathematics are separate subjects even
+  // though one name contains the other.
+  if (report.includes('FURTHER') !== source.includes('FURTHER')) return 0;
+  // Longer, truncated names ("SOCIAL AND CITIZENSHI.") still match their
+  // canonical form via the alias table, so a contains check is a safe fallback.
+  if (report.includes(source) && source.length >= 4) return 90;
+  if (source.includes(report) && report.length >= 4) return 90;
+  const reportWords = meaningfulWords(report);
+  const sourceWords = meaningfulWords(source);
   let overlap = 0;
   for (const word of reportWords) if (sourceWords.has(word)) overlap += 1;
-  return overlap * 20;
+  return overlap * 40;
 };
 
 export const bestSubjectMatch = (subject: GeneratedSubject, sources: SourceSubject[]) => {
@@ -343,7 +416,7 @@ export const bestSubjectMatch = (subject: GeneratedSubject, sources: SourceSubje
     const score = subjectMatches(subject.lines, source.name);
     if (!best || score > best.score) best = { source, score };
   }
-  return best && best.score >= 20 ? best.source : null;
+  return best && best.score >= 40 ? best.source : null;
 };
 
 export const sourcePercentage = (source: SourceSubject) => {

@@ -1,6 +1,6 @@
 import { Suspense, lazy, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, CircleSlash, Minus, Paperclip, X } from 'lucide-react';
+import { ArrowLeft, BookOpenCheck, Check, CircleSlash, Minus, Paperclip, X } from 'lucide-react';
 import {
   Card,
   CardHead,
@@ -318,7 +318,17 @@ export const StudentResultDetailPage = () => {
             {data.user?.class?.name ? ` · ${data.user.class.name}` : ''}
           </p>
         </div>
-        {backLink}
+        <div className="flex flex-wrap gap-2">
+          <Link
+            to={ROUTES.studentResultReport
+              .replace(':origin', offline ? 'offline' : 'online')
+              .replace(':id', id)}
+            className="inline-flex min-h-11 items-center gap-2 rounded bg-brand-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-700"
+          >
+            <BookOpenCheck size={15} aria-hidden="true" /> Exam report
+          </Link>
+          {backLink}
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">

@@ -24,6 +24,7 @@ import { StudentDashboardPage } from '@/pages/dashboard/student/StudentDashboard
 import { StudentFeesPage } from '@/pages/dashboard/student/StudentFeesPage';
 import { StudentResultsPage } from '@/pages/dashboard/student/StudentResultsPage';
 import { StudentResultDetailPage } from '@/pages/dashboard/student/StudentResultDetailPage';
+import { StudentExamReportPage } from '@/pages/dashboard/student/StudentExamReportPage';
 import { StudentAssignmentsPage } from '@/pages/dashboard/student/StudentAssignmentsPage';
 import { StudentVirtualClassPage } from '@/pages/dashboard/student/StudentVirtualClassPage';
 import { StudentMaterialsPage } from '@/pages/dashboard/student/StudentMaterialsPage';
@@ -119,6 +120,7 @@ const appRoutes = [
           { path: 'fees', element: <StudentFeesPage /> },
           { path: 'results', element: <StudentResultsPage /> },
           { path: 'results/:origin/:id', element: <StudentResultDetailPage /> },
+          { path: 'results/:origin/:id/report', element: <StudentExamReportPage /> },
           { path: 'assignments', element: <StudentAssignmentsPage /> },
           { path: 'virtual-class', element: <StudentVirtualClassPage /> },
           { path: 'materials', element: <StudentMaterialsPage /> },

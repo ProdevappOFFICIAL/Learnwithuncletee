@@ -19,6 +19,7 @@ export const ROUTES = {
   studentFees: '/dashboard/student/fees',
   studentResults: '/dashboard/student/results',
   studentResultDetail: '/dashboard/student/results/:origin/:id',
+  studentResultReport: '/dashboard/student/results/:origin/:id/report',
   studentAssignments: '/dashboard/student/assignments',
   studentVirtualClass: '/dashboard/student/virtual-class',
   studentMaterials: '/dashboard/student/materials',

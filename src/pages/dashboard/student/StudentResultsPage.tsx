@@ -7,7 +7,7 @@ import { printReportCard } from '@/lib/reportCard';
 import { ROUTES } from '@/routes/paths';
 import { TERM_OPTIONS, sessionOptions, type GradeData, type ResultDocData } from '@/data/dashboard';
 import type { ClassItem } from '@/data/dashboard';
-import { ExternalLink, Eye, FileText } from 'lucide-react';
+import { BookOpenCheck, ExternalLink, Eye, FileText } from 'lucide-react';
 
 interface AttemptRow {
   id: string;
@@ -107,14 +107,24 @@ const SittingAttempts = () => {
                       <span className="text-xs font-bold text-brand-700">{open ? 'Hide ▲' : 'Subjects ▼'}</span>
                     </span>
                   </button>
-                  <Link
-                    to={ROUTES.studentResultDetail
-                      .replace(':origin', r.origin === 'OFFLINE' ? 'offline' : 'online')
-                      .replace(':id', r.id)}
-                    className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded border border-line bg-white px-3 py-1.5 text-xs font-bold text-brand-700 hover:border-brand-500 hover:bg-brand-50"
-                  >
-                    <Eye size={14} aria-hidden="true" /> Full result
-                  </Link>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <Link
+                      to={ROUTES.studentResultDetail
+                        .replace(':origin', r.origin === 'OFFLINE' ? 'offline' : 'online')
+                        .replace(':id', r.id)}
+                      className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded border border-line bg-white px-3 py-1.5 text-xs font-bold text-brand-700 hover:border-brand-500 hover:bg-brand-50"
+                    >
+                      <Eye size={14} aria-hidden="true" /> Full result
+                    </Link>
+                    <Link
+                      to={ROUTES.studentResultReport
+                        .replace(':origin', r.origin === 'OFFLINE' ? 'offline' : 'online')
+                        .replace(':id', r.id)}
+                      className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded bg-brand-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-brand-700"
+                    >
+                      <BookOpenCheck size={14} aria-hidden="true" /> Exam report
+                    </Link>
+                  </span>
                 </div>
                 {open && (
                   parts.length === 0 ? (

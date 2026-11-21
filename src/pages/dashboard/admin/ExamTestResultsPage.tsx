@@ -33,6 +33,7 @@ export const ExamTestResultsPage = ({ origin }: { origin: 'ONLINE' | 'OFFLINE' }
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [classFilter, setClassFilter] = useState('');
+  const [examType, setExamType] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -43,11 +44,12 @@ export const ExamTestResultsPage = ({ origin }: { origin: 'ONLINE' | 'OFFLINE' }
   const term = academic.data?.data.term ?? '';
 
   const results = usePagedList<TestResultRow>(
-    ['test-results', query, classFilter, mode, session, term],
+    ['test-results', query, classFilter, examType, mode, session, term],
     (page, limit) =>
       apiGet<TestResultRow[]>(mode === 'OFFLINE' ? '/offline-results' : '/results', {
         searchTerm: query || undefined,
         classId: classFilter || undefined,
+        examType: examType || undefined,
         session: session || undefined,
         term: term || undefined,
         page,
@@ -94,6 +96,7 @@ export const ExamTestResultsPage = ({ origin }: { origin: 'ONLINE' | 'OFFLINE' }
           : {
               searchTerm: query || undefined,
               classId: classFilter || undefined,
+              examType: examType || undefined,
               session: session || undefined,
               term: term || undefined,
             },
@@ -177,9 +180,20 @@ export const ExamTestResultsPage = ({ origin }: { origin: 'ONLINE' | 'OFFLINE' }
             <option value="">All classes</option>
             {(classes.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+          <select
+            value={examType}
+            onChange={(e) => { setExamType(e.target.value); results.resetPage(); }}
+            aria-label="Filter by exam type"
+            className="min-h-11 rounded border border-line bg-white px-3 text-sm font-semibold"
+          >
+            <option value="">All exams</option>
+            <option value="cbt1">CBT 1</option>
+            <option value="cbt2">CBT 2</option>
+            <option value="exam">Examination</option>
+          </select>
           <button type="submit" className="min-h-11 rounded bg-brand-900 px-4 text-sm font-bold text-white hover:bg-brand-700">Search</button>
-          {(search || classFilter) && (
-            <button type="button" onClick={() => { setSearch(''); setQuery(''); setClassFilter(''); results.resetPage(); }} className="min-h-11 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">
+          {(search || classFilter || examType) && (
+            <button type="button" onClick={() => { setSearch(''); setQuery(''); setClassFilter(''); setExamType(''); results.resetPage(); }} className="min-h-11 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">
               Reset
             </button>
           )}
