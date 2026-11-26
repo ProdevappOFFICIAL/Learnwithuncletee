@@ -90,6 +90,7 @@ type TeacherTask = 'exam' | 'remarks';
 /** Fields a class teacher can complete on the result notification. */
 const CLASS_TEACHER_FIELDS = [
   'classTeacherRemark',
+  'newsLetter',
   'affective.puntuality',
   'affective.respect',
   'psychomotor.handwriting',
@@ -101,6 +102,7 @@ const teacherTextFieldPatch = (
   value: string,
 ): Partial<ReportCardDraft> | null => {
   if (field === 'classTeacherRemark') return { classTeacherRemark: value };
+  if (field === 'newsLetter') return { newsLetter: value };
   if (field === 'principalComment') return { principalComment: value };
   if (field === 'affective.puntuality') return { affectivePuntuality: value };
   if (field === 'affective.respect') return { affectiveRespect: value };
@@ -297,6 +299,7 @@ export const TeacherResultsNotificationPage = () => {
     if (task === 'remarks' && canEditClassTeacherRemark && draft) {
       // Highlight the class-teacher boxes that still need to be filled.
       if (!draft.classTeacherRemark.trim()) fields.add('classTeacherRemark');
+      if (!draft.newsLetter.trim()) fields.add('newsLetter');
       if (!draft.affectivePuntuality.trim()) fields.add('affective.puntuality');
       if (!draft.affectiveRespect.trim()) fields.add('affective.respect');
       if (!draft.psychomotorHandwriting.trim()) fields.add('psychomotor.handwriting');
@@ -339,9 +342,14 @@ export const TeacherResultsNotificationPage = () => {
       });
       return;
     }
-    if (field === 'classTeacherRemark' || field.startsWith('affective.') || field.startsWith('psychomotor.')) {
+    if (
+      field === 'classTeacherRemark' ||
+      field === 'newsLetter' ||
+      field.startsWith('affective.') ||
+      field.startsWith('psychomotor.')
+    ) {
       setNotice({
-        text: 'Only the class teacher for this pupil’s class can edit the remark, punctuality, respect, handwriting and recreation boxes.',
+        text: 'Only the class teacher for this pupil’s class can edit the remark, newsletter, punctuality, respect, handwriting and recreation boxes.',
         tone: 'error',
       });
       return;
@@ -601,7 +609,7 @@ export const TeacherResultsNotificationPage = () => {
             {task === 'exam'
               ? 'Choose a class, open a pupil, then enter only the Examination scores assigned to you. Changes save automatically.'
               : task === 'remarks'
-                ? 'Choose a class, open a pupil, then complete the class teacher remark and the punctuality, respect, handwriting and recreation boxes.'
+                ? 'Choose a class, open a pupil, then complete the class teacher remark, newsletter, punctuality, respect, handwriting and recreation boxes.'
                 : 'Choose Examination Scores or Class Teacher Remarks to open the matching class list and result sheet.'}
           </p>
         </div>
@@ -716,8 +724,8 @@ export const TeacherResultsNotificationPage = () => {
                 Class Teacher Remarks
               </span>
               <span className="mt-1 block text-xs leading-5 text-muted">
-                Complete the class teacher remark, punctuality, respect for authority, handwriting
-                and recreation boxes for your class.
+                Complete the class teacher remark, newsletter, punctuality, respect for authority,
+                handwriting and recreation boxes for your class.
               </span>
               <span className="mt-3 block text-[11px] font-bold text-emerald-800">
                 {classTeacherIds.size} class{classTeacherIds.size === 1 ? '' : 'es'} as class
@@ -764,7 +772,7 @@ export const TeacherResultsNotificationPage = () => {
             hint={
               task === 'exam'
                 ? 'Choose a class, then a pupil. Only the Examination boxes for your assigned subjects can be edited.'
-                : 'Choose a class, then a pupil. Complete the class teacher remark and the affective/psychomotor boxes.'
+                : 'Choose a class, then a pupil. Complete the class teacher remark, newsletter and the affective/psychomotor boxes.'
             }
             search={search}
             onSearchChange={setSearch}
@@ -918,7 +926,7 @@ export const TeacherResultsNotificationPage = () => {
           <RefreshCw size={11} aria-hidden="true" />
           {task === 'exam'
             ? 'Only the Examination subject scores assigned to you can be edited. CBT 1, CBT 2 and calculated columns stay locked.'
-            : 'Only the class teacher for this pupil’s class can edit the remark and the punctuality, respect, handwriting and recreation boxes. Calculated columns stay locked.'}
+            : 'Only the class teacher for this pupil’s class can edit the remark, newsletter and the punctuality, respect, handwriting and recreation boxes. Calculated columns stay locked.'}
         </p>
       )}
     </div>
