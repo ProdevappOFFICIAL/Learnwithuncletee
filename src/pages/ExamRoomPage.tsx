@@ -1,0 +1,1130 @@
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { PageMetadata } from '@/components/ui/PageMetadata';
+import { apiGet, apiPost } from '@/lib/api';
+import { ROUTES } from '@/routes/paths';
+import { siteInfo } from '@/data/content';
+import {
+  AlertTriangle,
+  Calculator,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Delete,
+  FileText,
+  Image as ImageIcon,
+  Send,
+  X,
+} from 'lucide-react';
+import type { ExamQuestion, LiveExam } from './ExaminationPage';
+
+const NewsContent = lazy(() => import('@/lib/mdxEditor').then((m) => ({ default: m.NewsContent })));
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const shuffle = <T,>(arr: T[]): T[] => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+const fmtTime = (secs: number) => {
+  const m = Math.floor(Math.max(0, secs) / 60);
+  const s = Math.max(0, secs) % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+};
+
+// ─── Calculator Dialog ────────────────────────────────────────────────────────
+
+const CALC_BUTTONS = [
+  ['C', '±', '%', '÷'],
+  ['7', '8', '9', '×'],
+  ['4', '5', '6', '−'],
+  ['1', '2', '3', '+'],
+  ['0', '.', '⌫', '='],
+] as const;
+
+type CalcBtn = (typeof CALC_BUTTONS)[number][number];
+
+const CalculatorDialog = ({ onClose }: { onClose: () => void }) => {
+  const [display, setDisplay] = useState('0');
+  const [prev, setPrev] = useState<string | null>(null);
+  const [op, setOp] = useState<string | null>(null);
+  const [fresh, setFresh] = useState(false);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onClose]);
+
+  const press = useCallback(
+    (btn: CalcBtn) => {
+      const cur = display;
+      if (btn === 'C') { setDisplay('0'); setPrev(null); setOp(null); setFresh(false); return; }
+      if (btn === '⌫') { setDisplay(cur.length > 1 ? cur.slice(0, -1) : '0'); return; }
+      if (btn === '±') { setDisplay(String(parseFloat(cur) * -1)); return; }
+      if (btn === '%') { setDisplay(String(parseFloat(cur) / 100)); return; }
+      if (btn === '÷' || btn === '×' || btn === '−' || btn === '+') {
+        setPrev(cur); setOp(btn); setFresh(true); return;
+      }
+      if (btn === '=') {
+        if (!op || !prev) return;
+        const a = parseFloat(prev), b = parseFloat(cur);
+        let res: number;
+        switch (op) {
+          case '÷': res = b !== 0 ? a / b : 0; break;
+          case '×': res = a * b; break;
+          case '−': res = a - b; break;
+          default:  res = a + b;
+        }
+        setDisplay(parseFloat(res.toPrecision(12)).toString());
+        setPrev(null); setOp(null); setFresh(false); return;
+      }
+      if (btn === '.') {
+        if (fresh) { setDisplay('0.'); setFresh(false); return; }
+        if (!cur.includes('.')) setDisplay(cur + '.');
+        return;
+      }
+      if (fresh || cur === '0') { setDisplay(btn); setFresh(false); }
+      else { if (cur.replace('-', '').replace('.', '').length >= 12) return; setDisplay(cur + btn); }
+    },
+    [display, op, prev, fresh],
+  );
+
+  const isOp = (b: CalcBtn) => b === '÷' || b === '×' || b === '−' || b === '+';
+  const isAction = (b: CalcBtn) => b === 'C' || b === '±' || b === '%';
+  const isEq = (b: CalcBtn) => b === '=';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-end p-4 sm:items-center sm:justify-center" role="dialog" aria-modal="true" aria-label="Calculator">
+      <button type="button" aria-label="Close calculator" onClick={onClose} className="absolute inset-0 bg-brand-900/50" />
+      <div className="relative w-72 overflow-hidden rounded-xl bg-brand-900 shadow-2xl ring-1 ring-white/10">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2 text-white/60">
+            <Calculator size={14} aria-hidden="true" />
+            <span className="text-xs font-semibold uppercase tracking-widest">Calculator</span>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close calculator" className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/60 hover:bg-white/20 hover:text-white">
+            <X size={13} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="px-4 pb-3 pt-1 text-right">
+          {op && prev && <p className="mb-0.5 font-mono text-xs text-white/40">{prev} {op}</p>}
+          <p className="font-mono text-4xl font-bold tracking-tight text-white" aria-live="polite" aria-label={`Display: ${display}`}>
+            {display.length > 10 ? parseFloat(display).toExponential(4) : display}
+          </p>
+        </div>
+        <div className="mx-4 border-t border-white/10" />
+        <div className="grid grid-cols-4 gap-px bg-white/10 p-px">
+          {CALC_BUTTONS.flat().map((btn, i) => (
+            <button
+              key={i}
+              type="button"
+              aria-label={btn === '⌫' ? 'Backspace' : btn}
+              onClick={() => press(btn as CalcBtn)}
+              className={[
+                'flex min-h-[58px] items-center justify-center text-lg font-semibold transition-colors active:scale-95',
+                isEq(btn as CalcBtn) ? 'bg-lime-accent text-brand-900 hover:bg-white'
+                  : isOp(btn as CalcBtn) ? 'bg-brand-500/80 text-white hover:bg-brand-500'
+                  : isAction(btn as CalcBtn) || btn === '⌫' ? 'bg-white/15 text-white/80 hover:bg-white/25'
+                  : 'bg-brand-800 text-white hover:bg-brand-700',
+              ].join(' ')}
+            >
+              {btn === '⌫' ? <Delete size={18} aria-hidden="true" /> : btn}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Anti-cheat warning overlay ───────────────────────────────────────────────
+
+const WarningOverlay = ({
+  count,
+  onDismiss,
+  onSubmitNow,
+}: {
+  count: number;
+  onDismiss: () => void;
+  onSubmitNow: () => void;
+}) => (
+  <div className="fixed inset-0 z-[60] flex items-center justify-center bg-brand-900/80 p-4 backdrop-blur-sm" role="alertdialog" aria-modal="true" aria-labelledby="warn-title">
+    <div className="w-full max-w-sm overflow-hidden rounded-xl bg-white shadow-2xl">
+      <div className="flex items-start gap-4 bg-rose-600 px-5 py-4 text-white">
+        <AlertTriangle size={22} strokeWidth={2} aria-hidden="true" className="mt-0.5 shrink-0" />
+        <div>
+          <h2 id="warn-title" className="font-display text-base font-extrabold">Exam integrity warning</h2>
+          <p className="mt-0.5 text-sm text-white/80">Switching away is not allowed during an examination.</p>
+        </div>
+      </div>
+      <div className="px-5 py-4">
+        <p className="text-sm text-ink">
+          You left this tab or minimised the window. This has been recorded.{' '}
+          <strong>Violation {count} of 3</strong> — on the 3rd violation your exam will be submitted automatically.
+        </p>
+        <div className="mt-4 flex gap-3">
+          <button
+            type="button"
+            onClick={onSubmitNow}
+            className="inline-flex min-h-10 flex-1 items-center justify-center rounded border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100"
+          >
+            Submit now
+          </button>
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="inline-flex min-h-10 flex-1 items-center justify-center rounded bg-brand-500 px-3 py-2 text-sm font-bold text-white hover:bg-brand-700"
+            autoFocus
+          >
+            Return to exam
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// ─── Submit confirmation dialog ───────────────────────────────────────────────
+
+const SubmitConfirm = ({
+  total,
+  answeredCount,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  total: number;
+  answeredCount: number;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) => {
+  const left = total - answeredCount;
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-brand-900/80 p-4 backdrop-blur-sm" role="alertdialog" aria-modal="true" aria-labelledby="submit-title">
+      <div className="w-full max-w-sm overflow-hidden rounded-xl bg-white shadow-2xl">
+        <div className="px-5 py-4">
+          <h2 id="submit-title" className="font-display text-base font-extrabold">Submit examination?</h2>
+          <p className="mt-2 text-sm text-ink">
+            You answered <strong>{answeredCount} of {total}</strong>
+            {left > 0 ? (
+              <>, <strong className="text-rose-700">{left} unanswered</strong> — unanswered questions score zero.</>
+            ) : (
+              <>. Every question answered — well done.</>
+            )}
+          </p>
+          <p className="mt-1 text-xs text-muted">This cannot be undone.</p>
+        </div>
+        <div className="flex gap-3 px-5 pb-5">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="inline-flex min-h-10 flex-1 items-center justify-center rounded border border-line bg-white px-3 py-2 text-sm font-semibold text-ink hover:border-brand-500 hover:text-brand-700"
+            autoFocus
+          >
+            Keep answering
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded bg-brand-500 px-3 py-2 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60"
+          >
+            <Send size={15} aria-hidden="true" />
+            {busy ? 'Submitting…' : 'Submit now'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Small keyboard-hint chip ─────────────────────────────────────────────────
+
+const Kbd = ({ children }: { children: string }) => (
+  <kbd className="rounded border border-line bg-white px-1.5 py-0.5 font-mono text-[11px] font-bold text-ink">{children}</kbd>
+);
+
+// ─── Attachment helpers ───────────────────────────────────────────────────────
+
+const isImageFile = (src: string) =>
+  /\.(png|jpe?g|gif|webp)(\?|#|$)/i.test(src) || /^data:image\//i.test(src);
+
+/** Browser-openable now (URL / data / blob / site-relative). Plain offline
+ * paths are shown as text — they resolve later on exam devices. */
+const isOpenableFile = (src: string) =>
+  /^(https?:|data:|blob:)/i.test(src) || src.startsWith('/');
+
+// ─── Attachment dialog (images render inside; other files open in browser) ───
+
+const AttachmentDialog = ({ src, onClose }: { src: string; onClose: () => void }) => {
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Question attachment">
+      <button type="button" aria-label="Close attachment" onClick={onClose} className="absolute inset-0 bg-brand-900/70" />
+      <div className="relative max-h-[85vh] w-full max-w-2xl overflow-auto rounded-xl bg-white p-4 shadow-2xl">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="truncate font-mono text-xs text-muted">{src.split('?')[0].split('/').pop() || 'Attachment'}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close attachment"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-line text-brand-800 hover:bg-brand-50"
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+        <img src={src} alt="Question attachment" className="max-h-[70vh] w-full rounded border border-line object-contain" />
+      </div>
+    </div>
+  );
+};
+
+// ─── Session payload stored by ExaminationPage on login ───────────────────────
+
+interface ExamSession {
+  exam: LiveExam['exam'];
+  questions: ExamQuestion[];
+  gate?: { className: string; combinationName: string | null } | null;
+  userId: string;
+  startedAt: number; // Date.now() ms
+}
+
+interface RoomProgress {
+  picked: Record<string, number | null>;
+  typed: Record<string, string>;
+  currentQ: number;
+}
+
+const readProgress = (key: string): RoomProgress => {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return { picked: {}, typed: {}, currentQ: 0 };
+    const p = JSON.parse(raw) as Partial<RoomProgress>;
+    return {
+      picked: p.picked && typeof p.picked === 'object' ? p.picked : {},
+      typed: p.typed && typeof p.typed === 'object' ? p.typed : {},
+      currentQ: typeof p.currentQ === 'number' && p.currentQ >= 0 ? p.currentQ : 0,
+    };
+  } catch {
+    return { picked: {}, typed: {}, currentQ: 0 };
+  }
+};
+
+// ─── ExamRoomPage ─────────────────────────────────────────────────────────────
+
+export const ExamRoomPage = () => {
+  const { code = '' } = useParams<{ code: string }>();
+  const sessionKey = `exam_session_${code}`;
+
+  // ── Hydrate from sessionStorage ─────────────────────────────────────────────
+  const session = useMemo<ExamSession | null>(() => {
+    try {
+      const raw = sessionStorage.getItem(sessionKey);
+      return raw ? (JSON.parse(raw) as ExamSession) : null;
+    } catch { return null; }
+  }, [sessionKey]);
+
+  const exam = session?.exam ?? null;
+  const userId = session?.userId ?? null;
+  // New sessions carry questions separately (filtered + answers stripped);
+  // fall back to exam-embedded rows for legacy in-flight sessions.
+  const questions: ExamQuestion[] = useMemo(
+    () => session?.questions ?? ((session?.exam as any)?.questions ?? []),
+    [session],
+  );
+
+  // If no valid session, redirect back to login
+  useEffect(() => {
+    if (!session) {
+      window.location.replace(ROUTES.examination.replace(':code', code));
+    }
+  }, [session, code]);
+
+  // ── Answer state (persisted so a tab reload resumes, timer keeps running) ────
+  const progressKey = `${sessionKey}:progress`;
+  const [picked, setPicked] = useState<Record<string, number | null>>(() => readProgress(progressKey).picked);
+  const [typed, setTyped] = useState<Record<string, string>>(() => readProgress(progressKey).typed);
+  const [currentQ, setCurrentQ] = useState(() => readProgress(progressKey).currentQ);
+  const [calcOpen, setCalcOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(progressKey, JSON.stringify({ picked, typed, currentQ }));
+    } catch {
+      /* private mode — resume unavailable, exam still works */
+    }
+  }, [picked, typed, currentQ, progressKey]);
+
+  // ── Sitter avatar (top-right) ───────────────────────────────────────────────
+  const [sitter, setSitter] = useState<{ user_name: string; img?: string | null; student?: { photoUrl?: string | null } | null } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    apiGet<{ user_name: string; img?: string | null; student?: { photoUrl?: string | null } | null }>('/dashboard/me')
+      .then((res) => { if (!cancelled) setSitter(res.data); })
+      .catch(() => { /* avatar is decorative — exam works without it */ });
+    return () => { cancelled = true; };
+  }, []);
+
+
+  const [secondsLeft, setSecondsLeft] = useState(() => {
+    if (!session) return 0;
+    const elapsed = Math.floor((Date.now() - session.startedAt) / 1000);
+    return Math.max(0, (session.exam.minutes || 60) * 60 - elapsed);
+  });
+
+  useEffect(() => {
+    if (submitted || secondsLeft <= 0) return;
+    const t = window.setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [secondsLeft, submitted]);
+
+  // ── Session activity tracking ──────────────────────────────────────────────
+  // Every meaningful interaction (previous / next / option / calculator /
+  // typed answer) writes a snapshot immediately; a 30 s heartbeat keeps the
+  // timer fresh for pupils who sit still.
+  const progressRef = useRef({ picked, typed, currentQ, secondsLeft });
+  useEffect(() => {
+    progressRef.current = { picked, typed, currentQ, secondsLeft };
+  }, [picked, typed, currentQ, secondsLeft]);
+
+  const flushProgress = useCallback(
+    (
+      action: string,
+      overrides?: Partial<{
+        picked: Record<string, number | null>;
+        typed: Record<string, string>;
+        currentQ: number;
+        secondsLeft: number;
+      }>,
+    ) => {
+      if (!userId || !exam?.id || submitted) return;
+      const snapshot = { ...progressRef.current, ...overrides };
+      progressRef.current = snapshot;
+      const answers: Record<string, any> = {};
+      for (const [qId, idx] of Object.entries(snapshot.picked)) answers[qId] = idx;
+      for (const [qId, text] of Object.entries(snapshot.typed)) answers[qId] = text;
+      apiPost('/exam-sessions/online/save-progress', {
+        userId,
+        examId: exam.id,
+        answers,
+        timeLeft: snapshot.secondsLeft,
+        currentQuestion: snapshot.currentQ,
+        action,
+      }).catch(() => { /* non-blocking activity log */ });
+    },
+    [userId, exam?.id, submitted],
+  );
+
+  useEffect(() => {
+    if (!userId || !exam?.id || submitted) return;
+    const interval = window.setInterval(() => flushProgress('HEARTBEAT'), 30_000);
+    return () => window.clearInterval(interval);
+  }, [userId, exam?.id, submitted, flushProgress]);
+
+  // Typed answers are debounced so every keystroke does not hit the API.
+  const typingTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (typingTimer.current) window.clearTimeout(typingTimer.current);
+    },
+    [],
+  );
+
+  const trackTyped = useCallback(
+    (questionId: string, value: string) => {
+      const nextTyped = { ...progressRef.current.typed, [questionId]: value };
+      progressRef.current = { ...progressRef.current, typed: nextTyped };
+      setTyped(nextTyped);
+      if (typingTimer.current) window.clearTimeout(typingTimer.current);
+      typingTimer.current = window.setTimeout(() => flushProgress('TYPING', { typed: nextTyped }), 700);
+    },
+    [flushProgress],
+  );
+
+  /** Pick an option and immediately persist the choice + current question. */
+  const chooseOption = useCallback(
+    (questionId: string, optionIndex: number) => {
+      const nextPicked = { ...progressRef.current.picked, [questionId]: optionIndex };
+      progressRef.current = { ...progressRef.current, picked: nextPicked };
+      setPicked(nextPicked);
+      flushProgress('OPTION', { picked: nextPicked });
+    },
+    [flushProgress],
+  );
+
+  // ── Anti-cheat: tab-switch / visibility / beforeunload ──────────────────────
+  const violationsRef = useRef(0);
+  const MAX_VIOLATIONS = 3;
+  const [warnCount, setWarnCount] = useState(0);
+  const [warnOpen, setWarnOpen] = useState(false);
+  const submitRef = useRef<(() => Promise<void>) | null>(null);
+
+  const handleViolation = useCallback(() => {
+    if (submitted) return;
+    violationsRef.current += 1;
+    const v = violationsRef.current;
+    setWarnCount(v);
+    setWarnOpen(true);
+    if (v >= MAX_VIOLATIONS) {
+      // Auto-submit on 3rd violation
+      submitRef.current?.();
+    }
+  }, [submitted]);
+
+  useEffect(() => {
+    // Relaxed exit guard: a plain reload resumes from saved progress (answers +
+    // current question persist, timer runs from startedAt), so only genuine
+    // tab-switching counts as a violation — no more reload block.
+    // Tab switch / window minimise
+    const onVisibilityChange = () => {
+      if (document.hidden) handleViolation();
+    };
+
+    // Window blur (switch to another app)
+    const onBlur = () => {
+      if (document.hidden) return; // already handled above
+      handleViolation();
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('blur', onBlur);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, [handleViolation, submitted]);
+
+  // ── Stable shuffled options ─────────────────────────────────────────────────
+  // The server pre-shuffles options per question (answers never reach the
+  // client). Legacy sessions still carry answers — shuffle those client-side.
+  const optionsByQ = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const q of questions) {
+      if (q.type === 'FILL_IN_THE_BLANK') {
+        map[q.id] = [];
+      } else if (q.options && q.options.length > 0) {
+        map[q.id] = q.options;
+      } else if (q.type === 'TRUE_FALSE') {
+        map[q.id] = ['True', 'False'];
+      } else {
+        map[q.id] = shuffle([q.correct_answer ?? '', ...(q.incorrect_answers ?? [])]);
+      }
+    }
+    return map;
+  }, [questions]);
+
+  const answered = (q: ExamQuestion) =>
+    q.type === 'FILL_IN_THE_BLANK'
+      ? (typed[q.id] ?? '').trim().length > 0
+      : picked[q.id] !== undefined && picked[q.id] !== null;
+
+  // Palette grouped per subject (single flat list when there's one subject).
+  const paletteGroups = useMemo(() => {
+    const withIdx = questions.map((x, i) => ({ q: x, i }));
+    const names = [...new Set(questions.map((x) => x.subject?.name ?? '').filter(Boolean))];
+    if (names.length <= 1) return [{ subject: null as string | null, items: withIdx }];
+    return names.map((name) => ({
+      subject: name,
+      items: withIdx.filter(({ q }) => (q.subject?.name ?? '') === name),
+    }));
+  }, [questions]);
+
+  // Subject strip above the question (only when the paper spans subjects).
+  const subjectNames = useMemo(
+    () => paletteGroups.map((g) => g.subject).filter(Boolean) as string[],
+    [paletteGroups],
+  );
+
+  // ── Submit ──────────────────────────────────────────────────────────────────
+  const submit = useCallback(async () => {
+    if (!exam || busy || !userId || submitted) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const questionAttempts = questions.map((q) => {
+        if (q.type === 'FILL_IN_THE_BLANK') {
+          const text = (typed[q.id] ?? '').trim();
+          return { questionId: q.id, visited: true, attempted: text.length > 0, options: [], userOption: null, userTextAnswer: text };
+        }
+        const idx = picked[q.id] ?? null;
+        return { questionId: q.id, visited: true, attempted: idx !== null, options: optionsByQ[q.id] ?? [], userOption: idx, userTextAnswer: null };
+      });
+      const res = await apiPost<{ overallScore: number; attempted_questions: number; total_questions: number }>('/results', {
+        userId,
+        examId: exam.id,
+        deploymentType: 'ONLINE',
+        attempted_questions: questionAttempts.filter((a) => a.attempted).length,
+        total_questions: questions.length,
+        questionAttempts,
+      });
+
+      // ── Finalise OnlineSession row in the backend ────────────────────────────
+      // Build a flat answers map the same way as the heartbeat.
+      const combinedAnswers: Record<string, any> = {};
+      for (const [qId, idx] of Object.entries(picked)) combinedAnswers[qId] = idx;
+      for (const [qId, text] of Object.entries(typed)) combinedAnswers[qId] = text;
+      apiPost('/exam-sessions/online/submit', {
+        userId,
+        examId: exam.id,
+        answers: combinedAnswers,
+        timeLeft: secondsLeft,
+        overallScore: res.data.overallScore,
+        questionAttempts,
+      }).catch(() => { /* non-blocking — result already saved */ });
+
+      setSubmitted(true);
+      sessionStorage.removeItem(sessionKey);
+      sessionStorage.removeItem(progressKey);
+      // Store counts only (never the score) for ExaminationPage to display on redirect
+      sessionStorage.setItem(
+        `exam_result_${code}`,
+        JSON.stringify({ attempted: res.data.attempted_questions, total: res.data.total_questions }),
+      );
+      // Remove the beforeunload guard then navigate back to login/done page
+      window.location.replace(ROUTES.examination.replace(':code', code));
+    } catch (err: any) {
+      setError(err?.message ?? 'Submit failed. Please try again.');
+      setBusy(false);
+    }
+  }, [exam, busy, userId, submitted, picked, typed, optionsByQ, sessionKey, progressKey, code, questions]);
+
+  // Keep submitRef in sync so the anti-cheat handler can call it
+  useEffect(() => { submitRef.current = submit; }, [submit]);
+
+  // Auto-submit when timer reaches zero
+  useEffect(() => {
+    if (secondsLeft === 0 && !submitted && exam && questions.length > 0) {
+      submit();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secondsLeft]);
+
+  const goTo = useCallback((idx: number, action = 'JUMP') => {
+    const next = Math.max(0, Math.min(questions.length - 1, idx));
+    setAttachOpen(false);
+    setCurrentQ(next);
+    progressRef.current = { ...progressRef.current, currentQ: next };
+    flushProgress(action, { currentQ: next });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [questions.length, flushProgress]);
+
+  const goToSubject = (name: string) => {
+    const idx = questions.findIndex((x) => (x.subject?.name ?? '') === name);
+    if (idx !== -1) goTo(idx, 'SUBJECT');
+  };
+
+  const openCalculator = () => {
+    setCalcOpen(true);
+    flushProgress('CALCULATOR_OPEN');
+  };
+
+  const closeCalculator = () => {
+    setCalcOpen(false);
+    flushProgress('CALCULATOR_CLOSE');
+  };
+
+  // ── Keyboard shortcuts: A… selects options, P previous, N next ─────────────
+  // Ignored while typing, while dialogs are open, or after submit.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (submitted || calcOpen || warnOpen || confirmOpen || attachOpen) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // Typing targets keep their keys; focused radios/checkboxes don't block shortcuts.
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName ?? '';
+      const isTextEntry =
+        tag === 'TEXTAREA' ||
+        tag === 'SELECT' ||
+        (t?.isContentEditable ?? false) ||
+        (tag === 'INPUT' && ['TEXT', 'PASSWORD', 'EMAIL', 'SEARCH', 'NUMBER', 'TEL', 'URL'].includes((t as HTMLInputElement).type?.toUpperCase()));
+      if (isTextEntry) return;
+      const total = questions.length;
+      if (!total) return;
+      const q = questions[Math.min(currentQ, total - 1)];
+      if (!q) return;
+      const k = e.key.toLowerCase();
+      // True/False questions answer directly off T/F (in addition to A/B).
+      if (q.type === 'TRUE_FALSE') {
+        if (k === 't' || k === 'f') {
+          const oi = (optionsByQ[q.id] ?? []).indexOf(k === 't' ? 'True' : 'False');
+          if (oi !== -1) {
+            chooseOption(q.id, oi);
+            e.preventDefault();
+          }
+        }
+        return;
+      }
+      if (k >= 'a' && k <= 'z') {
+        const idx = k.charCodeAt(0) - 97;
+        const opts = optionsByQ[q.id] ?? [];
+        if (q.type !== 'FILL_IN_THE_BLANK' && idx < opts.length) {
+          chooseOption(q.id, idx);
+          e.preventDefault();
+        }
+        return;
+      }
+      if (k === 'p') {
+        goTo(currentQ - 1, 'PREVIOUS');
+        return;
+      }
+      if (k === 'n') {
+        goTo(currentQ + 1, 'NEXT');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [submitted, calcOpen, warnOpen, confirmOpen, attachOpen, questions, currentQ, optionsByQ, goTo, chooseOption]);
+
+  // ── Guard: no session ───────────────────────────────────────────────────────
+  if (!exam || !userId) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-cream font-sans text-ink">
+        <p className="text-sm text-muted">Redirecting…</p>
+      </div>
+    );
+  }
+
+  const total = questions.length;
+  // Clamp: resumed progress could exceed the list if the feed changed.
+  const safeCurrent = total ? Math.min(currentQ, total - 1) : 0;
+  const q = questions[safeCurrent];
+
+  // ── Guard: filter chain assigned nothing (wrong class/combination, or an
+  // exam whose subjects don't overlap the pupil's combination) ────────────────
+  if (total === 0) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-cream px-4 font-sans text-ink">
+        <div className="w-full max-w-md border border-line bg-white p-8 text-center">
+          <p className="text-xs font-bold uppercase tracking-widest text-brand-700">No questions assigned</p>
+          <h1 className="mt-3 font-display text-2xl font-extrabold">{exam.exam_name}</h1>
+          <p className="mt-3 text-sm leading-relaxed text-muted">
+            Your class/combination has no questions in this exam. Check with your teacher —
+            they may need to link your subjects to this exam.
+          </p>
+          <Link to={ROUTES.examDashboard} className="mt-6 inline-flex min-h-11 items-center rounded bg-brand-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
+            Back to exam dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
+  const isFirst = safeCurrent === 0;
+  const isLast = safeCurrent === total - 1;
+  const answeredCount = questions.filter(answered).length;
+  const activeSubject = q?.subject?.name ?? '';
+
+  return (
+    <>
+      <PageMetadata
+        title={exam.exam_name}
+        description={`Sit ${exam.exam_name} online — answer and submit before time runs out.`}
+      />
+
+      {calcOpen && <CalculatorDialog onClose={closeCalculator} />}
+
+      {warnOpen && violationsRef.current < MAX_VIOLATIONS && (
+        <WarningOverlay
+          count={warnCount}
+          onDismiss={() => setWarnOpen(false)}
+          onSubmitNow={() => { setWarnOpen(false); submit(); }}
+        />
+      )}
+
+      {confirmOpen && (
+        <SubmitConfirm
+          total={total}
+          answeredCount={answeredCount}
+          busy={busy}
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={() => { setConfirmOpen(false); submit(); }}
+        />
+      )}
+
+      {attachOpen && q.question_file?.trim() && (
+        <AttachmentDialog src={q.question_file.trim()} onClose={() => setAttachOpen(false)} />
+      )}
+
+      <div className="flex min-h-screen flex-col bg-cream font-sans text-sm text-ink select-none">
+
+        {/* ── Hall header ── */}
+        <header className="sticky top-0 z-40 border-b border-line bg-white/90 px-4 py-4 backdrop-blur-sm sm:px-6">
+          <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+              <Link to={ROUTES.home} aria-label="Home" className="shrink-0">
+                <img src="/logo.png" alt={siteInfo.name} className="h-9 w-9 rounded-full border border-line object-cover" />
+              </Link>
+              <div className="min-w-0">
+                <h1 className="truncate text-base font-semibold leading-tight text-ink">{exam.exam_name}</h1>
+                <p className="mt-0.5 truncate text-xs text-muted">
+                  Student: {sitter?.user_name ?? '—'}
+                  {exam.minutes ? ` · ${exam.minutes} minutes` : ''}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              <button
+                type="button"
+                onClick={openCalculator}
+                aria-label="Open calculator"
+                title="Calculator"
+                className="flex h-9 w-9 items-center justify-center rounded border border-line text-brand-800 transition-colors hover:bg-brand-50"
+              >
+                <Calculator size={16} aria-hidden="true" />
+              </button>
+
+              {sitter && (
+                <span
+                  title={sitter.user_name}
+                  className="hidden h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-900 text-xs font-extrabold text-lime-accent ring-1 ring-line sm:flex"
+                >
+                  {sitter.student?.photoUrl || sitter.img ? (
+                    <img src={(sitter.student?.photoUrl || sitter.img) as string} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    sitter.user_name.split(' ').map((p) => p.replace('.', '')[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'LW'
+                  )}
+                </span>
+              )}
+
+              <p
+                className={`inline-flex items-center gap-2 rounded px-4 py-1.5 font-mono text-sm font-bold ${
+                  secondsLeft < 300
+                    ? 'animate-pulse bg-rose-50 text-rose-600 ring-1 ring-rose-400'
+                    : 'bg-brand-50 text-brand-700 ring-1 ring-brand-100'
+                }`}
+                role="timer"
+                aria-label="Time remaining"
+              >
+                <Clock size={15} aria-hidden="true" /> {fmtTime(secondsLeft)}
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setConfirmOpen(true)}
+                disabled={busy}
+                className="w-full rounded bg-brand-500 px-6 py-2 font-medium text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-gray-300 sm:w-auto"
+              >
+                {busy ? 'Submitting…' : 'Submit Exam'}
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <main className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-6 p-4 sm:p-6 lg:flex-row">
+
+          {/* ── Left: question + controls ── */}
+          <div className="flex min-w-0 flex-1 flex-col gap-4">
+
+            <article className="flex min-h-[400px] flex-col rounded border border-line bg-white p-5 sm:p-8" aria-label={`Question ${safeCurrent + 1}`}>
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                <span className="inline-flex items-center rounded bg-brand-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-brand-700">
+                  Question {safeCurrent + 1} of {total}
+                </span>
+
+                {subjectNames.length > 1 && (
+                  <div className="scroll-slim -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+                    {subjectNames.map((name) => {
+                      const items = paletteGroups.find((g) => g.subject === name)?.items ?? [];
+                      const done = items.filter(({ q: x }) => answered(x)).length;
+                      const active = activeSubject === name;
+                      return (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => goToSubject(name)}
+                          aria-pressed={active}
+                          className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-4 py-2 text-xs uppercase tracking-wider transition-colors ${
+                            active
+                              ? 'bg-brand-50 text-brand-700'
+                              : 'text-muted hover:bg-cream hover:text-brand-700'
+                          }`}
+                        >
+                          {name}
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                              active ? 'bg-white text-brand-700' : 'bg-brand-50 text-muted'
+                            }`}
+                          >
+                            {done} / {items.length}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="text-base font-medium leading-relaxed text-ink">
+                <Suspense
+                  fallback={<p className="whitespace-pre-wrap break-words">{q.question}</p>}
+                >
+                  {/* `NewsContent` mounts MDXEditor, which only reads its
+                      markdown on mount — key it per question so navigating
+                      the paper actually swaps the rendered question text. */}
+                  <NewsContent key={q.id} markdown={q.question} />
+                </Suspense>
+              </div>
+
+              {q.question_file?.trim() ? (
+                <div className="mt-5 rounded border border-line bg-cream px-4 py-3">
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted">Attachment</p>
+                  {(() => {
+                    const file = q.question_file!.trim();
+                    if (!isOpenableFile(file)) {
+                      return (
+                        <p className="mt-1.5 font-mono text-xs text-muted">
+                          Offline file: {file} <span className="font-sans">(available on exam devices)</span>
+                        </p>
+                      );
+                    }
+                    if (isImageFile(file)) {
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => setAttachOpen(true)}
+                          className="mt-2 inline-flex min-h-10 items-center gap-2 rounded border border-line bg-white px-4 text-xs font-bold hover:border-brand-500 hover:text-brand-700"
+                        >
+                          <ImageIcon size={14} aria-hidden="true" /> View image
+                        </button>
+                      );
+                    }
+                    return (
+                      <a
+                        href={file}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex min-h-10 items-center gap-2 rounded border border-line bg-white px-4 text-xs font-bold hover:border-brand-500 hover:text-brand-700"
+                      >
+                        <FileText size={14} aria-hidden="true" /> Open file in browser
+                      </a>
+                    );
+                  })()}
+                </div>
+              ) : null}
+
+              <div className="mt-6 space-y-3">
+                {q.type === 'FILL_IN_THE_BLANK' ? (
+                  <div>
+                    <input
+                      value={typed[q.id] ?? ''}
+                      onChange={(e) => trackTyped(q.id, e.target.value)}
+                      placeholder="Type your answer here…"
+                      aria-label={`Answer for question ${safeCurrent + 1}`}
+                      className="w-full rounded border border-line bg-white p-4 text-sm outline-none transition-colors focus:border-brand-500 focus:bg-brand-50/40 focus:ring-1 focus:ring-brand-500"
+                    />
+                    <p className="mt-2 text-xs text-muted">Note: please ensure correct spelling for your answer.</p>
+                  </div>
+                ) : q.type === 'TRUE_FALSE' ? (
+                  <div className="space-y-3" role="radiogroup" aria-label={`True or false for question ${safeCurrent + 1}`}>
+                    {(['True', 'False'] as const).map((label) => {
+                      const opts = optionsByQ[q.id] ?? [];
+                      const oi = opts.indexOf(label);
+                      const selected = oi !== -1 && picked[q.id] === oi;
+                      const available = oi !== -1;
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          disabled={!available}
+                          onClick={() => chooseOption(q.id, oi)}
+                          className={`group flex w-full items-center gap-4 rounded border p-4 text-left transition-colors disabled:opacity-40 ${
+                            selected
+                              ? 'border-brand-500 bg-brand-50 text-brand-800'
+                              : 'border-line bg-white text-ink hover:border-brand-500'
+                          }`}
+                        >
+                          <span
+                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${
+                              selected
+                                ? 'border-brand-500 bg-brand-500 text-white'
+                                : 'border-line bg-cream text-muted group-hover:border-brand-500 group-hover:text-brand-700'
+                            }`}
+                          >
+                            {label[0]}
+                          </span>
+                          <span className="text-sm">{label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="space-y-3" role="radiogroup" aria-label={`Options for question ${safeCurrent + 1}`}>
+                    {(optionsByQ[q.id] ?? []).map((opt, oi) => {
+                      const selected = picked[q.id] === oi;
+                      return (
+                        <button
+                          key={oi}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          onClick={() => chooseOption(q.id, oi)}
+                          className={`group flex w-full items-center gap-4 rounded border p-4 text-left transition-colors ${
+                            selected
+                              ? 'border-brand-500 bg-brand-50 text-brand-800'
+                              : 'border-line bg-white text-ink hover:border-brand-500'
+                          }`}
+                        >
+                          <span
+                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${
+                              selected
+                                ? 'border-brand-500 bg-brand-500 text-white'
+                                : 'border-line bg-cream text-muted group-hover:border-brand-500 group-hover:text-brand-700'
+                            }`}
+                          >
+                            {String.fromCharCode(65 + oi)}
+                          </span>
+                          <span className="text-sm">{opt}</span>
+                        </button>
+                      );
+                    })}
+                    {(optionsByQ[q.id] ?? []).length === 0 && (
+                      <p className="rounded border border-dashed border-line bg-cream px-4 py-3 text-xs text-muted">
+                        No options were served for this question. Tell an invigilator.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </article>
+
+            {/* ── Prev / Next ── */}
+            <div className="flex flex-col gap-3 py-1 sm:flex-row sm:justify-between">
+              <button
+                type="button"
+                onClick={() => goTo(safeCurrent - 1, 'PREVIOUS')}
+                disabled={isFirst}
+                title="Previous (P)"
+                className="flex items-center justify-center gap-2 rounded border border-line bg-white px-6 py-2.5 font-medium text-ink transition-colors hover:bg-cream disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              >
+                <ChevronLeft size={18} aria-hidden="true" /> Previous
+                <kbd className="hidden rounded border border-line bg-cream px-1.5 py-0.5 text-[10px] text-muted sm:inline">P</kbd>
+              </button>
+
+              {isLast ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmOpen(true)}
+                  disabled={busy}
+                  title="Review and submit"
+                  className="flex items-center justify-center gap-2 rounded bg-brand-500 px-6 py-2.5 font-bold text-white transition-colors hover:bg-brand-700 disabled:opacity-60 sm:w-auto"
+                >
+                  <Send size={16} aria-hidden="true" />
+                  {busy ? 'Submitting…' : 'Submit answers'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => goTo(safeCurrent + 1, 'NEXT')}
+                  title="Next (N)"
+                  className="flex items-center justify-center gap-2 rounded bg-brand-500 px-6 py-2.5 font-medium text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                >
+                  Next <ChevronRight size={18} aria-hidden="true" />
+                  <kbd className="hidden rounded border border-white/30 bg-white/20 px-1.5 py-0.5 text-[10px] text-white sm:inline">N</kbd>
+                </button>
+              )}
+            </div>
+
+            {error && (
+              <p role="alert" className="border-l-2 border-rose-400 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                {error}
+              </p>
+            )}
+
+            <p className="pb-2 text-center text-xs text-muted lg:text-left">
+              Shortcuts: <Kbd>A</Kbd>–<Kbd>{String.fromCharCode(64 + Math.min((optionsByQ[q.id] ?? []).length, 26))}</Kbd> answer
+              {' · '}<Kbd>P</Kbd> previous {' · '}<Kbd>N</Kbd> next
+            </p>
+          </div>
+
+          {/* ── Right: palette ── */}
+          <aside className="w-full shrink-0 lg:w-[320px]">
+            <div className="scroll-slim rounded border border-line bg-white p-6 lg:sticky lg:top-24 lg:max-h-[calc(100vh-9rem)] lg:overflow-y-auto">
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-ink">
+                <CheckCircle2 className="text-brand-700" size={16} aria-hidden="true" /> Question palette
+              </h2>
+
+              <div className="flex flex-col gap-5">
+                {paletteGroups.map((group) => (
+                  <div key={group.subject ?? 'all'}>
+                    {group.subject && (
+                      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted">
+                        {group.subject}
+                        <span className="ml-1 text-muted/70">
+                          {group.items.filter(({ q: x }) => answered(x)).length}/{group.items.length}
+                        </span>
+                      </p>
+                    )}
+                    <div className="grid grid-cols-5 gap-2 sm:grid-cols-6 lg:grid-cols-5">
+                      {group.items.map(({ q: x, i }) => {
+                        const done = answered(x);
+                        const active = i === safeCurrent;
+                        return (
+                          <button
+                            key={x.id}
+                            type="button"
+                            onClick={() => goTo(i, 'PALETTE')}
+                            aria-label={`Go to question ${i + 1}${done ? ' (answered)' : ''}`}
+                            aria-current={active ? 'step' : undefined}
+                            className={`flex aspect-square w-full items-center justify-center rounded text-xs font-medium transition-colors ${
+                              active
+                                ? 'z-10 bg-brand-900 text-white ring-2 ring-brand-500'
+                                : done
+                                  ? 'bg-brand-500 text-white hover:bg-brand-700'
+                                  : 'border border-line bg-white text-muted hover:border-brand-500 hover:text-brand-700'
+                            }`}
+                          >
+                            {i + 1}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-8 space-y-3 border-t border-line pt-6">
+                <div className="flex items-center gap-3 text-xs font-medium text-muted">
+                  <span className="h-3 w-3 rounded-sm bg-brand-500" />
+                  Answered ({answeredCount})
+                </div>
+                <div className="flex items-center gap-3 text-xs font-medium text-muted">
+                  <span className="h-3 w-3 rounded-sm border border-line bg-white" />
+                  Not answered ({total - answeredCount})
+                </div>
+                <div className="flex items-center gap-3 text-xs font-medium text-muted">
+                  <span className="h-3 w-3 rounded-sm bg-brand-900 ring-2 ring-brand-500/40" />
+                  Current
+                </div>
+              </div>
+
+              <div className="mt-6 border-t border-line pt-4 text-[11px] leading-relaxed text-muted">
+                <span className="font-semibold text-ink">Keyboard:</span> A–D to answer, P for previous, N for next.
+              </div>
+            </div>
+          </aside>
+        </main>
+      </div>
+    </>
+  );
+};

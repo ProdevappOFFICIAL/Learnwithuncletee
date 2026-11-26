@@ -1,0 +1,232 @@
+import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { ROUTES } from './paths';
+import { RequireAuth, RequireRole } from './guards';
+import { HomePage } from '@/pages/HomePage';
+import { AboutPage } from '@/pages/AboutPage';
+import { AcademicsPage } from '@/pages/AcademicsPage';
+import { AdmissionsPage } from '@/pages/AdmissionsPage';
+import { StudentLifePage } from '@/pages/StudentLifePage';
+import { ServicesPage } from '@/pages/ServicesPage';
+import { NewsPage } from '@/pages/NewsPage';
+import { NewsDetailPage } from '@/pages/NewsDetailPage';
+import { GalleryPage } from '@/pages/GalleryPage';
+import { ContactPage } from '@/pages/ContactPage';
+import { LoginPage } from '@/pages/LoginPage';
+import { ConnectDesktopPage } from '@/pages/ConnectDesktopPage';
+import { ExaminationPage } from '@/pages/ExaminationPage';
+import { ExamRoomPage } from '@/pages/ExamRoomPage';
+import { ExamDashboardPage } from '@/pages/ExamDashboardPage';
+import { NotFoundPage } from '@/pages/NotFoundPage';
+import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { adminNav, studentNav, teacherNav } from '@/data/dashboard';
+import { DashboardIndexPage } from '@/pages/dashboard/DashboardIndexPage';
+import { StudentDashboardPage } from '@/pages/dashboard/student/StudentDashboardPage';
+import { StudentFeesPage } from '@/pages/dashboard/student/StudentFeesPage';
+import { StudentResultsPage } from '@/pages/dashboard/student/StudentResultsPage';
+import { StudentResultNotificationPage } from '@/pages/dashboard/student/StudentResultNotificationPage';
+import { StudentResultDetailPage } from '@/pages/dashboard/student/StudentResultDetailPage';
+import { StudentExamReportPage } from '@/pages/dashboard/student/StudentExamReportPage';
+import { StudentAssignmentsPage } from '@/pages/dashboard/student/StudentAssignmentsPage';
+import { StudentVirtualClassPage } from '@/pages/dashboard/student/StudentVirtualClassPage';
+import { StudentMaterialsPage } from '@/pages/dashboard/student/StudentMaterialsPage';
+import { StudentConductPage } from '@/pages/dashboard/student/StudentConductPage';
+import { TeacherDashboardPage } from '@/pages/dashboard/teacher/TeacherDashboardPage';
+import { TeacherAttendancePage } from '@/pages/dashboard/teacher/TeacherAttendancePage';
+import { TeacherAssignmentsPage } from '@/pages/dashboard/teacher/TeacherAssignmentsPage';
+import { TeacherResultsPage } from '@/pages/dashboard/teacher/TeacherResultsPage';
+import { TeacherClassesPage } from '@/pages/dashboard/teacher/TeacherClassesPage';
+import { TeacherCourseQuestionsPage } from '@/pages/dashboard/teacher/TeacherCourseQuestionsPage';
+import { TeacherResultsNotificationPage } from '@/pages/dashboard/teacher/TeacherResultsNotificationPage';
+import { AdminDashboardPage } from '@/pages/dashboard/admin/AdminDashboardPage';
+import { AdminStudentsPage } from '@/pages/dashboard/admin/AdminStudentsPage';
+import { AdminTeachersPage } from '@/pages/dashboard/admin/AdminTeachersPage';
+import { AdminStatusPage } from '@/pages/dashboard/admin/AdminStatusPage';
+import { AdminAdmissionsPage } from '@/pages/dashboard/admin/AdminAdmissionsPage';
+import { AdminAttendancePage } from '@/pages/dashboard/admin/AdminAttendancePage';
+import { AdminFeesPage } from '@/pages/dashboard/admin/AdminFeesPage';
+import { AdminResultsPage } from '@/pages/dashboard/admin/AdminResultsPage';
+import { AdminResultsNotificationPage } from '@/pages/dashboard/admin/AdminResultsNotificationPage';
+import { AdminPPTMarkerPage } from '@/pages/dashboard/admin/AdminPPTMarkerPage';
+import { AdminAssignmentsPage } from '@/pages/dashboard/admin/AdminAssignmentsPage';
+import { AdminVirtualClassPage } from '@/pages/dashboard/admin/AdminVirtualClassPage';
+import { AdminNewsPage } from '@/pages/dashboard/admin/AdminNewsPage';
+import { AdminNewsPreviewPage } from '@/pages/dashboard/admin/AdminNewsPreviewPage';
+import { AdminMaterialsPage } from '@/pages/dashboard/admin/AdminMaterialsPage';
+import { AdminFormsPage } from '@/pages/dashboard/admin/AdminFormsPage';
+import { AdminFormPreviewPage } from '@/pages/dashboard/admin/AdminFormPreviewPage';
+import { FormResponsesPage } from '@/pages/dashboard/admin/FormResponsesPage';
+import { FormPage } from '@/pages/FormPage';
+import { FormSuccessPage } from '@/pages/FormSuccessPage';
+import { AdminMembersPage } from '@/pages/dashboard/admin/AdminMembersPage';
+import { AdminMemberPage } from '@/pages/dashboard/admin/AdminMemberPage';
+import { AdminWebsitePage } from '@/pages/dashboard/admin/AdminWebsitePage';
+import { AdminWebsitePagesPage } from '@/pages/dashboard/admin/AdminWebsitePagesPage';
+import { ExamClassesPage } from '@/pages/dashboard/admin/ExamClassesPage';
+import { AdminDatabasePage } from '@/pages/dashboard/admin/AdminDatabasePage';
+import { AdminDatabaseDetailPage } from '@/pages/dashboard/admin/AdminDatabaseDetailPage';
+import { AdminPrincipalCommentsPage, TeacherClassTeacherCommentsPage } from '@/pages/dashboard/admin/AdminPrincipalCommentsPage';
+import { AllExamsPage } from '@/pages/dashboard/admin/AllExamsPage';
+import { AllSubjectsPage } from '@/pages/dashboard/admin/AllSubjectsPage';
+import { AllQuestionsPage } from '@/pages/dashboard/admin/AllQuestionsPage';
+import { QuestionBankPage } from '@/pages/dashboard/admin/QuestionBankPage';
+import { AdminCombinationPage } from '@/pages/dashboard/admin/AdminCombinationPage';
+import { DeploymentsPage } from '@/pages/dashboard/admin/DeploymentsPage';
+import { AdminDeploymentSecurity } from '@/pages/dashboard/admin/AdminDeploymentSecurity';
+import { ClassExamsPage } from '@/pages/dashboard/admin/ClassExamsPage';
+import { ExamSubjectsPage } from '@/pages/dashboard/admin/ExamSubjectsPage';
+import { SubjectQuestionsPage } from '@/pages/dashboard/admin/SubjectQuestionsPage';
+import { ExamTestResultsPage } from '@/pages/dashboard/admin/ExamTestResultsPage';
+import { WebsiteSectionPage } from '@/pages/dashboard/admin/AdminSectionPage';
+import { AdminSettingsPage } from '@/pages/dashboard/admin/AdminSettingsPage';
+import { AdminAuditLogPage } from '@/pages/dashboard/admin/AdminAuditLogPage';
+import { RouteError } from '@/components/ui/RouteError';
+import AdminResultGeneratorPage from '@/pages/dashboard/admin/AdminResultGeneratorPage';
+import { AdminSessionOnline } from '@/pages/dashboard/admin/AdminSessionOnline';
+import { AdminSessionOffline } from '@/pages/dashboard/admin/AdminSessionOffline';
+import { AdminSessionDetailPage } from '@/pages/dashboard/admin/AdminSessionDetailPage';
+
+const appRoutes = [
+  { path: ROUTES.home, element: <HomePage /> },
+  { path: ROUTES.about, element: <AboutPage /> },
+  { path: ROUTES.academics, element: <AcademicsPage /> },
+  { path: ROUTES.admissions, element: <AdmissionsPage /> },
+  { path: ROUTES.studentLife, element: <StudentLifePage /> },
+  { path: ROUTES.services, element: <ServicesPage /> },
+  { path: ROUTES.news, element: <NewsPage /> },
+  { path: ROUTES.newsDetail, element: <NewsDetailPage /> },
+  { path: ROUTES.gallery, element: <GalleryPage /> },
+  { path: ROUTES.contact, element: <ContactPage /> },
+  { path: ROUTES.login, element: <LoginPage /> },
+  {
+    path: ROUTES.connectDesktop,
+    element: <RequireAuth />,
+    children: [{ index: true, element: <ConnectDesktopPage /> }],
+  },
+  { path: ROUTES.examDashboard, element: <ExamDashboardPage /> },
+  { path: ROUTES.examination, element: <ExaminationPage /> },
+  { path: ROUTES.examinationRoom, element: <ExamRoomPage /> },
+  { path: ROUTES.formPublic, element: <FormPage /> },
+  { path: ROUTES.formSuccess, element: <FormSuccessPage /> },
+  { path: ROUTES.dashboard, element: <DashboardIndexPage /> },
+  {
+    path: ROUTES.studentDashboard,
+    element: <RequireAuth />,
+    children: [
+      {
+        element: (
+          <RequireRole allow={['STUDENT', 'PARENT']}>
+            <DashboardLayout role="student" nav={studentNav} />
+          </RequireRole>
+        ),
+        children: [
+          { index: true, element: <StudentDashboardPage /> },
+          { path: 'fees', element: <StudentFeesPage /> },
+          { path: 'results', element: <StudentResultsPage /> },
+          { path: 'result-notification', element: <StudentResultNotificationPage /> },
+          { path: 'results/:origin/:id', element: <StudentResultDetailPage /> },
+          { path: 'results/:origin/:id/report', element: <StudentExamReportPage /> },
+          { path: 'assignments', element: <StudentAssignmentsPage /> },
+          { path: 'virtual-class', element: <StudentVirtualClassPage /> },
+          { path: 'materials', element: <StudentMaterialsPage /> },
+          { path: 'conduct', element: <StudentConductPage /> },
+        ],
+      },
+    ],
+  },
+  {
+    path: ROUTES.teacherDashboard,
+    element: <RequireAuth />,
+    children: [
+      {
+        element: (
+          <RequireRole allow={['TEACHER']}>
+            <DashboardLayout role="teacher" nav={teacherNav} />
+          </RequireRole>
+        ),
+        children: [
+          { index: true, element: <TeacherDashboardPage /> },
+          { path: 'attendance', element: <TeacherAttendancePage /> },
+          { path: 'attendance', element: <TeacherAttendancePage /> },
+          { path: 'assignments', element: <TeacherAssignmentsPage /> },
+          { path: 'results', element: <TeacherResultsPage /> },
+          { path: 'results-notification', element: <TeacherResultsNotificationPage /> },
+          { path: 'classes', element: <TeacherClassesPage /> },
+          { path: 'courses/questions', element: <TeacherCourseQuestionsPage /> },
+          { path: 'principal-comments', element: <AdminPrincipalCommentsPage /> },
+          { path: 'class-teacher-comments', element: <TeacherClassTeacherCommentsPage /> },
+        ],
+      },
+    ],
+  },
+  {
+    path: ROUTES.adminDashboard,
+    element: <RequireAuth />,
+    children: [
+      {
+        element: (
+          <RequireRole allow={['ADMIN', 'OWNER', 'MEMBER']}>
+            <DashboardLayout role="admin" nav={adminNav} />
+          </RequireRole>
+        ),
+        children: [
+          { index: true, element: <AdminDashboardPage /> },
+          { path: 'members', element: <AdminMembersPage /> },
+          { path: 'members/list', element: <AdminMemberPage /> },
+          { path: 'students', element: <AdminStudentsPage /> },
+          { path: 'teachers', element: <AdminTeachersPage /> },
+          { path: 'teachers/statuses', element: <AdminStatusPage /> },
+          { path: 'admissions', element: <AdminAdmissionsPage /> },
+          { path: 'attendance', element: <AdminAttendancePage /> },
+          { path: 'attendance', element: <AdminAttendancePage /> },
+          { path: 'fees', element: <AdminFeesPage /> },
+          { path: 'results', element: <AdminResultsPage /> },
+          { path: 'results-notification', element: <AdminResultsNotificationPage /> },
+          { path: 'ppt-marker', element: <AdminPPTMarkerPage /> },
+          { path: 'assignments', element: <AdminAssignmentsPage /> },
+          { path: 'virtual-class', element: <AdminVirtualClassPage /> },
+          { path: 'news', element: <AdminNewsPage /> },
+          { path: 'news/preview', element: <AdminNewsPreviewPage /> },
+          { path: 'materials', element: <AdminMaterialsPage /> },
+          { path: 'forms', element: <AdminFormsPage /> },
+          { path: 'forms/preview', element: <AdminFormPreviewPage /> },
+          { path: 'forms/responses', element: <FormResponsesPage /> },
+          { path: 'exams', element: <ExamClassesPage /> },
+          { path: 'database', element: <AdminDatabasePage /> },
+          { path: 'database/:databaseId', element: <AdminDatabaseDetailPage /> },
+          { path: 'exams/all', element: <AllExamsPage /> },
+          { path: 'exams/subjects', element: <AllSubjectsPage /> },
+          { path: 'exams/questions', element: <AllQuestionsPage /> },
+          { path: 'exams/question-bank', element: <QuestionBankPage /> },
+          { path: 'exams/combinations', element: <AdminCombinationPage /> },
+          { path: 'exams/deployments', element: <DeploymentsPage /> },
+          { path: 'exams/deployment-security', element: <AdminDeploymentSecurity /> },
+          { path: 'exams/results', element: <ExamTestResultsPage origin="ONLINE" /> },
+          { path: 'exams/results/offline', element: <ExamTestResultsPage origin="OFFLINE" /> },
+          { path: 'exams/sessions', element: <AdminSessionOnline /> },
+          { path: 'exams/sessions/offline', element: <AdminSessionOffline /> },
+          { path: 'exams/sessions/:mode/:id', element: <AdminSessionDetailPage /> },
+          { path: 'exams/:classId', element: <ClassExamsPage /> },
+          { path: 'exams/:classId/:examId', element: <ExamSubjectsPage /> },
+          { path: 'exams/:classId/:examId/:subjectId', element: <SubjectQuestionsPage /> },
+          { path: 'website', element: <AdminWebsitePage /> },
+          { path: 'website/pages', element: <AdminWebsitePagesPage /> },
+          { path: 'website/:section', element: <WebsiteSectionPage /> },
+          { path: 'settings', element: <AdminSettingsPage /> },
+          { path: 'audit-log', element: <AdminAuditLogPage /> },
+          { path: 'result-generator', element: <AdminResultGeneratorPage /> },
+          { path: 'principal-comments', element: <AdminPrincipalCommentsPage /> },
+        ],
+      },
+    ],
+  },
+  // Back-compat alias: /admin/student -> /dashboard/student
+  { path: '/admin/student/*', element: <Navigate to={ROUTES.studentDashboard} replace /> },
+  { path: ROUTES.notFound, element: <NotFoundPage /> },
+];
+
+// Every top-level route gets the branded error element; nested dashboard
+// pages inherit it by bubbling, so a crash in any page (e.g. a typo'd
+// variable) shows this dialog instead of the router's default error screen.
+export const router = createBrowserRouter(
+  appRoutes.map((r) => ({ errorElement: <RouteError />, ...r })),
+);

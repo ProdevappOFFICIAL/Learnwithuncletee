@@ -1,0 +1,368 @@
+import { Fragment, useEffect, useState } from 'react';
+import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pagination, Pill, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
+import { useResource } from '@/context/AuthContext';
+import { apiDelete, apiDownload, apiGet, apiPatch } from '@/lib/api';
+import { useAcademicSettings } from '@/lib/academic';
+import { usePagedList } from '@/lib/pagedQuery';
+import type { ClassItem } from '@/data/dashboard';
+import { ChevronDown, ChevronRight, Download } from 'lucide-react';
+
+interface TestResultRow {
+  id: string;
+  overallScore: number;
+  attempted_questions: number;
+  total_questions: number;
+  date: string;
+  submitted?: boolean;
+  deploymentType?: string;
+  user?: { user_name: string; user_email: string; class?: { name: string } | null };
+  exam?: { exam_name: string };
+  subjectScores?: Record<string, { correct: number; total: number }>;
+  subjectNames?: Record<string, string>;
+}
+
+const breakdownOf = (r: TestResultRow) =>
+  Object.entries(r.subjectScores ?? {})
+    .map(([id, s]) => ({ id, name: r.subjectNames?.[id] ?? 'Unknown subject', correct: s.correct, total: s.total }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+export const ExamTestResultsPage = ({ origin }: { origin: 'ONLINE' | 'OFFLINE' }) => {
+  // Separate routes per origin (/results vs /results/offline) so the sidebar
+  // active indicator isolates exactly one child.
+  const mode = origin;
+  const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
+  const [classFilter, setClassFilter] = useState('');
+  const [examType, setExamType] = useState('');
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [exporting, setExporting] = useState<'selected' | 'all' | null>(null);
+  const classes = useResource<ClassItem[]>('/classes', { limit: 200 });
+  const academic = useAcademicSettings();
+  const session = academic.data?.data.session ?? '';
+  const term = academic.data?.data.term ?? '';
+
+  const results = usePagedList<TestResultRow>(
+    ['test-results', query, classFilter, examType, mode, session, term],
+    (page, limit) =>
+      apiGet<TestResultRow[]>(mode === 'OFFLINE' ? '/offline-results' : '/results', {
+        searchTerm: query || undefined,
+        classId: classFilter || undefined,
+        examType: examType || undefined,
+        session: session || undefined,
+        term: term || undefined,
+        page,
+        limit,
+      }),
+  );
+
+  useEffect(() => {
+    setSelected(new Set());
+    setExpanded(null);
+  }, [mode]);
+
+  const pageIds = results.rows.map((row) => row.id);
+  const allOnPageSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+  const someOnPageSelected = !allOnPageSelected && pageIds.some((id) => selected.has(id));
+
+  const toggleRow = (id: string) => {
+    setSelected((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const togglePage = () => {
+    setSelected((previous) => {
+      const next = new Set(previous);
+      if (allOnPageSelected) pageIds.forEach((id) => next.delete(id));
+      else pageIds.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  const exportResults = async (which: 'selected' | 'all') => {
+    if (which === 'selected' && selected.size === 0) return;
+    setExporting(which);
+    setNotice(null);
+    try {
+      const { filename } = await apiDownload(
+        mode === 'OFFLINE' ? '/offline-results/export' : '/results/export',
+        which === 'selected'
+          ? { ids: [...selected].join(','), session: session || undefined, term: term || undefined }
+          : {
+              searchTerm: query || undefined,
+              classId: classFilter || undefined,
+              examType: examType || undefined,
+              session: session || undefined,
+              term: term || undefined,
+            },
+      );
+      setNotice(
+        `Exported ${which === 'selected' ? selected.size : results.total} result(s) to ${filename}.`,
+      );
+    } catch (error: any) {
+      setNotice(error?.message ?? 'Export failed');
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  const remove = async (row: TestResultRow) => {
+    if (!confirm(`Delete the test result of ${row.user?.user_name ?? 'this pupil'} for "${row.exam?.exam_name ?? 'this exam'}"? This cannot be undone.`)) return;
+    try {
+      await apiDelete(mode === 'OFFLINE' ? `/offline-results/${row.id}` : `/results/${row.id}`);
+      setSelected((previous) => {
+        if (!previous.has(row.id)) return previous;
+        const next = new Set(previous);
+        next.delete(row.id);
+        return next;
+      });
+      setNotice('Test result deleted.');
+      results.invalidate();
+    } catch (err: any) {
+      setNotice(err?.message ?? 'Delete failed');
+    }
+  };
+
+  // Online-only submission lock: on = pupil can't re-enter; off = re-allowed.
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
+
+  const flipSubmitted = async (row: TestResultRow) => {
+    setRowBusy(row.id);
+    try {
+      const next = !row.submitted;
+      await apiPatch(`/results/${row.id}`, { submitted: next });
+      setNotice(next ? `Locked - ${row.user?.user_name ?? 'pupil'} can't re-enter this exam.` : `Re-opened - ${row.user?.user_name ?? 'pupil'} can sit this exam again.`);
+      results.invalidate();
+    } catch (err: any) {
+      setNotice(err?.message ?? 'Update failed');
+    } finally {
+      setRowBusy(null);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Exam & Test"
+        title={mode === 'OFFLINE' ? 'Offline Results' : mode === 'ONLINE' ? 'Online Results' : 'Test Results'}
+        text="Overall scores from pupils sitting exams on the platform. Select rows for a partial export, or export every matching result to Excel."
+      />
+      {notice && <p role="status" className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
+
+      <Card>
+        <CardHead title="All attempts" sub={`${results.total} newest first${session || term ? ` · ${session}${term ? ` · ${term}` : ''}` : ''}`} />
+        <form
+          className="flex flex-wrap gap-2 border-b border-line px-5 py-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setQuery(search);
+            results.resetPage();
+          }}
+        >
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search pupil or exam..."
+            aria-label="Search test results"
+            className="min-h-11 w-full max-w-xs rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500"
+          />
+          <select
+            value={classFilter}
+            onChange={(e) => { setClassFilter(e.target.value); results.resetPage(); }}
+            aria-label="Filter by class"
+            className="min-h-11 rounded border border-line bg-white px-3 text-sm font-semibold"
+          >
+            <option value="">All classes</option>
+            {(classes.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <select
+            value={examType}
+            onChange={(e) => { setExamType(e.target.value); results.resetPage(); }}
+            aria-label="Filter by exam type"
+            className="min-h-11 rounded border border-line bg-white px-3 text-sm font-semibold"
+          >
+            <option value="">All exams</option>
+            <option value="cbt1">CBT 1</option>
+            <option value="cbt2">CBT 2</option>
+            <option value="exam">Examination</option>
+          </select>
+          <button type="submit" className="min-h-11 rounded bg-brand-900 px-4 text-sm font-bold text-white hover:bg-brand-700">Search</button>
+          {(search || classFilter || examType) && (
+            <button type="button" onClick={() => { setSearch(''); setQuery(''); setClassFilter(''); setExamType(''); results.resetPage(); }} className="min-h-11 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">
+              Reset
+            </button>
+          )}
+        </form>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3">
+          <p className="text-xs text-muted">
+            {selected.size > 0
+              ? `${selected.size} selected - export just these, or export all matching results.`
+              : 'Select rows for a partial export, or export every matching result.'}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {selected.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelected(new Set())}
+                className="min-h-10 rounded border border-line px-3 text-xs font-bold text-muted hover:text-ink"
+              >
+                Clear
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => exportResults('selected')}
+              disabled={selected.size === 0 || exporting !== null}
+              className="inline-flex min-h-10 items-center gap-1.5 rounded border border-line px-3 text-xs font-bold hover:border-brand-500 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Download size={13} aria-hidden="true" />
+              {exporting === 'selected' ? 'Exporting...' : 'Export selected'}
+            </button>
+            <button
+              type="button"
+              onClick={() => exportResults('all')}
+              disabled={results.total === 0 || exporting !== null}
+              className="inline-flex min-h-10 items-center gap-1.5 rounded bg-brand-500 px-3 text-xs font-bold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Download size={13} aria-hidden="true" />
+              {exporting === 'all' ? 'Exporting...' : 'Export all'}
+            </button>
+          </div>
+        </div>
+
+        {results.isPending ? (
+          <div className="px-5 py-5"><LoadingSkeleton rows={5} /></div>
+        ) : results.isError ? (
+          <div className="px-5 py-5"><ErrorState message="Could not load results" onRetry={() => results.refetch()} /></div>
+        ) : results.rows.length === 0 ? (
+          <div className="px-5 py-5"><EmptyState message="No test attempts recorded yet." /></div>
+        ) : (
+          <>
+            <TableWrap>
+              <table className={`w-full min-w-[940px] text-left text-sm transition-opacity ${results.isFetching ? 'opacity-60' : ''}`}>
+                <thead>
+                  <tr>
+                    <Th>
+                      <input
+                        type="checkbox"
+                        checked={allOnPageSelected}
+                        onChange={togglePage}
+                        ref={(node) => {
+                          if (node) node.indeterminate = someOnPageSelected;
+                        }}
+                        aria-label="Select all results on this page"
+                        className="h-4 w-4 accent-brand-500"
+                      />
+                    </Th>
+                    <Th>Pupil</Th>
+                    <Th>Exam</Th>
+                    <Th>Class</Th>
+                    <Th>Mode</Th>
+                    <Th>Score</Th>
+                    <Th>Attempted</Th>
+                    <Th>Submitted</Th>
+                    <Th><span className="sr-only">Actions</span></Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.rows.map((r) => {
+                    const open = expanded === r.id;
+                    const parts = breakdownOf(r);
+                    return (
+                      <Fragment key={r.id}>
+                        <tr>
+                          <Td>
+                            <input
+                              type="checkbox"
+                              checked={selected.has(r.id)}
+                              onChange={() => toggleRow(r.id)}
+                              aria-label={`Select result for ${r.user?.user_name ?? 'pupil'}`}
+                              className="h-4 w-4 accent-brand-500"
+                            />
+                          </Td>
+                          <Td><span className="font-bold">{r.user?.user_name ?? '-'}</span><span className="block text-xs text-muted">{r.user?.user_email ?? ''}</span></Td>
+                          <Td>{r.exam?.exam_name ?? '-'}</Td>
+                          <Td className="text-muted">{r.user?.class?.name ?? '-'}</Td>
+                          <Td><Pill tone={mode === 'OFFLINE' ? 'amber' : 'sky'}>{mode === 'OFFLINE' ? 'Offline' : 'Online'}</Pill></Td>
+                          <Td><Pill tone={r.overallScore >= 75 ? 'emerald' : r.overallScore < 40 ? 'rose' : 'sky'}>{r.overallScore}%</Pill></Td>
+                          <Td className="text-muted">{r.attempted_questions}/{r.total_questions}</Td>
+                          <Td className="text-muted">{new Date(r.date).toLocaleString()}</Td>
+                          <Td>
+                            <span className="flex items-center gap-1.5">
+                              {mode === 'ONLINE' && (
+                                <button
+                                  type="button"
+                                  role="switch"
+                                  aria-checked={!!r.submitted}
+                                  aria-label={`Submission lock for ${r.user?.user_name ?? 'pupil'}`}
+                                  title={r.submitted ? 'Locked - pupil cannot re-enter (click to re-allow)' : 'Re-entry allowed (click to lock)'}
+                                  disabled={rowBusy === r.id}
+                                  onClick={() => flipSubmitted(r)}
+                                  className={`inline-flex h-6 w-11 shrink-0 items-center rounded-full px-1 transition-colors disabled:opacity-60 ${r.submitted ? 'bg-brand-500' : 'bg-line'}`}
+                                >
+                                  <span className={`h-4 w-4 rounded-full bg-white transition-transform ${r.submitted ? 'translate-x-5' : ''}`} />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setExpanded(open ? null : r.id)}
+                                aria-expanded={open}
+                                aria-label={open ? 'Hide subject breakdown' : 'Show subject breakdown'}
+                                title="Subject breakdown"
+                                className="inline-flex items-center gap-1 rounded border border-line px-2.5 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700"
+                              >
+                                {open ? <ChevronDown aria-hidden="true" size={14} /> : <ChevronRight aria-hidden="true" size={14} />}
+                                Subjects
+                              </button>
+                              <button type="button" onClick={() => remove(r)} className="rounded border border-line px-3 py-1.5 text-xs font-bold text-rose-700 hover:border-rose-300">Delete</button>
+                            </span>
+                          </Td>
+                        </tr>
+                        {open && (
+                          <tr>
+                            <td colSpan={9} className="border-t border-line bg-cream/60 px-5 py-4">
+                              {parts.length === 0 ? (
+                                <p className="text-xs text-muted">No per-subject data on this attempt.</p>
+                              ) : (
+                                <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                  {parts.map((p) => (
+                                    <li key={p.id} className="flex items-center justify-between gap-2 rounded border border-line bg-cream px-3 py-2">
+                                      <span className="truncate text-xs font-bold">{p.name}</span>
+                                      <span className="shrink-0 font-mono text-xs font-extrabold text-brand-700">
+                                        {p.correct}/{p.total}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </TableWrap>
+            <Pagination
+              total={results.total}
+              page={results.page}
+              pageCount={results.pageCount}
+              limit={results.limit}
+              onPage={results.setPage}
+              onLimit={results.setLimit}
+              disabled={results.isFetching}
+              noun="attempt(s)"
+            />
+          </>
+        )}
+      </Card>
+    </div>
+  );
+};

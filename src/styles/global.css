@@ -1,0 +1,273 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Manrope", ui-sans-serif, system-ui, sans-serif;
+
+  /* Brand — green, per school identity */
+  --color-brand-50: #eaf7ef;
+  --color-brand-100: #d4f0dd;
+  --color-brand-200: #a9e0bd;
+  --color-brand-300: #6fc998;
+  --color-brand-400: #16a05d;
+  --color-brand-500: #0b6b3a;
+  --color-brand-600: #095e32;
+  --color-brand-700: #064a2a;
+  --color-brand-800: #043a21;
+  --color-brand-900: #052e1a;
+
+  --color-lime-accent: #b7e36b;
+  --color-cream: #fffdf7;
+  --color-ink: #15221a;
+  --color-muted: #637067;
+  --color-line: #dde9e1;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: #fff;
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── MDXEditor brand skin (announcements) ────────────────────────── */
+.mdx-news-editor {
+  border: 1px solid var(--color-line);
+  border-radius: 0.375rem;
+  background: #fff;
+}
+
+.mdx-news-viewer [role='textbox'] {
+  padding: 0;
+}
+
+.mdx-news-content {
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  line-height: 1.75;
+}
+
+.mdx-news-content h1,
+.mdx-news-content h2,
+.mdx-news-content h3 {
+  font-family: var(--font-display);
+  color: var(--color-brand-700);
+  font-weight: 800;
+  margin: 1.25em 0 0.5em;
+  line-height: 1.3;
+}
+
+.mdx-news-content h1 { font-size: 1.5rem; }
+.mdx-news-content h2 { font-size: 1.25rem; }
+.mdx-news-content h3 { font-size: 1.1rem; }
+
+.mdx-news-content p { margin: 0.75em 0; }
+.mdx-news-content ul,
+.mdx-news-content ol { margin: 0.75em 0; padding-left: 1.5rem; }
+.mdx-news-content ul { list-style: disc; }
+.mdx-news-content ol { list-style: decimal; }
+.mdx-news-content blockquote {
+  border-left: 3px solid var(--color-brand-500);
+  background: var(--color-brand-50);
+  margin: 1em 0;
+  padding: 0.75em 1em;
+  color: var(--color-brand-800);
+}
+.mdx-news-content a { color: var(--color-brand-500); font-weight: 700; }
+.mdx-news-content hr { border-color: var(--color-line); margin: 1.5em 0; }
+.mdx-news-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+  margin: 1em 0;
+  display: block;
+  overflow-x: auto;
+}
+.mdx-news-content thead { background: var(--color-brand-50); }
+.mdx-news-content th,
+.mdx-news-content td { border: 1px solid var(--color-line); padding: 0.5em 0.75em; text-align: left; }
+.mdx-news-content th { color: var(--color-brand-700); font-weight: 800; }
+.mdx-news-content code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  background: var(--color-brand-50);
+  border: 1px solid var(--color-line);
+  border-radius: 0.25rem;
+  padding: 0.1em 0.35em;
+}
+.mdx-news-content pre {
+  background: var(--color-brand-900);
+  color: #eaf7ef;
+  border-radius: 0.5rem;
+  padding: 1em;
+  overflow-x: auto;
+  margin: 1em 0;
+}
+.mdx-news-content pre code { background: none; border: none; padding: 0; color: inherit; }
+.mdx-news-content img { max-width: 100%; border-radius: 0.5rem; margin: 1em 0; }
+.mdx-news-content [data-lexical-decorator] { max-width: 100%; }
+
+/* Question bank rows: same viewer, compact enough for a list item. */
+.mdx-question-bank .mdx-news-content {
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+.mdx-question-bank .mdx-news-content p { margin: 0; }
+.mdx-question-bank .mdx-news-content h1,
+.mdx-question-bank .mdx-news-content h2,
+.mdx-question-bank .mdx-news-content h3 {
+  margin: 0 0 0.15em;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+}
+.mdx-question-bank .mdx-news-content ul,
+.mdx-question-bank .mdx-news-content ol { margin: 0.25em 0; padding-left: 1.25rem; }
+.mdx-question-bank .mdx-news-content blockquote { margin: 0.35em 0; padding: 0.35em 0.65em; }
+.mdx-question-bank .mdx-news-content img { margin: 0.35em 0; }
+.mdx-question-bank .mdx-news-content pre,
+.mdx-question-bank .mdx-news-content table { margin: 0.35em 0; }
+
+/* ── Custom slim scrollbar (dashboard sidebar + drawers) ──────────── */
+.scroll-slim {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+.scroll-slim::-webkit-scrollbar {
+  width: 6px;
+}
+.scroll-slim::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-slim::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+}
+.scroll-slim::-webkit-scrollbar-thumb:hover {
+  background: rgba(183, 227, 107, 0.55);
+}
+
+/* Light-surface variant for data tables (Database page). */
+.scroll-db {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(31, 61, 43, 0.28) transparent;
+}
+.scroll-db::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-db::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-db::-webkit-scrollbar-thumb {
+  background: rgba(31, 61, 43, 0.28);
+  border-radius: 999px;
+}
+.scroll-db::-webkit-scrollbar-thumb:hover {
+  background: rgba(31, 61, 43, 0.5);
+}
+
+/* Result Generator: print only the result-notification sheet. */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  body {
+    background: #ffffff !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #report-card-print,
+  #report-card-print * {
+    visibility: visible;
+  }
+
+  #report-card-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    overflow: visible !important;
+    border: 0 !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+  }
+
+  #report-card-print .print\:hidden {
+    display: none !important;
+  }
+}
+
+/* Teacher Result Notification: editable boxes get a yellow fill and a rolling
+   black dotted border so they stand out on the result sheet. The dotted edges
+   are painted as four background gradients, so the table layout never shifts
+   while the line rolls. */
+@keyframes teacher-field-march {
+  from {
+    background-position: 0 0, 0 100%, 0 0, 100% 0;
+  }
+  to {
+    background-position: 12px 0, -12px 100%, 0 12px, 100% -12px;
+  }
+}
+
+.teacher-field-highlight {
+  border-color: transparent !important;
+  background-color: #fde68a !important;
+  background-image:
+    repeating-linear-gradient(90deg, #111 0 6px, transparent 6px 12px),
+    repeating-linear-gradient(90deg, #111 0 6px, transparent 6px 12px),
+    repeating-linear-gradient(0deg, #111 0 6px, transparent 6px 12px),
+    repeating-linear-gradient(0deg, #111 0 6px, transparent 6px 12px);
+  background-size: 100% 2px, 100% 2px, 2px 100%, 2px 100%;
+  background-position: 0 0, 0 100%, 0 0, 100% 0;
+  background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
+  background-origin: border-box;
+  background-clip: border-box;
+  animation: teacher-field-march 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .teacher-field-highlight {
+    animation: none;
+  }
+}
+
+@media print {
+  .teacher-field-highlight {
+    animation: none;
+    background-color: #ffffff !important;
+    background-image: none;
+    border-color: #000 !important;
+  }
+}

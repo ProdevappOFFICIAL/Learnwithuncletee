@@ -1,0 +1,419 @@
+import { useEffect, useState } from 'react';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, Modal, PageHeader, Pill, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
+import { useResource } from '@/context/AuthContext';
+import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
+import { UploadButton } from '@/lib/uploadthing';
+import type { CourseAssignmentItem, StaffRow } from '@/data/dashboard';
+import { BookOpen, BadgeCheck, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ROUTES } from '@/routes/paths';
+import { CourseAssignmentWizard, type InitialAssignTeacher } from './teacher-assign/CourseAssignmentWizard';
+
+// Same caching strategy as the student directory: 5-min stale directory data,
+// 30-min garbage collection, previous-page rows kept during page turns, and
+// adjacent pages prefetched so Prev/Next feel instant.
+const PAGE_SIZE = 10;
+const LIST_STALE = 5 * 60 * 1000;
+const LIST_GC = 30 * 60 * 1000;
+
+const fetchStaff = (search: string, page: number) =>
+  apiGet<StaffRow[]>('/staff', { search: search || undefined, page, limit: PAGE_SIZE });
+
+const initialsOf = (name: string) =>
+  name.split(' ').map((p) => p.replace('.', '')[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'LW';
+
+/** Staff picture with initials fallback. */
+const StaffPicture = ({ row }: { row: StaffRow }) => {
+  const src = row.teacher?.photoUrl || row.img || null;
+  if (src) return <img src={src} alt="" className="h-10 w-10 shrink-0 rounded-full border border-line object-cover" />;
+  return (
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-900 text-xs font-extrabold text-lime-accent">
+      {initialsOf(row.user_name)}
+    </span>
+  );
+};
+
+interface TeacherForm {
+  user_name: string;
+  user_email: string;
+  password: string;
+  active: boolean;
+  photoUrl: string;
+}
+
+const emptyForm = (): TeacherForm => ({
+  user_name: '',
+  user_email: '',
+  password: '',
+  active: true,
+  photoUrl: '',
+});
+
+export const AdminTeachersPage = () => {
+  const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const qc = useQueryClient();
+  const list = useQuery({
+    queryKey: ['admin-staff', query, page],
+    queryFn: () => fetchStaff(query, page),
+    staleTime: LIST_STALE,
+    gcTime: LIST_GC,
+    placeholderData: keepPreviousData,
+  });
+  const data = list.data?.data ?? null;
+  const total = (list.data?.meta as { total?: number } | undefined)?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const loading = list.isPending;
+  const error = list.isError ? 'Could not load staff' : null;
+  const reload = () => qc.invalidateQueries({ queryKey: ['admin-staff'] });
+
+  useEffect(() => {
+    if (safePage < pageCount) {
+      void qc.prefetchQuery({
+        queryKey: ['admin-staff', query, safePage + 1],
+        queryFn: () => fetchStaff(query, safePage + 1),
+        staleTime: LIST_STALE,
+      });
+    }
+    if (safePage > 1) {
+      void qc.prefetchQuery({
+        queryKey: ['admin-staff', query, safePage - 1],
+        queryFn: () => fetchStaff(query, safePage - 1),
+        staleTime: LIST_STALE,
+      });
+    }
+  }, [qc, query, safePage, pageCount]);
+  const assignments = useResource<CourseAssignmentItem[]>('/course-assignments', { limit: 100 });
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<StaffRow | null>(null);
+  const [form, setForm] = useState<TeacherForm>(emptyForm());
+  const [created, setCreated] = useState<{ email: string; password: string; staffCode: string } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const [assignWizard, setAssignWizard] = useState<{ open: boolean; teacher: InitialAssignTeacher | null }>({
+    open: false,
+    teacher: null,
+  });
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(emptyForm());
+    setCreated(null);
+    setNotice(null);
+    setModalOpen(true);
+  };
+
+  const openEdit = (row: StaffRow) => {
+    setEditing(row);
+    setForm({
+      user_name: row.user_name,
+      user_email: row.user_email,
+      password: '',
+      active: row.active,
+      photoUrl: '',
+    });
+    setCreated(null);
+    setNotice(null);
+    setModalOpen(true);
+  };
+
+  const openAssignments = (row?: StaffRow) => {
+    setAssignWizard({
+      open: true,
+      teacher: row ? { id: row.id, name: row.user_name } : null,
+    });
+  };
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setNotice(null);
+    setCreated(null);
+    try {
+      if (editing) {
+        await apiPatch(`/staff/${editing.id}`, {
+          user_name: form.user_name.trim(),
+          active: form.active,
+        });
+        setNotice(`"${form.user_name.trim()}" updated.`);
+      } else {
+        const res = await apiPost<{ login: { email: string; password: string }; profile: { staffCode: string } }>('/staff', {
+          user_name: form.user_name.trim(),
+          user_email: form.user_email.trim(),
+          password: form.password || undefined,
+          photoUrl: form.photoUrl || undefined,
+        });
+        setCreated({ email: res.data.login.email, password: res.data.login.password, staffCode: res.data.profile.staffCode });
+        setNotice(null);
+      }
+      setModalOpen(false);
+      setEditing(null);
+      reload();
+    } catch (err: any) {
+      setNotice(err?.message ?? 'Save failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (row: StaffRow) => {
+    if (!confirm(`Delete teacher "${row.user_name}"? Their account is removed. This cannot be undone.`)) return;
+    setRowBusy(row.id);
+    try {
+      await apiDelete(`/users/${row.id}`);
+      reload();
+    } catch (err: any) {
+      setNotice(err?.message ?? 'Delete failed');
+    } finally {
+      setRowBusy(null);
+    }
+  };
+
+  const toggleActive = async (row: StaffRow) => {
+    setRowBusy(row.id);
+    try {
+      await apiPatch(`/staff/${row.id}`, { active: !row.active });
+      reload();
+    } catch (err: any) {
+      setNotice(err?.message ?? 'Could not change status');
+    } finally {
+      setRowBusy(null);
+    }
+  };
+
+  const removeAssignment = async (id: string) => {
+    if (!confirm('Remove this course assignment?')) return;
+    try {
+      await apiDelete(`/course-assignments/${id}`);
+      assignments.reload();
+    } catch (err: any) {
+      setNotice(err?.message ?? 'Could not remove assignment');
+    }
+  };
+
+  const coursesByTeacher = (teacherId: string) => (assignments.data ?? []).filter((a) => a.teacherId === teacherId);
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Members"
+        title="Teachers & staff"
+        text="Accounts, course assignments and access."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Link
+              to={ROUTES.adminTeacherStatuses}
+              className="inline-flex min-h-11 items-center rounded border border-line bg-white px-5 py-2.5 text-sm font-bold text-ink hover:border-brand-500 hover:text-brand-700"
+            >
+              <BadgeCheck aria-hidden="true" size={16} className="mr-2" /> Statuses
+            </Link>
+            <button
+              type="button"
+              onClick={() => openAssignments()}
+              className="inline-flex min-h-11 items-center rounded border border-line bg-white px-5 py-2.5 text-sm font-bold text-ink hover:border-brand-500 hover:text-brand-700"
+            >
+              <BookOpen aria-hidden="true" size={16} className="mr-2" /> Assign Courses
+            </button>
+            <button type="button" onClick={openCreate} className="inline-flex min-h-11 items-center rounded bg-brand-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
+              <Plus aria-hidden="true" size={16} className="mr-2" /> Add Teacher
+            </button>
+          </div>
+        }
+      />
+      {notice && !modalOpen && <p role="status" className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
+      {created && (
+        <Card className="border-lime-accent p-4 text-sm">
+          <p className="font-extrabold text-brand-800">Account created - share these login details now (shown once):</p>
+          <ul className="mt-2 space-y-1 font-mono text-[13px]">
+            <li>Email: <b>{created.email}</b></li>
+            <li>Password: <b>{created.password}</b></li>
+            <li>Staff ID: <b>{created.staffCode}</b></li>
+          </ul>
+        </Card>
+      )}
+
+      <Card>
+        <CardHead title="Staff directory" sub={`${total} staff - search and assign courses`} />
+        <form
+          className="flex flex-wrap gap-2 border-b border-line px-5 py-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setQuery(search);
+            setPage(1);
+          }}
+        >
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name or email..." className="min-h-11 w-full max-w-xs rounded border border-line px-3 text-sm outline-none focus:border-brand-500" />
+          <button type="submit" className="min-h-11 rounded bg-brand-900 px-4 text-sm font-bold text-white hover:bg-brand-700">Search</button>
+          {search && (
+            <button type="button" onClick={() => { setSearch(''); setQuery(''); setPage(1); }} className="min-h-11 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">
+              Reset
+            </button>
+          )}
+        </form>
+        {loading ? (
+          <div className="px-5 py-5"><LoadingSkeleton rows={5} /></div>
+        ) : error || !data ? (
+          <div className="px-5 py-5"><ErrorState message={error ?? 'No data'} onRetry={reload} /></div>
+        ) : data.length === 0 ? (
+          <div className="px-5 py-5"><EmptyState message="No staff found." /></div>
+        ) : (
+          <>
+          <TableWrap>
+            <table className={`w-full min-w-[1040px] text-left text-sm transition-opacity ${list.isFetching ? 'opacity-60' : ''}`}>
+              <thead><tr><Th>Picture</Th><Th>Staff</Th><Th>Role</Th><Th>Assigned courses</Th><Th>Status</Th><Th><span className="sr-only">Actions</span></Th></tr></thead>
+              <tbody>
+                {data.map((s) => {
+                  const courses = coursesByTeacher(s.id);
+                  return (
+                    <tr key={s.id}>
+                      <Td><StaffPicture row={s} /></Td>
+                      <Td><span className="font-bold">{s.user_name}</span><span className="block text-xs text-muted">{s.user_email}{s.teacher ? ` - ${s.teacher.staffCode}` : ''}</span></Td>
+                      <Td>
+                        <Pill tone="ink">{s.role}</Pill>
+                      </Td>
+                      <Td className="text-muted">
+                        {courses.length === 0 ? '-' : (
+                          <ul className="space-y-1">
+                            {courses.map((c) => (
+                              <li key={c.id} className="flex items-center gap-2 text-xs">
+                                <span className="font-semibold text-ink">{[c.exam?.exam_name, c.subject?.name, c.class?.name].filter(Boolean).join(' / ') || 'Assigned'}</span>
+                                <button type="button" onClick={() => removeAssignment(c.id)} aria-label="Remove assignment" title="Remove" className="font-bold text-rose-700 hover:underline">x</button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </Td>
+                      <Td><Pill tone={s.active ? 'emerald' : 'rose'}>{s.active ? 'Active' : 'Inactive'}</Pill></Td>
+                      <Td>
+                        <span className="flex flex-wrap gap-1.5">
+                          <button
+                            type="button"
+                            disabled={s.role !== 'TEACHER'}
+                            onClick={() => openAssignments(s)}
+                            aria-label={`Assign courses to ${s.user_name}`}
+                            title={s.role === 'TEACHER' ? 'Assign courses' : 'Only teacher accounts can be assigned courses'}
+                            className="inline-flex items-center gap-1 rounded border border-line px-2.5 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            <BookOpen aria-hidden="true" size={14} /> Assign
+                          </button>
+                          <button type="button" onClick={() => openEdit(s)} aria-label={`Edit ${s.user_name}`} title="Edit" className="rounded border border-line px-2.5 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700">
+                            <Pencil aria-hidden="true" size={14} />
+                          </button>
+                          <button type="button" disabled={rowBusy === s.id} onClick={() => toggleActive(s)} aria-label={s.active ? `Deactivate ${s.user_name}` : `Activate ${s.user_name}`} title={s.active ? 'Deactivate' : 'Activate'} className="rounded border border-line px-2.5 py-1.5 text-xs font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-60">
+                            {s.active ? 'Deactivate' : 'Activate'}
+                          </button>
+                          <button type="button" disabled={rowBusy === s.id} onClick={() => remove(s)} aria-label={`Delete ${s.user_name}`} title="Delete" className="rounded border border-line px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:border-rose-300 disabled:opacity-60">
+                            <Trash2 aria-hidden="true" size={14} />
+                          </button>
+                        </span>
+                      </Td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </TableWrap>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-5 py-3 text-sm">
+            <p className="text-muted">{total} staff - page {safePage} of {pageCount}</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={safePage <= 1 || list.isFetching}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="min-h-10 rounded border border-line px-4 text-sm font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-50"
+              >
+                &larr; Prev
+              </button>
+              <button
+                type="button"
+                disabled={safePage >= pageCount || list.isFetching}
+                onClick={() => setPage((p) => p + 1)}
+                className="min-h-10 rounded border border-line px-4 text-sm font-bold hover:border-brand-500 hover:text-brand-700 disabled:opacity-50"
+              >
+                Next &rarr;
+              </button>
+            </div>
+          </div>
+          </>
+        )}
+      </Card>
+
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Teacher' : 'Add Teacher'}>
+        <form onSubmit={save} className="space-y-4">
+          <label className="block text-sm font-semibold">Full name
+            <input required value={form.user_name} onChange={(e) => setForm({ ...form, user_name: e.target.value })} placeholder="e.g. Mr. Balogun" className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500" />
+          </label>
+          <label className="block text-sm font-semibold">Email (login)
+            <input
+              required={!editing}
+              disabled={!!editing}
+              type="email"
+              value={form.user_email}
+              onChange={(e) => setForm({ ...form, user_email: e.target.value })}
+              placeholder="teacher@example.com"
+              title={editing ? 'Email is fixed after creation' : undefined}
+              className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500 disabled:bg-cream disabled:text-muted"
+            />
+          </label>
+          {!editing && (
+            <>
+              <label className="block text-sm font-semibold">Password (optional - auto-generated if blank)
+                <input type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Auto-generate" className="mt-2 min-h-11 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500" />
+              </label>
+              <div className="flex items-center gap-3">
+                {form.photoUrl ? (
+                  <img src={form.photoUrl} alt="Avatar preview" className="h-11 w-11 rounded-full border border-line object-cover" />
+                ) : (
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-sm font-extrabold text-brand-700">?</span>
+                )}
+                <div>
+                  <p className="text-sm font-semibold">Avatar {form.photoUrl && <span className="text-emerald-700">set</span>}</p>
+                  <div className="mt-1">
+                    <UploadButton endpoint="avatarUploader" label="Upload avatar" onClientUploadComplete={(res) => setForm({ ...form, photoUrl: res?.[0]?.ufsUrl ?? '' })} onUploadError={(err) => setNotice(err.message)} />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+          <div className="flex items-center justify-between gap-3 rounded border border-line bg-cream px-4 py-3">
+            <div>
+              <p className="text-sm font-bold">Active account</p>
+              <p className="text-xs text-muted">Inactive teachers cannot sign in.</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.active}
+              aria-label="Active account"
+              onClick={() => setForm({ ...form, active: !form.active })}
+              className={`inline-flex h-6 w-11 shrink-0 items-center rounded-full px-1 transition-colors ${form.active ? 'bg-brand-500' : 'bg-line'}`}
+            >
+              <span className={`h-4 w-4 rounded-full bg-white transition-transform ${form.active ? 'translate-x-5' : ''}`} />
+            </button>
+          </div>
+          {notice && <p role={editing ? 'status' : 'alert'} className="border-l-2 border-lime-accent bg-brand-50 px-4 py-3 text-sm text-brand-800">{notice}</p>}
+          <div className="flex gap-3">
+            <button type="button" onClick={() => setModalOpen(false)} className="min-h-11 flex-1 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">
+              Cancel
+            </button>
+            <button type="submit" disabled={busy} className="min-h-11 flex-1 rounded bg-brand-500 px-4 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60">
+              {busy ? 'Saving...' : editing ? 'Save Changes' : 'Add Teacher'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <CourseAssignmentWizard
+        open={assignWizard.open}
+        onClose={() => setAssignWizard({ open: false, teacher: null })}
+        initialTeacher={assignWizard.teacher}
+        onAssigned={() => assignments.reload()}
+      />
+    </div>
+  );
+};
