@@ -4,14 +4,17 @@ import { router } from './routes';
 import { AuthProvider } from './context/AuthContext';
 import { queryClient } from './lib/queryClient';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
+import { ToastProvider } from './components/ui/Toast';
 
 export const App = () => {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <RouterProvider router={router} />
-        </AuthProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <RouterProvider router={router} />
+          </AuthProvider>
+        </ToastProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );

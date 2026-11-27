@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Check, Plus, UserRound, X } from 'lucide-react';
 import { avatarOf, useAuth } from '@/context/AuthContext';
 import { ROUTES } from '@/routes/paths';
@@ -44,7 +43,6 @@ export const AccountSwitcherDialog = ({
   onClose: () => void;
 }) => {
   const { user, accounts, login, switchAccount, removeAccount } = useAuth();
-  const navigate = useNavigate();
   const [view, setView] = useState<'list' | 'add'>('list');
   const [roleHint, setRoleHint] = useState<RoleHint>('STUDENT');
   const [identity, setIdentity] = useState('');
@@ -76,7 +74,9 @@ export const AccountSwitcherDialog = ({
 
   const goHome = (role: string) => {
     onClose();
-    navigate(homeForRole(role), { replace: true });
+    // Full navigation + reload so every dashboard query, layout and role
+    // guard is rebuilt from the newly active account.
+    window.location.assign(homeForRole(role));
   };
 
   const useAccount = async (accountId: string) => {

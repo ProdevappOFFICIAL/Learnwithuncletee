@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Download, FilePlus2, Menu, Printer, Save, SlidersHorizontal, Upload, UserRound, X } from 'lucide-react';
 import { ErrorState, LoadingSkeleton, PageHeader } from '@/components/dashboard/DashboardUI';
+import { useToast } from '@/components/ui/Toast';
 import { apiDownload, apiGet, apiPost, apiPut } from '@/lib/api';
 import { useAcademicSettings } from '@/lib/academic';
 import { downloadNodeAsPng } from '@/lib/studentIdCard';
@@ -51,6 +52,33 @@ interface TestResultRow {
 
 const VARIANT_ORDER = Object.keys(VARIANT_LABELS) as ReportVariant[];
 
+/**
+ * A report card is only worth saving once the user has actually entered
+ * something. Selecting a pupil and blurring empty boxes must not create a
+ * blank card (or an autosave full of null scores).
+ */
+const hasReportContent = (draft: ReportCardDraft | null) => {
+  if (!draft?.studentId) return false;
+  const hasScore = draft.subjects.some(
+    (subject) =>
+      subject.cbt1 != null ||
+      subject.cbt2 != null ||
+      subject.exam != null ||
+      subject.lastCum != null,
+  );
+  const hasText = [
+    draft.classTeacherRemark,
+    draft.principalComment,
+    draft.newsLetter,
+    draft.nextTermBegins,
+    draft.affectivePuntuality,
+    draft.affectiveRespect,
+    draft.psychomotorHandwriting,
+    draft.psychomotorRecreation,
+  ].some((value) => String(value ?? '').trim().length > 0);
+  return hasScore || hasText;
+};
+
 const isDesktopViewport = () =>
   typeof window !== 'undefined' && window.matchMedia('(min-width: 1280px)').matches;
 
@@ -90,6 +118,7 @@ const loadSources = async (
 
 export default function AdminResultGeneratorPage() {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const requestRef = useRef(0);
   const attendanceRequestRef = useRef(0);
   const editRevisionRef = useRef(0);
@@ -191,9 +220,12 @@ export default function AdminResultGeneratorPage() {
 
   useEffect(() => {
     if (!notice) return;
+    // Toast is only rendered below xl; desktop keeps the inline notice below.
+    if (notice.tone === 'error') toast.error(notice.text);
+    else toast.success(notice.text);
     const timer = window.setTimeout(() => setNotice(null), notice.tone === 'error' ? 7000 : 4000);
     return () => window.clearTimeout(timer);
-  }, [notice]);
+  }, [notice, toast]);
 
   useEffect(() => {
     if (classesQuery.isError) {
@@ -732,6 +764,17 @@ export default function AdminResultGeneratorPage() {
       if (!silent) setNotice({ text: 'Select or attach a pupil before saving.', tone: 'error' });
       return false;
     }
+    // Never persist an empty card: at least one score, remark or comment must
+    // have been entered. Autosave silently skips; a manual save explains why.
+    if (!hasReportContent(draft)) {
+      if (!silent) {
+        setNotice({
+          text: 'Fill at least one score, remark or comment before saving this result card.',
+          tone: 'error',
+        });
+      }
+      return false;
+    }
     const revision = editRevisionRef.current;
     setSaving(true);
     try {
@@ -767,6 +810,8 @@ export default function AdminResultGeneratorPage() {
   useEffect(() => {
     if (!draft?.studentId || !dirty || selectionBusy || saving) return;
     if (lastAutosaveErrorRef.current) return;
+    // Blank rows / untouched boxes are not a saveable report card.
+    if (!hasReportContent(draft)) return;
     const timer = window.setTimeout(() => {
       void saveDraftRef.current?.(true);
     }, 1200);
@@ -789,6 +834,9 @@ export default function AdminResultGeneratorPage() {
       setNotice({ text: 'Attach this card to a pupil before switching, or clear it first.', tone: 'error' });
       return false;
     }
+    // Nothing meaningful has been typed yet — allow switching without writing
+    // a blank card to the database.
+    if (!hasReportContent(draft)) return true;
     return saveDraft(true);
   };
 
@@ -1048,7 +1096,7 @@ export default function AdminResultGeneratorPage() {
       {notice && (
         <p
           role="status"
-          className={`border-l-2 px-4 py-3 text-sm print:hidden ${
+          className={`hidden border-l-2 px-4 py-3 text-sm print:hidden xl:block ${
             notice.tone === 'error'
               ? 'border-rose-400 bg-rose-50 text-rose-800'
               : 'border-lime-accent bg-brand-50 text-brand-800'

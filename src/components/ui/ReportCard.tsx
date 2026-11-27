@@ -1,5 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
+import { LoaderCircle, Redo2, Sparkles, Undo2 } from "lucide-react";
 import { gradeBandFor, type GradingScale } from "@/lib/academic";
+import { apiPost } from "@/lib/api";
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                     */
@@ -175,6 +177,13 @@ const td = "border border-black px-[7px] align-middle";
 
 const DEFAULT_GRADING: GradingScale = { a: 75, b: 65, c: 55, d: 45, f: 0 };
 
+/** Long-form comment boxes that offer the AI grammar chip. */
+const AI_CORRECT_FIELDS = new Set([
+    "classTeacherRemark",
+    "principalComment",
+    "newsLetter",
+]);
+
 const fmt = (v?: number) => (v === undefined || Number.isNaN(v) ? "" : String(v));
 
 const fmtDash = (v?: number) => (v === undefined || v === null || Number.isNaN(v) ? "—" : String(v));
@@ -296,6 +305,12 @@ export default function ReportCard({
         multiline: boolean;
         numeric: boolean;
         max?: number;
+        /** AI grammar correction is only offered on long-form remarks. */
+        aiBusy?: boolean;
+        aiError?: string | null;
+        aiMessage?: string | null;
+        aiHistory?: string[];
+        aiIndex?: number;
     };
     const [inline, setInline] = useState<InlineEdit | null>(null);
 
@@ -376,6 +391,150 @@ export default function ReportCard({
         setInline(null);
         onFieldCommit?.(current.field, valueOverride ?? current.value);
     };
+
+    const isAiField = (field?: string) => Boolean(field && AI_CORRECT_FIELDS.has(field));
+
+    /** Move back/forward through AI correction versions without closing the cell. */
+    const applyAiHistory = (nextIndex: number) => {
+        setInline((previous) => {
+            if (!previous?.aiHistory?.length) return previous;
+            const clamped = Math.max(0, Math.min(nextIndex, previous.aiHistory.length - 1));
+            const nextValue = previous.aiHistory[clamped];
+            if (nextValue === undefined) return previous;
+            return {
+                ...previous,
+                value: nextValue,
+                aiIndex: clamped,
+                aiError: null,
+                aiMessage: null,
+            };
+        });
+    };
+
+    const runAiCorrection = async () => {
+        if (!inline || !isAiField(inline.field)) return;
+        const text = inline.value.trim();
+        if (!text) {
+            setInline((previous) =>
+                previous
+                    ? {
+                          ...previous,
+                          aiBusy: false,
+                          aiError: "Write the remark first, then let AI correct it.",
+                          aiMessage: null,
+                      }
+                    : previous,
+            );
+            return;
+        }
+        const correctedField = inline.field;
+        const before = inline.value;
+        setInline((previous) =>
+            previous
+                ? { ...previous, aiBusy: true, aiError: null, aiMessage: null }
+                : previous,
+        );
+        try {
+            const response = await apiPost<{ corrected: string }>("/ai/agent/correct-text", {
+                text: before,
+            });
+            const corrected = String(response.data?.corrected ?? "").trim();
+            if (!corrected) throw new Error("The AI did not return corrected text.");
+            setInline((previous) => {
+                if (!previous || previous.field !== correctedField) return previous;
+                if (corrected === previous.value.trim()) {
+                    return {
+                        ...previous,
+                        aiBusy: false,
+                        aiError: null,
+                        aiMessage: "No grammar changes were needed.",
+                    };
+                }
+                const history = previous.aiHistory ?? [before];
+                const index = previous.aiIndex ?? 0;
+                const base = history.slice(0, index + 1);
+                // Manual edits after a correction start a new branch, so undo
+                // returns to the text the editor was actually looking at.
+                if (base[base.length - 1] !== previous.value) base.push(previous.value);
+                const nextHistory = [...base, corrected];
+                return {
+                    ...previous,
+                    value: corrected,
+                    aiBusy: false,
+                    aiError: null,
+                    aiMessage: "Corrected. Use Undo/Redo, then click outside to save.",
+                    aiHistory: nextHistory,
+                    aiIndex: nextHistory.length - 1,
+                };
+            });
+        } catch (error: any) {
+            setInline((previous) =>
+                previous
+                    ? {
+                          ...previous,
+                          aiBusy: false,
+                          aiError: error?.message ?? "AI correction failed. Try again.",
+                      }
+                    : previous,
+            );
+        }
+    };
+
+    const aiToolbar = inline && isAiField(inline.field) ? (
+        <div
+            className="absolute z-40 flex max-w-[310px] flex-wrap items-center gap-1 rounded-md border border-brand-400 bg-white/95 px-1.5 py-1 shadow-lg ring-1 ring-brand-100 print:hidden"
+            style={{
+                left: Math.max(4, Math.min(inline.left + inline.width - 310, 794 - 310)),
+                top: Math.max(2, inline.top - 42),
+            }}
+            onMouseDown={(event) => event.preventDefault()}
+        >
+            <span className="inline-flex items-center gap-1 rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-brand-800">
+                <Sparkles size={11} aria-hidden="true" /> AI
+            </span>
+            <button
+                type="button"
+                onClick={() => void runAiCorrection()}
+                disabled={Boolean(inline.aiBusy)}
+                title="Correct spelling and grammar with AI"
+                className="inline-flex min-h-7 items-center gap-1 rounded border border-brand-300 bg-brand-50 px-2 text-[10px] font-bold text-brand-800 hover:border-brand-500 hover:bg-brand-100 disabled:opacity-60"
+            >
+                {inline.aiBusy ? (
+                    <LoaderCircle size={11} className="animate-spin" aria-hidden="true" />
+                ) : (
+                    <Sparkles size={11} aria-hidden="true" />
+                )}
+                {inline.aiBusy ? "Correcting…" : "AI auto correct"}
+            </button>
+            <button
+                type="button"
+                onClick={() => applyAiHistory((inline.aiIndex ?? 0) - 1)}
+                disabled={!inline.aiHistory?.length || (inline.aiIndex ?? 0) <= 0}
+                title="Undo AI correction"
+                className="inline-flex min-h-7 items-center gap-1 rounded border border-line bg-white px-2 text-[10px] font-bold text-brand-800 hover:border-brand-400 disabled:opacity-40"
+            >
+                <Undo2 size={11} aria-hidden="true" /> Undo
+            </button>
+            <button
+                type="button"
+                onClick={() => applyAiHistory((inline.aiIndex ?? 0) + 1)}
+                disabled={
+                    !inline.aiHistory?.length ||
+                    (inline.aiIndex ?? 0) >= inline.aiHistory.length - 1
+                }
+                title="Redo AI correction"
+                className="inline-flex min-h-7 items-center gap-1 rounded border border-line bg-white px-2 text-[10px] font-bold text-brand-800 hover:border-brand-400 disabled:opacity-40"
+            >
+                <Redo2 size={11} aria-hidden="true" /> Redo
+            </button>
+            {inline.aiError && (
+                <span className="w-full text-[10px] font-semibold text-rose-700">{inline.aiError}</span>
+            )}
+            {inline.aiMessage && !inline.aiError && (
+                <span className="w-full text-[10px] font-semibold text-emerald-700">{inline.aiMessage}</span>
+            )}
+        </div>
+    ) : null;
 
     /** Click-to-edit affordance only; all printed dimensions stay untouched. */
     const cellProps = (field: string) => {
@@ -760,8 +919,9 @@ export default function ReportCard({
                     <textarea
                         autoFocus
                         value={inline.value}
+                        readOnly={Boolean(inline.aiBusy)}
                         aria-label={`Edit ${inline.field.replace(/\./g, " ")}`}
-                        onChange={(event) => setInline({ ...inline, value: event.target.value })}
+                        onChange={(event) => setInline({ ...inline, value: event.target.value, aiMessage: null })}
                         onFocus={(event) => event.currentTarget.select()}
                         onBlur={() => {
                             if (cancelInlineRef.current) {
@@ -787,7 +947,9 @@ export default function ReportCard({
                             width: inline.width,
                             height: inline.height,
                         }}
-                        className="absolute z-30 resize-none overflow-auto border-2 border-brand-500 bg-white px-1 py-0.5 text-[12px] leading-[15px] text-black shadow-lg outline-none print:hidden"
+                        className={`absolute z-30 resize-none overflow-auto border-2 ${
+                            isAiField(inline.field) ? "border-brand-400 ring-2 ring-brand-100" : "border-brand-500"
+                        } bg-white px-1 py-0.5 text-[12px] leading-[15px] text-black shadow-lg outline-none print:hidden`}
                     />
                 ) : (
                     <input
@@ -827,6 +989,7 @@ export default function ReportCard({
                         className="absolute z-30 border-2 border-brand-500 bg-white px-1 text-[12px] font-semibold text-black shadow-lg outline-none print:hidden"
                     />
                 ))}
+            {aiToolbar}
         </div>
     );
 }

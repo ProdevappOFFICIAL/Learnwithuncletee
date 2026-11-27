@@ -13,6 +13,7 @@ import {
   LoadingSkeleton,
   Pill,
 } from '@/components/dashboard/DashboardUI';
+import { useToast } from '@/components/ui/Toast';
 import { useResource } from '@/context/AuthContext';
 import { apiGet, apiPost } from '@/lib/api';
 import { useAcademicSettings } from '@/lib/academic';
@@ -194,6 +195,7 @@ const buildRowAccess = (
 };
 
 export const TeacherResultsNotificationPage = () => {
+  const toast = useToast();
   const academic = useAcademicSettings();
   const session = academic.data?.data.session ?? '';
   const term = academic.data?.data.term ?? '';
@@ -226,9 +228,12 @@ export const TeacherResultsNotificationPage = () => {
 
   useEffect(() => {
     if (!notice) return;
+    // Toast on phones/tablets; the inline notice below stays for xl screens.
+    if (notice.tone === 'error') toast.error(notice.text);
+    else toast.success(notice.text);
     const timer = window.setTimeout(() => setNotice(null), notice.tone === 'error' ? 6000 : 3500);
     return () => window.clearTimeout(timer);
-  }, [notice]);
+  }, [notice, toast]);
 
   const context = contextRes.data;
   const pupils = context?.pupils ?? [];
@@ -494,6 +499,17 @@ export const TeacherResultsNotificationPage = () => {
         if (parsed !== null && !Number.isFinite(parsed)) return;
         const score = parsed === null ? null : Math.max(0, Math.min(max, parsed));
         const row = draft.subjects[index];
+        const previousScore = row?.[part] ?? null;
+        // An empty, never-filled box is not a score. Only save a clear when a
+        // value already exists (the teacher deliberately emptied that cell).
+        if (raw === '' && previousScore == null) {
+          setNotice({
+            text: 'Enter a score before saving. Type 0 if the pupil scored zero.',
+            tone: 'error',
+          });
+          return;
+        }
+        if (score === previousScore) return;
         await apiPost<GeneratedReportCard>('/report-cards/teacher/cell', {
           studentId: draft.studentId,
           session: draft.session,
@@ -522,6 +538,12 @@ export const TeacherResultsNotificationPage = () => {
         );
       } else if (teacherTextFieldPatch(field, value)) {
         const patch = teacherTextFieldPatch(field, value)!;
+        const [patchKey, patchValue] = Object.entries(patch)[0] ?? [];
+        const currentValue = patchKey ? (draft as Record<string, any>)[patchKey] : undefined;
+        // Blurring an empty text box should not create or overwrite a blank
+        // value; an existing remark can still be cleared deliberately.
+        if (!value.trim() && !String(currentValue ?? '').trim()) return;
+        if (String(currentValue ?? '') === String(patchValue ?? '')) return;
         await apiPost<GeneratedReportCard>('/report-cards/teacher/cell', {
           studentId: draft.studentId,
           session: draft.session,
@@ -662,7 +684,7 @@ export const TeacherResultsNotificationPage = () => {
       {notice && (
         <p
           role="status"
-          className={`border-l-2 px-4 py-3 text-sm ${
+          className={`hidden border-l-2 px-4 py-3 text-sm xl:block ${
             notice.tone === 'error'
               ? 'border-rose-400 bg-rose-50 text-rose-800'
               : 'border-lime-accent bg-brand-50 text-brand-800'
