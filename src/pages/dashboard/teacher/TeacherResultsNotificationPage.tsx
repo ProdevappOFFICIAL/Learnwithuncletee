@@ -157,8 +157,17 @@ const buildRowAccess = (
   subjects: ReportCardDraft['subjects'],
   assignments: TeacherAssignment[],
   aliases: SubjectAliasMap,
-): RowAccess[] =>
-  subjects.map((row) => {
+  classId: string | null,
+): RowAccess[] => {
+  // A teacher is assigned to a subject *within a class*. Two classes can have
+  // same-named subjects with different IDs (e.g. BIO1 in SS1 and BIO2 in SS2),
+  // so only this pupil's class assignments may grant access here. Otherwise a
+  // row can resolve to another class's subject ID and the server rejects the
+  // save even though the teacher was assigned to the subject.
+  const classAssignments = classId
+    ? assignments.filter((assignment) => assignment.classId === classId)
+    : [];
+  return subjects.map((row) => {
     const access: RowAccess = {
       cbt1: null,
       cbt2: null,
@@ -166,7 +175,7 @@ const buildRowAccess = (
       rowSubjectId: row.sourceSubjectId ?? null,
       rowSubjectName: row.sourceSubjectName ?? null,
     };
-    for (const assignment of assignments) {
+    for (const assignment of classAssignments) {
       // Match the printed template row, not a saved card's source field. An
       // older card can carry a stale/wrong sourceSubjectId; that must never
       // grant a teacher access to a different subject row.
@@ -182,6 +191,7 @@ const buildRowAccess = (
     }
     return access;
   });
+};
 
 export const TeacherResultsNotificationPage = () => {
   const academic = useAcademicSettings();
@@ -279,8 +289,16 @@ export const TeacherResultsNotificationPage = () => {
     taskPupils.filter((pupil) => pupilClassId(pupil) === classId).length;
 
   const rowAccess = useMemo(
-    () => (draft ? buildRowAccess(draft.subjects, context?.assignments ?? [], aliases) : []),
-    [draft, context?.assignments, aliases],
+    () =>
+      draft
+        ? buildRowAccess(
+            draft.subjects,
+            context?.assignments ?? [],
+            aliases,
+            pupilClassId(selectedPupil),
+          )
+        : [],
+    [draft, context?.assignments, aliases, selectedPupil],
   );
 
   const canEditClassTeacherRemark = useMemo(() => {

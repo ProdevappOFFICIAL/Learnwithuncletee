@@ -1,0 +1,5 @@
+allowBuilds:
+  '@swc/core': false
+  '@tailwindcss/oxide': false
+  esbuild: false
+  msgpackr-extract: false

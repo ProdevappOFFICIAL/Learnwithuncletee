@@ -20,6 +20,10 @@ import {
   type StaffRow,
   type SubjectItem,
 } from '@/data/dashboard';
+import {
+  subjectMatches,
+  type SubjectAliasMap,
+} from '@/pages/dashboard/admin/result-generator/helpers';
 
 interface ScoreAssignmentItem {
   id: string;
@@ -70,6 +74,32 @@ const isExaminationExam = (name: string) => /examination/i.test(name);
 const subjectIdsFor = (setup: ClassSetup, selected: Record<string, string[]>) =>
   selected[setup.classId] ?? [];
 
+/**
+ * Find the same subject in another class. Classes usually store their own
+ * copies (ENG1/ENG2/ENG3), so compare through the saved Subject Mapper instead
+ * of requiring identical names.
+ */
+const matchingSubject = (
+  subject: SubjectItem,
+  candidates: SubjectItem[],
+  aliases: SubjectAliasMap,
+): SubjectItem | null => {
+  const name = subject.name.trim().toLowerCase();
+  const code = subject.code?.trim().toLowerCase() ?? '';
+  let best: { subject: SubjectItem; rank: number } | null = null;
+  for (const candidate of candidates) {
+    if (candidate.id === subject.id) continue;
+    const score = subjectMatches([subject.name], candidate.name, aliases);
+    if (score < 90) continue;
+    const rank =
+      score +
+      (candidate.name.trim().toLowerCase() === name ? 10 : 0) +
+      (code && candidate.code?.trim().toLowerCase() === code ? 5 : 0);
+    if (!best || rank > best.rank) best = { subject: candidate, rank };
+  }
+  return best?.subject ?? null;
+};
+
 export const AdminResultsNotificationPage = () => {
   const [teacherId, setTeacherId] = useState('');
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
@@ -96,6 +126,7 @@ export const AdminResultsNotificationPage = () => {
     session: effectiveVisibilitySession || undefined,
     term: effectiveVisibilityTerm || undefined,
   });
+  const aliasesRes = useResource<SubjectAliasMap>('/settings/subject-aliases');
 
   useEffect(() => {
     setDisabled(Boolean(visibilityRes.data?.disabled));
@@ -144,6 +175,7 @@ export const AdminResultsNotificationPage = () => {
   );
   const classes = classesRes.data ?? [];
   const assignments = assignmentsRes.data ?? [];
+  const aliases = aliasesRes.data ?? {};
 
   const classSetupQuery = useQuery({
     queryKey: ['results-notification-class-setup', selectedClassIds],
@@ -227,16 +259,33 @@ export const AdminResultsNotificationPage = () => {
     }
   };
 
-  const toggleSubject = (setup: ClassSetup, subjectId: string) => {
+  const toggleSubject = (setup: ClassSetup, subject: SubjectItem) => {
     if (!setup.exam) return;
     setSelectedSubjects((previous) => {
       const current = previous[setup.classId] ?? [];
-      return {
+      if (current.includes(subject.id)) {
+        // Untick only this class: after a bulk selection the admin may want to
+        // keep the subject in other classes but remove it from this one.
+        return {
+          ...previous,
+          [setup.classId]: current.filter((id) => id !== subject.id),
+        };
+      }
+
+      const next: Record<string, string[]> = {
         ...previous,
-        [setup.classId]: current.includes(subjectId)
-          ? current.filter((id) => id !== subjectId)
-          : [...current, subjectId],
+        [setup.classId]: [...current, subject.id],
       };
+      // Selecting a subject in one class also selects the same subject in
+      // every other selected class, so it does not have to be ticked again.
+      for (const other of classSetups) {
+        if (other.classId === setup.classId || !other.exam) continue;
+        const match = matchingSubject(subject, other.subjects, aliases);
+        if (!match) continue;
+        const selected = next[other.classId] ?? [];
+        if (!selected.includes(match.id)) next[other.classId] = [...selected, match.id];
+      }
+      return next;
     });
   };
 
@@ -455,7 +504,7 @@ export const AdminResultsNotificationPage = () => {
       <Card>
         <CardHead
           title="Assign classes and subjects"
-          sub="Tick every class, then choose the subjects for each class. The Examination exam is filled automatically."
+          sub="Tick every class, then choose the subjects for each class. Selecting a subject in one class also ticks the same subject in the other selected classes. The Examination exam is filled automatically."
         />
         <form onSubmit={addAssignments} className="space-y-4 px-5 py-5">
           <label className="block max-w-xl text-sm font-semibold">
@@ -577,7 +626,7 @@ export const AdminResultsNotificationPage = () => {
                                     <input
                                       type="checkbox"
                                       checked={current.includes(subject.id)}
-                                      onChange={() => toggleSubject(setup, subject.id)}
+                                      onChange={() => toggleSubject(setup, subject)}
                                       className="h-4 w-4 accent-brand-500"
                                     />
                                     <span className="min-w-0 truncate">{subject.name}</span>
