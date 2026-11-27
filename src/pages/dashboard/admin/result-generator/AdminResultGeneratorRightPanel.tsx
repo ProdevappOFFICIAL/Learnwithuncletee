@@ -11,6 +11,7 @@ import {
   Wand2,
 } from 'lucide-react';
 import { SearchSelect, type SearchOption } from '@/components/dashboard/SearchSelect';
+import { AiGrammarChip } from '@/components/ui/AiGrammarChip';
 import {
   clampNumber,
   cTotalOf,
@@ -81,6 +82,9 @@ const TEXT_FIELDS: Record<
 };
 
 const traitOptions = ['Excellent', 'Very good', 'Good', 'Fair', 'Poor'];
+
+/** Fields that get the green AI grammar chip. */
+const AI_GRAMMAR_FIELDS = new Set(['classTeacherRemark', 'principalComment', 'newsLetter']);
 
 const readFieldValue = (draft: ReportCardDraft, field: keyof typeof TEXT_FIELDS) => {
   switch (field) {
@@ -319,7 +323,16 @@ export const AdminResultGeneratorRightPanel = ({
           </section>
         ) : textField ? (
           <section className="space-y-3 border-t border-line pt-4">
-            <p className="text-sm font-bold text-ink">{TEXT_FIELDS[textField].label}</p>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <p className="text-sm font-bold text-ink">{TEXT_FIELDS[textField].label}</p>
+              {AI_GRAMMAR_FIELDS.has(textField) && (
+                <AiGrammarChip
+                  value={readFieldValue(draft, textField)}
+                  onChange={(next) => onPatchDraft({ [textField]: next })}
+                  className="max-w-full"
+                />
+              )}
+            </div>
             {TEXT_FIELDS[textField].hint && (
               <p className="text-xs leading-5 text-muted">{TEXT_FIELDS[textField].hint}</p>
             )}
