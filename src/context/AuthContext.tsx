@@ -202,6 +202,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Stored refresh token keeps silent refresh working even where the
     // HttpOnly cookie is blocked (plain-http dev, 3P-cookie blocking).
     if (data.refreshToken) refreshTokenStore.set(data.refreshToken, persistent);
+    // Register the new identity before any /dashboard/me fallback so that
+    // request cannot be mistaken for the previously active account.
+    if (data.user?.id) {
+      accountStore.remember({
+        user: data.user as SessionUser,
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken ?? refreshTokenStore.get(),
+        persistent,
+      });
+    }
     // The login response already carries the role profile + permissions, so
     // seed the session cache without a second round trip. Fall back to
     // /dashboard/me for older servers that omit the permission list.

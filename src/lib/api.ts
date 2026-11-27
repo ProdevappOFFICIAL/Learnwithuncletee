@@ -159,10 +159,22 @@ export class ApiError extends Error {
 }
 
 /** Single-flight refresh: concurrent 401s share one refresh call. */
-let refreshPromise: Promise<{ accessToken: string; refreshToken?: string }> | null = null;
+let refreshPromise: Promise<{
+  accessToken: string;
+  refreshToken?: string;
+  accountId: string | null;
+}> | null = null;
 
-async function refreshAccessToken(): Promise<{ accessToken: string; refreshToken?: string }> {
+async function refreshAccessToken(): Promise<{
+  accessToken: string;
+  refreshToken?: string;
+  accountId: string | null;
+}> {
   if (!refreshPromise) {
+    // Pin the refresh to the account that is active when the request starts.
+    // If the user switches accounts while it is in flight, the response must
+    // never be written into the newly active account's token slot.
+    const accountId = accountStore.activeId();
     // The refresh token travels in the HttpOnly cookie (credentials:include);
     // the stored token is also sent in the body as a fallback for contexts
     // where the cookie is blocked or another account owns the cookie.
@@ -201,6 +213,7 @@ async function refreshAccessToken(): Promise<{ accessToken: string; refreshToken
         accessToken: payload.data.accessToken as string,
         refreshToken:
           typeof payload.data.refreshToken === 'string' ? payload.data.refreshToken : undefined,
+        accountId,
       };
     })().finally(() => {
       refreshPromise = null;
@@ -217,12 +230,16 @@ async function refreshAccessToken(): Promise<{ accessToken: string; refreshToken
 async function refreshSession(): Promise<string> {
   try {
     const tokens = await refreshAccessToken();
+    const activeId = accountStore.activeId();
+    if (tokens.accountId && tokens.accountId !== activeId) {
+      throw new ApiError(409, 'The active account changed. Please try again.');
+    }
     const persistent = tokenStore.isPersistent();
     tokenStore.set(tokens.accessToken, persistent);
     if (tokens.refreshToken) refreshTokenStore.set(tokens.refreshToken, persistent);
-    const activeId = accountStore.activeId();
-    if (activeId) {
-      accountStore.setTokens(activeId, {
+    const ownerId = tokens.accountId ?? activeId;
+    if (ownerId) {
+      accountStore.setTokens(ownerId, {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
         persistent,
