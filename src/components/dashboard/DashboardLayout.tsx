@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LogOut, Menu, Search, Sparkles, X } from 'lucide-react';
+import { Bell, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LogOut, Menu, Search, Sparkles, X, ArrowLeftRight } from 'lucide-react';
 import { ROUTES } from '@/routes/paths';
 import { memberNav, roleMeta, type DashboardNavItem, type DashboardRole } from '@/data/dashboard';
 import { siteInfo } from '@/data/content';
@@ -9,6 +9,7 @@ import { avatarOf, useAuth } from '@/context/AuthContext';
 import { apiGet } from '@/lib/api';
 import { NotificationDrawer, readSeen, type FeedItem } from './NotificationDrawer';
 import { AccountDialog } from './AccountDialog';
+import { AccountSwitcherDialog } from './AccountSwitcherDialog';
 import { AiChatDrawer, type AiChatMode } from './ai/AiChatDrawer';
 
 interface Props {
@@ -41,6 +42,12 @@ const initialsOf = (name: string) =>
     .join('')
     .toUpperCase() || 'LW';
 
+const homeForRole = (role: string) => {
+  if (role === 'STUDENT' || role === 'PARENT') return ROUTES.studentDashboard;
+  if (role === 'TEACHER') return ROUTES.teacherDashboard;
+  return ROUTES.adminDashboard;
+};
+
 const cx = (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(' ');
 
 // Sidebar row styling: flat rounded rows, muted by default, soft grey fill
@@ -56,7 +63,7 @@ export const DashboardLayout = ({ role, nav }: Props) => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, can, logout } = useAuth();
+  const { user, can, logout, accounts } = useAuth();
   const statusQuery = useQuery({
     queryKey: ['my-statuses'],
     queryFn: async () => (await apiGet<MyStatusSummary>('/statuses/me')).data,
@@ -317,6 +324,7 @@ export const DashboardLayout = ({ role, nav }: Props) => {
 
   const [notifOpen, setNotifOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const [aiMode, setAiMode] = useState<AiChatMode>(() => {
     try {
@@ -354,17 +362,26 @@ export const DashboardLayout = ({ role, nav }: Props) => {
   };
   const openAccount = () => {
     setAiMode('closed');
+    setSwitcherOpen(false);
     setAccountOpen(true);
+  };
+  const openSwitcher = () => {
+    setAiMode('closed');
+    setNotifOpen(false);
+    setAccountOpen(false);
+    setSwitcherOpen(true);
   };
   const openAi = () => {
     setNotifOpen(false);
     setAccountOpen(false);
+    setSwitcherOpen(false);
     setAiMode('drawer');
   };
   const changeAiMode = (next: AiChatMode) => {
     if (next !== 'closed') {
       setNotifOpen(false);
       setAccountOpen(false);
+      setSwitcherOpen(false);
     }
     setAiMode(next);
   };
@@ -383,9 +400,10 @@ export const DashboardLayout = ({ role, nav }: Props) => {
 
   const handleLogout = async () => {
     try {
-      await logout();
-    } finally {
+      const next = await logout();
       // `replace` keeps the back button from returning to the old dashboard.
+      navigate(next ? homeForRole(next.role) : ROUTES.login, { replace: true });
+    } catch {
       navigate(ROUTES.login, { replace: true });
     }
   };
@@ -474,6 +492,27 @@ export const DashboardLayout = ({ role, nav }: Props) => {
             </span>
           )}
         </button>
+
+        {user && (
+          <button
+            type="button"
+            onClick={openSwitcher}
+            title={isCollapsed ? 'Switch account' : undefined}
+            className={cx(rowBase, rowIdle, isCollapsed && 'justify-center px-0')}
+          >
+            <ArrowLeftRight size={18} strokeWidth={1.75} aria-hidden="true" className="shrink-0" />
+            {!isCollapsed && (
+              <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                <span className="truncate">Switch account</span>
+                {accounts.length > 1 && (
+                  <span className="rounded-full bg-white/15 px-1.5 py-0.5 text-[10px] font-bold text-white/80">
+                    {accounts.length}
+                  </span>
+                )}
+              </span>
+            )}
+          </button>
+        )}
 
         {user ? (
           <button
@@ -629,6 +668,7 @@ export const DashboardLayout = ({ role, nav }: Props) => {
           otherwise trap `fixed` positioning inside the 68px header. */}
       <NotificationDrawer open={notifOpen} onClose={closeNotif} />
       <AccountDialog open={accountOpen} onClose={() => setAccountOpen(false)} />
+      <AccountSwitcherDialog open={switcherOpen} onClose={() => setSwitcherOpen(false)} />
       <AiChatDrawer mode={aiMode} onModeChange={changeAiMode} onClose={() => setAiMode('closed')} />
     </div>
   );

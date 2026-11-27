@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Eye, EyeOff, Plus, Trash2, UserCheck } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Plus, UserCheck } from 'lucide-react';
 import {
   Card,
   CardHead,
@@ -11,7 +11,7 @@ import {
   Pill,
 } from '@/components/dashboard/DashboardUI';
 import { useResource } from '@/context/AuthContext';
-import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api';
+import { apiGet, apiPost, apiPut } from '@/lib/api';
 import { ACADEMIC_TERMS, useAcademicSettings } from '@/lib/academic';
 import {
   sessionOptions,
@@ -24,6 +24,10 @@ import {
   subjectMatches,
   type SubjectAliasMap,
 } from '@/pages/dashboard/admin/result-generator/helpers';
+import {
+  TeacherAssignmentDialog,
+  type TeacherAssignmentRow,
+} from './results-notification/TeacherAssignmentDialog';
 
 interface ScoreAssignmentItem {
   id: string;
@@ -39,12 +43,12 @@ interface ScoreAssignmentItem {
   createdAt: string;
 }
 
-interface AssignmentGroup {
-  key: string;
+interface TeacherAssignmentGroup {
+  teacherId: string;
   teacher: ScoreAssignmentItem['teacher'];
-  class: ScoreAssignmentItem['class'];
-  exam: ScoreAssignmentItem['exam'];
   rows: ScoreAssignmentItem[];
+  classNames: string[];
+  subjectNames: string[];
 }
 
 interface ClassSetup {
@@ -105,6 +109,7 @@ export const AdminResultsNotificationPage = () => {
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
   const [selectedSubjects, setSelectedSubjects] = useState<Record<string, string[]>>({});
   const [filterClassId, setFilterClassId] = useState('');
+  const [editingTeacherId, setEditingTeacherId] = useState('');
   const [visibilitySession, setVisibilitySession] = useState('');
   const [visibilityTerm, setVisibilityTerm] = useState('');
   const [disabled, setDisabled] = useState(false);
@@ -119,9 +124,7 @@ export const AdminResultsNotificationPage = () => {
 
   const teachersRes = useResource<StaffRow[]>('/staff', { limit: 200 });
   const classesRes = useResource<ClassItem[]>('/classes', { limit: 200 });
-  const assignmentsRes = useResource<ScoreAssignmentItem[]>('/report-cards/score-assignments', {
-    classId: filterClassId || undefined,
-  });
+  const assignmentsRes = useResource<ScoreAssignmentItem[]>('/report-cards/score-assignments');
   const visibilityRes = useResource<ResultNotificationSetting>('/settings/result-notification', {
     session: effectiveVisibilitySession || undefined,
     term: effectiveVisibilityTerm || undefined,
@@ -173,8 +176,8 @@ export const AdminResultsNotificationPage = () => {
     () => (teachersRes.data ?? []).filter((row) => row.role === 'TEACHER'),
     [teachersRes.data],
   );
-  const classes = classesRes.data ?? [];
-  const assignments = assignmentsRes.data ?? [];
+  const classes = useMemo(() => classesRes.data ?? [], [classesRes.data]);
+  const assignments = useMemo(() => assignmentsRes.data ?? [], [assignmentsRes.data]);
   const aliases = aliasesRes.data ?? {};
 
   const classSetupQuery = useQuery({
@@ -207,28 +210,56 @@ export const AdminResultsNotificationPage = () => {
     [assignments],
   );
 
-  const groups = useMemo<AssignmentGroup[]>(() => {
-    const map = new Map<string, AssignmentGroup>();
-    for (const row of examinationAssignments) {
-      const key = `${row.teacherId}:${row.classId}:${row.examId}`;
-      const existing =
-        map.get(key) ??
-        {
-          key,
+  const teacherGroups = useMemo<TeacherAssignmentGroup[]>(() => {
+    const rows = filterClassId
+      ? examinationAssignments.filter((row) => row.classId === filterClassId)
+      : examinationAssignments;
+    const map = new Map<string, TeacherAssignmentGroup>();
+    for (const row of rows) {
+      let group = map.get(row.teacherId);
+      if (!group) {
+        group = {
+          teacherId: row.teacherId,
           teacher: row.teacher,
-          class: row.class,
-          exam: row.exam,
           rows: [],
+          classNames: [],
+          subjectNames: [],
         };
-      existing.rows.push(row);
-      map.set(key, existing);
+        map.set(row.teacherId, group);
+      }
+      group.rows.push(row);
+      if (!group.classNames.includes(row.class.name)) group.classNames.push(row.class.name);
+      if (!group.subjectNames.includes(row.subject.name)) group.subjectNames.push(row.subject.name);
     }
-    return [...map.values()].sort(
-      (a, b) =>
-        a.class.name.localeCompare(b.class.name) ||
-        a.teacher.user_name.localeCompare(b.teacher.user_name),
-    );
-  }, [examinationAssignments]);
+    return [...map.values()]
+      .map((group) => ({
+        ...group,
+        classNames: [...group.classNames].sort((a, b) =>
+          a.localeCompare(b, undefined, { numeric: true }),
+        ),
+        subjectNames: [...group.subjectNames].sort((a, b) => a.localeCompare(b)),
+      }))
+      .sort((a, b) => a.teacher.user_name.localeCompare(b.teacher.user_name));
+  }, [examinationAssignments, filterClassId]);
+
+  const editingTeacher = useMemo(() => {
+    if (!editingTeacherId) return null;
+    const row = examinationAssignments.find((item) => item.teacherId === editingTeacherId);
+    return row?.teacher ?? null;
+  }, [editingTeacherId, examinationAssignments]);
+
+  const editingAssignments = useMemo<TeacherAssignmentRow[]>(
+    () =>
+      editingTeacherId
+        ? examinationAssignments.filter((row) => row.teacherId === editingTeacherId)
+        : [],
+    [editingTeacherId, examinationAssignments],
+  );
+
+  const handleAssignmentsSaved = (message: string) => {
+    setNotice({ text: message, tone: 'ok' });
+    assignmentsRes.reload();
+  };
 
   const selectedSubjectCount = classSetups.reduce(
     (sum, setup) => sum + subjectIdsFor(setup, selectedSubjects).length,
@@ -358,23 +389,6 @@ export const AdminResultsNotificationPage = () => {
       setNotice({ text: error?.message ?? 'Could not save the assignments.', tone: 'error' });
     } finally {
       setBusy(false);
-    }
-  };
-
-  const removeAssignment = async (row: ScoreAssignmentItem) => {
-    if (
-      !window.confirm(
-        `Remove ${row.teacher.user_name}'s access to ${row.subject.name} on ${row.exam.exam_name}?`,
-      )
-    ) {
-      return;
-    }
-    try {
-      await apiDelete(`/report-cards/score-assignments/${row.id}`);
-      assignmentsRes.reload();
-      setNotice({ text: 'Subject assignment removed.', tone: 'ok' });
-    } catch (error: any) {
-      setNotice({ text: error?.message ?? 'Could not remove the assignment.', tone: 'error' });
     }
   };
 
@@ -663,7 +677,7 @@ export const AdminResultsNotificationPage = () => {
       <Card>
         <CardHead
           title="Teacher Examination assignments"
-          sub={`${examinationAssignments.length} subject assignment(s) · class-teacher remarks and principal comments stay controlled by Statuses`}
+          sub={`${teacherGroups.length} teacher(s) · ${examinationAssignments.length} subject assignment(s) · open a teacher to edit or remove their assignments`}
           link={{ to: '/dashboard/admin/teachers/statuses', label: 'Manage statuses' }}
         />
         <div className="flex flex-wrap items-end gap-3 border-b border-line px-5 py-4">
@@ -697,14 +711,20 @@ export const AdminResultsNotificationPage = () => {
           <div className="px-5 py-5">
             <ErrorState message={assignmentsRes.error} onRetry={assignmentsRes.reload} />
           </div>
-        ) : groups.length === 0 ? (
+        ) : teacherGroups.length === 0 ? (
           <div className="px-5 py-5">
-            <EmptyState message="No Examination subject assignments yet. Add the first one above." />
+            <EmptyState
+              message={
+                filterClassId
+                  ? 'No teacher is assigned to a subject in this class yet.'
+                  : 'No Examination subject assignments yet. Add the first one above.'
+              }
+            />
           </div>
         ) : (
           <ul className="divide-y divide-line">
-            {groups.map((group) => (
-              <li key={group.key} className="px-5 py-4">
+            {teacherGroups.map((group) => (
+              <li key={group.teacherId} className="px-5 py-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-3">
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-brand-50 text-brand-700">
@@ -712,28 +732,34 @@ export const AdminResultsNotificationPage = () => {
                     </span>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold">{group.teacher.user_name}</p>
-                      <p className="text-xs text-muted">
-                        {group.class.name} · {group.exam.exam_name}
+                      <p className="truncate text-xs text-muted">{group.teacher.user_email}</p>
+                      <p className="mt-0.5 text-[11px] font-semibold text-brand-700">
+                        {group.classNames.join(' · ')}
                       </p>
                     </div>
                   </div>
-                  <Pill tone="violet">Examination</Pill>
+                  <div className="flex flex-col items-end gap-2">
+                    <Pill tone="violet">Examination</Pill>
+                    <p className="text-xs text-muted">
+                      {group.rows.length} subject{group.rows.length === 1 ? '' : 's'} ·{' '}
+                      {group.classNames.length} class{group.classNames.length === 1 ? '' : 'es'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setEditingTeacherId(group.teacherId)}
+                      className="inline-flex min-h-9 items-center gap-1.5 rounded border border-line bg-white px-3 text-xs font-bold text-brand-800 hover:border-brand-500 hover:text-brand-700"
+                    >
+                      <Pencil size={13} aria-hidden="true" /> Edit assignments
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {group.rows.map((row) => (
+                  {group.subjectNames.map((name) => (
                     <span
-                      key={row.id}
-                      className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 text-[11px] font-bold text-brand-800"
+                      key={name}
+                      className="inline-flex items-center rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 text-[11px] font-bold text-brand-800"
                     >
-                      {row.subject.name}
-                      <button
-                        type="button"
-                        onClick={() => void removeAssignment(row)}
-                        aria-label={`Remove ${row.subject.name} from ${group.teacher.user_name}`}
-                        className="text-brand-700 hover:text-rose-700"
-                      >
-                        <Trash2 size={11} aria-hidden="true" />
-                      </button>
+                      {name}
                     </span>
                   ))}
                 </div>
@@ -742,6 +768,15 @@ export const AdminResultsNotificationPage = () => {
           </ul>
         )}
       </Card>
+
+      <TeacherAssignmentDialog
+        open={Boolean(editingTeacherId)}
+        onClose={() => setEditingTeacherId('')}
+        teacher={editingTeacher}
+        assignments={editingAssignments}
+        classes={classes}
+        onSaved={handleAssignmentsSaved}
+      />
     </div>
   );
 };

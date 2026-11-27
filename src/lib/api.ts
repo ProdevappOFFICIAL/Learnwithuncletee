@@ -6,22 +6,34 @@
  */
 
 import { queryClient } from './queryClient';
+import { accountStore } from './accounts';
 
 /** Session key shared with AuthContext (kept here to avoid an import cycle). */
 export const SESSION_KEY = ['session'] as const;
 
 /**
- * Tell every session consumer the session is dead (guards redirect to login).
+ * Tell every session consumer the active session is dead.
+ *
+ * If another account is saved on this device we switch straight to it instead
+ * of throwing the user back to the login screen. Only when no saved account
+ * remains do guards see a signed-out session.
  *
  * IMPORTANT: use setQueryData, NOT invalidateQueries. Invalidating refetches
  * /dashboard/me, which 401s -> refresh 401s -> lands back here -> infinite loop.
- * Writing `null` directly flips the guards to "logged out" with no network call.
  */
 function notifySessionDead() {
-  tokenStore.clear();
-  refreshTokenStore.clear();
+  const next = accountStore.removeActive();
+  if (next) {
+    tokenStore.set(next.accessToken ?? '', next.persistent);
+    if (next.refreshToken) refreshTokenStore.set(next.refreshToken, next.persistent);
+    else refreshTokenStore.clear();
+  } else {
+    tokenStore.clear();
+    refreshTokenStore.clear();
+  }
   try {
-    queryClient.setQueryData(SESSION_KEY, null);
+    queryClient.removeQueries();
+    queryClient.setQueryData(SESSION_KEY, next?.user ?? null);
   } catch {
     /* query client not mounted yet */
   }
@@ -147,36 +159,86 @@ export class ApiError extends Error {
 }
 
 /** Single-flight refresh: concurrent 401s share one refresh call. */
-let refreshPromise: Promise<string> | null = null;
+let refreshPromise: Promise<{ accessToken: string; refreshToken?: string }> | null = null;
 
-async function refreshAccessToken(): Promise<string> {
+async function refreshAccessToken(): Promise<{ accessToken: string; refreshToken?: string }> {
   if (!refreshPromise) {
     // The refresh token travels in the HttpOnly cookie (credentials:include);
     // the stored token is also sent in the body as a fallback for contexts
-    // where the cookie is blocked. The backend accepts either.
+    // where the cookie is blocked or another account owns the cookie.
     refreshPromise = (async () => {
       const storedRefresh = refreshTokenStore.get();
-      const res = await fetch(`${API_BASE}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(storedRefresh ? { refreshToken: storedRefresh } : {}),
-      });
+      let res: Response;
+      try {
+        res = await fetch(`${API_BASE}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(storedRefresh ? { refreshToken: storedRefresh } : {}),
+        });
+      } catch {
+        // Network failure — retryable. Never discard a still-valid session
+        // because the connection dropped for a moment.
+        throw new ApiError(0, 'Could not reach the school service. Please try again.');
+      }
       let payload: any = null;
       try {
         payload = await res.json();
       } catch {
         /* non-JSON */
       }
-      if (!res.ok || !payload?.data?.accessToken) {
+      if (res.status === 401 || res.status === 403) {
         throw new ApiError(res.status, payload?.message ?? 'Session expired');
       }
-      return payload.data.accessToken as string;
+      if (!res.ok || !payload?.data?.accessToken) {
+        // 5xx / proxy errors / malformed response are temporary, not logout.
+        throw new ApiError(
+          res.status || 0,
+          payload?.message ?? 'Could not refresh the session. Please try again.',
+        );
+      }
+      return {
+        accessToken: payload.data.accessToken as string,
+        refreshToken:
+          typeof payload.data.refreshToken === 'string' ? payload.data.refreshToken : undefined,
+      };
     })().finally(() => {
       refreshPromise = null;
     });
   }
   return refreshPromise;
+}
+
+/**
+ * Refresh and persist the new tokens for the active account. A 401/403 means
+ * the session is genuinely gone; anything else is temporary and must keep the
+ * user signed in.
+ */
+async function refreshSession(): Promise<string> {
+  try {
+    const tokens = await refreshAccessToken();
+    const persistent = tokenStore.isPersistent();
+    tokenStore.set(tokens.accessToken, persistent);
+    if (tokens.refreshToken) refreshTokenStore.set(tokens.refreshToken, persistent);
+    const activeId = accountStore.activeId();
+    if (activeId) {
+      accountStore.setTokens(activeId, {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        persistent,
+      });
+    }
+    return tokens.accessToken;
+  } catch (error: any) {
+    if (error?.status === 401 || error?.status === 403) {
+      notifySessionDead();
+      throw new ApiError(401, 'Session expired. Please sign in again.');
+    }
+    throw new ApiError(
+      error?.status || 0,
+      error?.message ?? 'Could not reach the school service. Your session is still saved — please try again.',
+    );
+  }
 }
 
 interface RequestOptions {
@@ -223,15 +285,9 @@ export async function api<T = any>(path: string, opts: RequestOptions = {}): Pro
   // One silent refresh on 401 (never for the auth endpoints themselves —
   // a 401 there is a credentials/refresh failure, not a reason to retry).
   if (res.status === 401 && auth && !isAuthEndpoint) {
-    try {
-      const fresh = await refreshAccessToken();
-      tokenStore.set(fresh, tokenStore.isPersistent());
-      res = await send(fresh);
-      payload = await readPayload(res);
-    } catch {
-      notifySessionDead();
-      throw new ApiError(401, 'Session expired. Please sign in again.');
-    }
+    const fresh = await refreshSession();
+    res = await send(fresh);
+    payload = await readPayload(res);
   }
 
   if (!res.ok) {
@@ -268,14 +324,8 @@ export async function apiDownload(
 
   let res = await send(tokenStore.get());
   if (res.status === 401) {
-    try {
-      const fresh = await refreshAccessToken();
-      tokenStore.set(fresh, tokenStore.isPersistent());
-      res = await send(fresh);
-    } catch {
-      notifySessionDead();
-      throw new ApiError(401, 'Session expired. Please sign in again.');
-    }
+    const fresh = await refreshSession();
+    res = await send(fresh);
   }
 
   if (!res.ok) {
@@ -342,14 +392,8 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
 
   let res = await send(tokenStore.get());
   if (res.status === 401) {
-    try {
-      const fresh = await refreshAccessToken();
-      tokenStore.set(fresh, tokenStore.isPersistent());
-      res = await send(fresh);
-    } catch {
-      notifySessionDead();
-      throw new ApiError(401, 'Session expired. Please sign in again.');
-    }
+    const fresh = await refreshSession();
+    res = await send(fresh);
   }
 
   if (!res.ok) {

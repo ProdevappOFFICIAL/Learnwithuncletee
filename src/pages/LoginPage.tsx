@@ -4,7 +4,7 @@ import { ROUTES } from '@/routes/paths';
 import { siteInfo } from '@/data/content';
 import { PageMetadata } from '@/components/ui/PageMetadata';
 import { ChevronLeft } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { avatarOf, useAuth } from '@/context/AuthContext';
 import { apiPost } from '@/lib/api';
 
 const inputClass = 'mt-2 min-h-12 w-full rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100';
@@ -32,7 +32,8 @@ export const LoginPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const { login, user, loading: sessionLoading } = useAuth();
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
+  const { login, user, loading: sessionLoading, accounts, switchAccount } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const fromDesktop = searchParams.get('source') === 'desktop';
@@ -76,6 +77,19 @@ export const LoginPage = () => {
       setError(e?.message ?? 'Sign-in failed. Check your credentials.');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleSwitch = async (accountId: string) => {
+    setError(null);
+    setSwitchingId(accountId);
+    try {
+      const me = await switchAccount(accountId);
+      navigate(fromDesktop ? ROUTES.connectDesktop : homeForRole(me.role), { replace: true });
+    } catch (e: any) {
+      setError(e?.message ?? 'Could not switch account.');
+    } finally {
+      setSwitchingId(null);
     }
   };
 
@@ -174,6 +188,54 @@ export const LoginPage = () => {
                     {r.label}
                   </button>
                 ))}
+              </div>
+            )}
+
+            {/* ── Saved accounts on this device ── */}
+            {!sessionLoading && !user && mode === 'login' && accounts.length > 0 && (
+              <div className="mt-5 rounded border border-line bg-white p-3">
+                <p className="text-[10px] font-bold uppercase tracking-[.16em] text-brand-700">
+                  Continue as
+                </p>
+                <div className="mt-2 space-y-1.5">
+                  {accounts.map((account) => {
+                    const avatar = avatarOf(account.user);
+                    return (
+                      <button
+                        key={account.id}
+                        type="button"
+                        onClick={() => void handleSwitch(account.id)}
+                        disabled={Boolean(switchingId)}
+                        className="flex w-full items-center gap-3 rounded px-2 py-2 text-left transition-colors hover:bg-cream disabled:opacity-60"
+                      >
+                        {avatar ? (
+                          <img src={avatar} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+                        ) : (
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-900 text-[10px] font-extrabold text-lime-accent">
+                            {account.user.user_name
+                              .split(' ')
+                              .map((part) => part.replace('.', '')[0])
+                              .filter(Boolean)
+                              .slice(0, 2)
+                              .join('')
+                              .toUpperCase() || 'LW'}
+                          </span>
+                        )}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-bold text-ink">
+                            {account.user.user_name}
+                          </span>
+                          <span className="block truncate text-[11px] text-muted">
+                            {account.user.user_email}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-brand-700">
+                          {switchingId === account.id ? 'Opening…' : 'Switch'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
 

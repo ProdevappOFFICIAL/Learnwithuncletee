@@ -1,8 +1,21 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { api, apiPost, tokenStore, refreshTokenStore, SESSION_KEY } from '@/lib/api';
+import {
+  api,
+  apiPost,
+  tokenStore,
+  refreshTokenStore,
+  getDeviceId,
+  SESSION_KEY,
+} from '@/lib/api';
+import {
+  accountStore,
+  type AccountSummary,
+  type SessionUser,
+} from '@/lib/accounts';
 import { queryClient } from '@/lib/queryClient';
 
+export type { SessionUser } from '@/lib/accounts';
 
 /** Preferred avatar: role profile photo first, then account image. */
 export const avatarOf = (
@@ -13,19 +26,6 @@ export const avatarOf = (
   user?.admin?.photoUrl ||
   user?.img ||
   null;
-
-export interface SessionUser {
-  id: string;
-  user_name: string;
-  user_email: string;
-  role: string;
-  img?: string | null;
-  workspaceId?: string;
-  student?: { studentCode: string; className: string; photoUrl?: string | null } | null;
-  teacher?: { staffCode: string; department?: string; photoUrl?: string | null } | null;
-  admin?: { staffCode: string; department?: string; photoUrl?: string | null } | null;
-  permissions: string[];
-}
 
 /**
  * Role hint → role-scoped login route. The server enforces the scope, so a
@@ -43,12 +43,43 @@ const LOGIN_ENDPOINTS: Record<string, string> = {
 const loginEndpointFor = (role?: string) =>
   LOGIN_ENDPOINTS[String(role ?? '').trim().toUpperCase()] ?? '/auth/login';
 
+/** Human-readable label shown in the Sessions list. */
+const deviceName = () => {
+  if (typeof navigator === 'undefined') return 'Web Browser';
+  const ua = navigator.userAgent;
+  const browser = /Edg\//.test(ua)
+    ? 'Edge'
+    : /Chrome\//.test(ua)
+      ? 'Chrome'
+      : /Firefox\//.test(ua)
+        ? 'Firefox'
+        : /Safari\//.test(ua)
+          ? 'Safari'
+          : 'Browser';
+  const platform = /Windows/.test(ua)
+    ? 'Windows'
+    : /Android/.test(ua)
+      ? 'Android'
+      : /iPhone|iPad/.test(ua)
+        ? 'iOS'
+        : /Mac/.test(ua)
+          ? 'macOS'
+          : /Linux/.test(ua)
+            ? 'Linux'
+            : '';
+  return `${browser}${platform ? ` on ${platform}` : ''}`;
+};
+
 interface AuthState {
   user: SessionUser | null;
   loading: boolean;
   error: string | null;
+  /** Other accounts saved on this device (for the sidebar switcher). */
+  accounts: AccountSummary[];
   login: (identity: string, password: string, opts?: { remember?: boolean; role?: string }) => Promise<SessionUser>;
-  logout: () => Promise<void>;
+  logout: () => Promise<SessionUser | null>;
+  switchAccount: (accountId: string) => Promise<SessionUser>;
+  removeAccount: (accountId: string) => Promise<void>;
   refresh: () => Promise<void>;
   can: (permission: string) => boolean;
 }
@@ -57,10 +88,15 @@ export const AuthCtx = createContext<AuthState>({
   user: null,
   loading: true,
   error: null,
+  accounts: [],
   login: async () => {
     throw new Error('AuthProvider missing');
   },
-  logout: async () => {},
+  logout: async () => null,
+  switchAccount: async () => {
+    throw new Error('AuthProvider missing');
+  },
+  removeAccount: async () => {},
   refresh: async () => {},
   can: () => false,
 });
@@ -74,16 +110,48 @@ async function fetchMe(): Promise<SessionUser | null> {
   // Always attempt: even with no stored access token, the HttpOnly refresh
   // cookie may still hold a session — the api layer attempts one silent
   // refresh on 401 before giving up.
+  const accountAtStart = accountStore.activeId();
   try {
     const { data } = await api<SessionUser>('/dashboard/me');
-    return data ?? null;
+    if (!data) return null;
+
+    const activeNow = accountStore.activeId();
+    // A switch happened while /dashboard/me was in flight. Return the account
+    // that is active now so a stale response cannot replace it.
+    if (activeNow && activeNow !== data.id) {
+      return accountStore.active()?.user ?? data;
+    }
+    // A logout happened while the request was in flight — do not resurrect it.
+    if (!activeNow && accountAtStart) return null;
+
+    accountStore.remember({
+      user: data,
+      accessToken: tokenStore.get(),
+      refreshToken: refreshTokenStore.get(),
+      persistent: tokenStore.isPersistent(),
+      makeActive: true,
+    });
+    return data;
   } catch (e: any) {
-    if (e?.status === 401) return null;
+    if (e?.status === 401) {
+      // The 401 may have already triggered an automatic switch to another
+      // saved account. Never overwrite that switch with a null session.
+      return accountStore.active()?.user ?? null;
+    }
     throw e;
   }
 }
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  // Restore the last account snapshot synchronously so the login page and
+  // guards can route instantly while /dashboard/me revalidates in the
+  // background. The API still verifies the session on every request.
+  const [initialAccount] = useState(() => {
+    const account = accountStore.active();
+    const hasCredentials = Boolean(tokenStore.get() || refreshTokenStore.get());
+    return account && hasCredentials ? account : null;
+  });
+
   const {
     data: user = null,
     isLoading: loading,
@@ -91,6 +159,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   } = useQuery({
     queryKey: SESSION_KEY,
     queryFn: fetchMe,
+    initialData: initialAccount?.user,
+    initialDataUpdatedAt: initialAccount ? 0 : undefined,
     // Don't retry: a 401 already went through the single refresh attempt.
     retry: false,
     // Off: with no session, every tab-focus refires me → refresh → 401
@@ -103,6 +173,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // after logout. This flag makes every consumer see "signed out" immediately,
   // so /login never bounces a just-logged-out user back to their old dashboard.
   const [signedOut, setSignedOut] = useState(false);
+  const [accounts, setAccounts] = useState<AccountSummary[]>(() => accountStore.summaries());
+  const syncAccounts = useCallback(() => setAccounts(accountStore.summaries()), []);
+
+  // Keep the switcher in sync when the background session check restores or
+  // refreshes the account snapshot.
+  useEffect(() => {
+    syncAccounts();
+  }, [user?.id, loading, syncAccounts]);
 
   const login = useCallback(async (identity: string, password: string, opts?: { remember?: boolean; role?: string }) => {
     // Scoped route: the selected tab determines which role model is searched.
@@ -112,6 +190,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         user_email: identity,
         user_password: password,
         ...(opts?.role ? { role: opts.role } : {}),
+        // Scope the server session to THIS browser. Without this the server
+        // reused one session per account, so signing in on another device
+        // silently invalidated everyone else's refresh token.
+        deviceId: getDeviceId(),
+        deviceName: deviceName(),
       },
     );
     const persistent = opts?.remember ?? true;
@@ -126,39 +209,102 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       ? (data.user as SessionUser)
       : await fetchMe();
     if (!me) throw new Error('Sign-in succeeded but the session could not be verified.');
-    // Instant UI: seed the cache so protected routes render without a flash,
-    // and only now lift the logout barrier.
+
+    accountStore.remember({
+      user: me,
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken ?? refreshTokenStore.get(),
+      persistent,
+    });
+    syncAccounts();
+
+    // Drop every cached query from the previous account, then seed this one.
+    await queryClient.cancelQueries();
+    queryClient.removeQueries();
     queryClient.setQueryData(SESSION_KEY, me);
     setSignedOut(false);
     return me;
-  }, []);
+  }, [syncAccounts]);
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (): Promise<SessionUser | null> => {
     // Local logout first: block every consumer immediately, scrub the stored
     // credentials, and stop in-flight session checks. A late /dashboard/me
     // response must never restore the account we just left.
-    setSignedOut(true);
-    const refreshToken = refreshTokenStore.get() ?? undefined;
+    const active = accountStore.active();
+    const refreshToken = refreshTokenStore.get() ?? active?.refreshToken ?? undefined;
+    const next = accountStore.removeActive();
+
     tokenStore.clear();
     refreshTokenStore.clear();
     await queryClient.cancelQueries();
-    queryClient.setQueryData(SESSION_KEY, null);
-    // Drop every cached query (dashboard lists, notifications, …) so the next
-    // account can never see the previous user's data. Re-seed the session as
-    // logged out afterwards; the AuthProvider observes that key.
     queryClient.removeQueries();
-    queryClient.setQueryData(SESSION_KEY, null);
-    // Revoke the server session in the background — local logout must not
-    // wait on the network, and the captured token still identifies the old
-    // session even though it is gone from storage.
+
+    if (next) {
+      // More accounts remain on this device: switch into the most recent one
+      // instead of forcing a fresh login.
+      if (next.accessToken) tokenStore.set(next.accessToken, next.persistent);
+      if (next.refreshToken) refreshTokenStore.set(next.refreshToken, next.persistent);
+      queryClient.setQueryData(SESSION_KEY, next.user);
+      setSignedOut(false);
+      setAccounts(accountStore.summaries());
+      void queryClient.invalidateQueries({ queryKey: SESSION_KEY });
+    } else {
+      queryClient.setQueryData(SESSION_KEY, null);
+      setSignedOut(true);
+      setAccounts([]);
+    }
+
+    // Revoke only the account we signed out of. Other saved accounts keep
+    // their own server sessions.
     void apiPost('/auth/logout', { refreshToken }).catch(() => {
       /* best effort — local session is already gone */
     });
+
+    return next?.user ?? null;
   }, []);
+
+  const switchAccount = useCallback(async (accountId: string): Promise<SessionUser> => {
+    const account = accountStore.activate(accountId);
+    if (!account) throw new Error('That account is no longer saved on this device.');
+
+    if (account.accessToken) tokenStore.set(account.accessToken, account.persistent);
+    else tokenStore.clear();
+    if (account.refreshToken) refreshTokenStore.set(account.refreshToken, account.persistent);
+    else refreshTokenStore.clear();
+
+    setSignedOut(false);
+    setAccounts(accountStore.summaries());
+
+    // Never let one account see another account's cached dashboard data.
+    await queryClient.cancelQueries();
+    queryClient.removeQueries();
+    queryClient.setQueryData(SESSION_KEY, account.user);
+    // Validate in the background; the saved profile renders immediately.
+    void queryClient.invalidateQueries({ queryKey: SESSION_KEY });
+
+    return account.user;
+  }, []);
+
+  const removeAccount = useCallback(async (accountId: string) => {
+    if (accountId === accountStore.activeId()) {
+      await logout();
+      return;
+    }
+    const account = accountStore.list().find((row) => row.id === accountId);
+    if (!account) return;
+    accountStore.remove(accountId);
+    setAccounts(accountStore.summaries());
+    if (account.refreshToken) {
+      void apiPost('/auth/logout', { refreshToken: account.refreshToken }).catch(() => {
+        /* best effort */
+      });
+    }
+  }, [logout]);
 
   const refresh = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: SESSION_KEY });
-  }, []);
+    syncAccounts();
+  }, [syncAccounts]);
 
   // Consumers never see a user while the local logout barrier is up, even if
   // an old query result is still lingering in memory.
@@ -177,13 +323,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     () => ({
       user: currentUser,
       loading: signedOut ? false : loading,
-      error: queryError && !signedOut ? 'Session expired' : null,
+      error: !currentUser && queryError ? 'Session expired' : null,
+      accounts,
       login,
       logout,
+      switchAccount,
+      removeAccount,
       refresh,
       can,
     }),
-    [currentUser, signedOut, loading, queryError, login, logout, refresh, can],
+    [
+      currentUser,
+      signedOut,
+      loading,
+      queryError,
+      accounts,
+      login,
+      logout,
+      switchAccount,
+      removeAccount,
+      refresh,
+      can,
+    ],
   );
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
@@ -198,7 +359,7 @@ export function useResource<T = any>(path: string | null, query?: Record<string,
   const key = useMemo(() => JSON.stringify({ path, query }), [path, query]);
 
   const load = useCallback(async () => {
-    if (!path || !tokenStore.get()) {
+    if (!path || (!tokenStore.get() && !refreshTokenStore.get())) {
       setLoading(false);
       return;
     }
@@ -213,7 +374,6 @@ export function useResource<T = any>(path: string | null, query?: Record<string,
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
   useEffect(() => {

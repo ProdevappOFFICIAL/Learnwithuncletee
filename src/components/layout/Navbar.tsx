@@ -62,8 +62,8 @@ export const Navbar = () => {
 
   const handleLogout = async () => {
     setMenuOpen(false);
-    await logout();
-    navigate(ROUTES.home);
+    const next = await logout();
+    navigate(next ? homeForRole(next.role) : ROUTES.home);
   };
 
   const avatar = avatarOf(user);

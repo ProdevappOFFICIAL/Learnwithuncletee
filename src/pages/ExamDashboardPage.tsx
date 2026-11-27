@@ -31,6 +31,13 @@ const initialsOf = (name: string) =>
     .join('')
     .toUpperCase() || 'LW';
 
+const homeForRole = (role: string) =>
+  role === 'STUDENT' || role === 'PARENT'
+    ? ROUTES.studentDashboard
+    : role === 'TEACHER'
+      ? ROUTES.teacherDashboard
+      : ROUTES.adminDashboard;
+
 /**
  * Pupil exam portal — the hall noticeboard. Lists every LIVE online exam the
  * signed-in pupil is allowed to sit (class + combination gated server-side),
@@ -45,8 +52,8 @@ export const ExamDashboardPage = () => {
   const staff = !!user && ['TEACHER', 'ADMIN', 'OWNER', 'MEMBER'].includes(user.role);
 
   const doLogout = async () => {
-    await logout();
-    navigate(ROUTES.login);
+    const next = await logout();
+    navigate(next ? homeForRole(next.role) : ROUTES.login);
   };
 
   return (
