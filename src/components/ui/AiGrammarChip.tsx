@@ -83,7 +83,7 @@ export const AiGrammarChip = ({
 
   return (
     <div
-      className={`flex max-w-full flex-wrap items-center gap-1 rounded-md border border-brand-400 bg-white/95 px-1.5 py-1 shadow-sm ${className}`}
+      className={`ai-grammar-chip flex max-w-full flex-wrap items-center gap-1 rounded-md border border-brand-400 bg-white/95 px-1.5 py-1 shadow-sm ${className}`}
       onMouseDown={preserveFocus ? (event) => event.preventDefault() : undefined}
     >
       <span className="inline-flex items-center gap-1 rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-brand-800">

@@ -153,6 +153,12 @@ h4 {
 .mdx-question-bank .mdx-news-content pre,
 .mdx-question-bank .mdx-news-content table { margin: 0.35em 0; }
 
+/* ── AI grammar chip: always use the site-wide font, even inside the
+   printed report sheet (which uses Times New Roman for its table). ── */
+.ai-grammar-chip {
+  font-family: var(--font-sans);
+}
+
 /* ── Responsive toast feedback (phones/tablets) ──────────────────── */
 @keyframes lwu-toast-in {
   from {

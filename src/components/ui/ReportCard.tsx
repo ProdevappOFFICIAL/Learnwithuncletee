@@ -482,7 +482,7 @@ export default function ReportCard({
 
     const aiToolbar = inline && isAiField(inline.field) ? (
         <div
-            className="absolute z-40 flex max-w-[310px] flex-wrap items-center gap-1 rounded-md border border-brand-400 bg-white/95 px-1.5 py-1 shadow-lg ring-1 ring-brand-100 print:hidden"
+            className="ai-grammar-chip absolute z-40 flex max-w-[310px] flex-wrap items-center gap-1 rounded-md border border-brand-400 bg-white/95 px-1.5 py-1 shadow-lg ring-1 ring-brand-100 print:hidden"
             style={{
                 left: Math.max(4, Math.min(inline.left + inline.width - 310, 794 - 310)),
                 top: Math.max(2, inline.top - 42),
