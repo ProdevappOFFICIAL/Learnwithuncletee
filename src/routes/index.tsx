@@ -11,6 +11,8 @@ import { NewsPage } from '@/pages/NewsPage';
 import { NewsDetailPage } from '@/pages/NewsDetailPage';
 import { GalleryPage } from '@/pages/GalleryPage';
 import { ContactPage } from '@/pages/ContactPage';
+import { UncleTeepediaPage } from '@/pages/UncleTeepediaPage';
+import { UncleTeepediaWatchPage } from '@/pages/UncleTeepediaWatchPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { ConnectDesktopPage } from '@/pages/ConnectDesktopPage';
 import { ExaminationPage } from '@/pages/ExaminationPage';
@@ -86,6 +88,10 @@ import AdminResultGeneratorPage from '@/pages/dashboard/admin/AdminResultGenerat
 import { AdminSessionOnline } from '@/pages/dashboard/admin/AdminSessionOnline';
 import { AdminSessionOffline } from '@/pages/dashboard/admin/AdminSessionOffline';
 import { AdminSessionDetailPage } from '@/pages/dashboard/admin/AdminSessionDetailPage';
+import { AdminUncleTeepediaPage } from '@/pages/dashboard/admin/AdminUncleTeepediaPage';
+import { AdminUncleTeepediaDetailPage } from '@/pages/dashboard/admin/AdminUncleTeepediaDetailPage';
+import { StudentUncleTeepediaPage } from '@/pages/dashboard/student/StudentUncleTeepediaPage';
+import { StudentUncleTeepediaPlayPage } from '@/pages/dashboard/student/StudentUncleTeepediaPlayPage';
 
 const appRoutes = [
   { path: ROUTES.home, element: <HomePage /> },
@@ -98,6 +104,8 @@ const appRoutes = [
   { path: ROUTES.newsDetail, element: <NewsDetailPage /> },
   { path: ROUTES.gallery, element: <GalleryPage /> },
   { path: ROUTES.contact, element: <ContactPage /> },
+  { path: ROUTES.uncleTeepedia, element: <UncleTeepediaPage /> },
+  { path: ROUTES.uncleTeepediaWatch, element: <UncleTeepediaWatchPage /> },
   { path: ROUTES.login, element: <LoginPage /> },
   {
     path: '/site-preview/:pageKey',
@@ -145,6 +153,8 @@ const appRoutes = [
           { path: 'virtual-class', element: <StudentVirtualClassPage /> },
           { path: 'materials', element: <StudentMaterialsPage /> },
           { path: 'conduct', element: <StudentConductPage /> },
+          { path: 'uncleteepedia', element: <StudentUncleTeepediaPage /> },
+          { path: 'uncleteepedia/:sessionId', element: <StudentUncleTeepediaPlayPage /> },
         ],
       },
     ],
@@ -232,6 +242,8 @@ const appRoutes = [
           { path: 'audit-log', element: <AdminAuditLogPage /> },
           { path: 'result-generator', element: <AdminResultGeneratorPage /> },
           { path: 'principal-comments', element: <AdminPrincipalCommentsPage /> },
+          { path: 'uncleteepedia', element: <AdminUncleTeepediaPage /> },
+          { path: 'uncleteepedia/:id', element: <AdminUncleTeepediaDetailPage /> },
         ],
       },
     ],

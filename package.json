@@ -24,6 +24,7 @@
     "react-router-dom": "7.18.4",
     "rehype-sanitize": "6.0.0",
     "remark-gfm": "4.0.1",
+    "socket.io-client": "^4.8.4",
     "uploadthing": "7.7.4"
   },
   "devDependencies": {

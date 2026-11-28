@@ -35,7 +35,11 @@ export const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const { user, logout } = useAuth();
   const site = useSiteGlobal();
-  const navLinks = (site.nav ?? []) as Array<{ label: string; to: string }>;
+  const baseNavLinks = (site.nav ?? []) as Array<{ label: string; to: string }>;
+  // Falls back gracefully when a school has already customised its nav array.
+  const navLinks = baseNavLinks.some((link) => link.to === ROUTES.uncleTeepedia)
+    ? baseNavLinks
+    : [...baseNavLinks, { label: 'UncleTeepedia', to: ROUTES.uncleTeepedia }];
   const navigate = useNavigate();
   const location = useLocation();
   const menuRef = useRef<HTMLDivElement>(null);

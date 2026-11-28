@@ -7,6 +7,7 @@ export const Footer = () => {
   const navLinks = (site.nav ?? []) as Array<{ label: string; to: string }>;
   const secondary = [
     ...navLinks.slice(5),
+    { to: ROUTES.uncleTeepedia, label: 'UncleTeepedia Live' },
     { to: ROUTES.examDashboard, label: 'Examination Portal' },
     { to: ROUTES.login, label: 'Portal Login' },
   ];

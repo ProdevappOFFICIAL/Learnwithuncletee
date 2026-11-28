@@ -9,6 +9,8 @@ export const ROUTES = {
   newsDetail: '/news/:id',
   gallery: '/gallery',
   contact: '/contact',
+  uncleTeepedia: '/uncleteepedia',
+  uncleTeepediaWatch: '/uncleteepedia/watch/:sessionId',
   login: '/login',
   connectDesktop: '/connect-desktop',
   examination: '/examination/:code',
@@ -25,6 +27,7 @@ export const ROUTES = {
   studentVirtualClass: '/dashboard/student/virtual-class',
   studentMaterials: '/dashboard/student/materials',
   studentConduct: '/dashboard/student/conduct',
+  studentUncleTeepedia: '/dashboard/student/uncleteepedia',
   teacherDashboard: '/dashboard/teacher',
   teacherAttendance: '/dashboard/teacher/attendance',
   teacherAssignments: '/dashboard/teacher/assignments',
@@ -76,6 +79,7 @@ export const ROUTES = {
   adminResultGenerator: '/dashboard/admin/result-generator',
   adminResultsNotification: '/dashboard/admin/results-notification',
   adminPrincipalComments: '/dashboard/admin/principal-comments',
+  adminUncleTeepedia: '/dashboard/admin/uncleteepedia',
   notFound: '*',
   
 } as const;

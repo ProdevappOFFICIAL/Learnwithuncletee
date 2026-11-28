@@ -34,6 +34,7 @@ const nav = [
   { label: 'Services', to: ROUTES.services },
   { label: 'News & Events', to: ROUTES.news },
   { label: 'Gallery', to: ROUTES.gallery },
+  { label: 'UncleTeepedia', to: ROUTES.uncleTeepedia },
   { label: 'Contact', to: ROUTES.contact },
 ];
 

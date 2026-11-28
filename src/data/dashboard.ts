@@ -24,6 +24,7 @@ import {
   Settings,
   ShieldAlert,
   ShieldCheck,
+  Trophy,
   UserCog,
   Users,
   Video,
@@ -77,6 +78,12 @@ export const studentNav: DashboardNavItem[] = [
     to: ROUTES.examDashboard,
     label: "Examinations",
     icon: ScrollText,
+  },
+  {
+    to: ROUTES.studentUncleTeepedia,
+    label: "UncleTeepedia",
+    icon: Trophy,
+    permission: "uncleteepedia.read",
   },
   {
     to: ROUTES.studentResults,
@@ -174,6 +181,12 @@ export const teacherNav: DashboardNavItem[] = [
 
 export const adminNav: DashboardNavItem[] = [
   { to: ROUTES.adminDashboard, label: "Dashboard", icon: LayoutDashboard },
+  {
+    to: ROUTES.adminUncleTeepedia,
+    label: "UncleTeepedia",
+    icon: Trophy,
+    permission: "uncleteepedia.read",
+  },
   {
     label: "Members",
     icon: Users,
