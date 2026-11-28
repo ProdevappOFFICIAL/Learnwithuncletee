@@ -21,14 +21,12 @@ import {
 import {
   ArrowLeft,
   CheckCircle2,
-  ChevronRight,
   Clock3,
   Flame,
   Lock,
   Send,
   Sparkles,
   Trophy,
-  XCircle,
 } from 'lucide-react';
 
 const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
@@ -71,13 +69,13 @@ export const StudentUncleTeepediaPlayPage = () => {
 
   const state = practiceState ?? playerQuery.data;
   const mode = state?.competition?.gameplayMode;
+  const cursorMode = mode === 'SELF_PACED' || mode === 'SHARED_LIVE';
   const selfPaced = mode === 'SELF_PACED';
   const attempt = state?.attempt;
   const question = state?.question;
   const participant = (state as any)?.participant as UncleTeepediaParticipantItem | undefined;
   const selected = state?.selectedOption ?? null;
   const round = state?.currentRound;
-  const revealed = Boolean(state?.answerRevealed);
   const sessionEnded = state?.session?.status === 'ENDED' || attempt?.status === 'SUBMITTED';
 
   const deadline = useMemo(() => {
@@ -125,69 +123,59 @@ export const StudentUncleTeepediaPlayPage = () => {
     }
   };
 
+  const applyState = (next: UncleTeepediaLiveState | null | undefined) => {
+    if (!next) return;
+    if (practiceRef.current) setPracticeState(next);
+    else setPlayerStateCache(client, sessionId, next);
+  };
+
   const answer = async (optionIndex: number) => {
-    if (!state || selected !== null || !question) return;
+    if (!state || selected !== null || !question || !attempt) return;
     if (round && round.status !== 'OPEN') return;
     setBusy(`answer-${optionIndex}`);
+    // Optimistic lock: the server will normally replace this with the next
+    // question inside the same acknowledgement.
+    if (practiceRef.current) {
+      setPracticeState((current) =>
+        current ? { ...current, selectedOption: optionIndex } : current,
+      );
+    } else {
+      client.setQueryData<UncleTeepediaLiveState>(utpKeys.player(sessionId), (current) =>
+        current ? { ...current, selectedOption: optionIndex } : current,
+      );
+    }
     try {
       const payload = {
-        attemptId: attempt?.id,
+        attemptId: attempt.id,
         questionId: question.id,
         roundId: round?.id,
         optionIndex,
         clientRequestId: requestId(),
       };
       if (practiceRef.current) {
-        await apiPost(`/uncleteepedia/attempts/${attempt?.id}/answers`, payload);
-        setPracticeState((current) =>
-          current ? { ...current, selectedOption: optionIndex } : current,
+        const response = await apiPost<{ state?: UncleTeepediaLiveState }>(
+          `/uncleteepedia/attempts/${attempt.id}/answers`,
+          payload,
         );
+        applyState(response.data?.state);
       } else if (socketHandle?.socket?.connected) {
-        await emitAck(socketHandle.socket, 'player:answer', payload);
-        client.setQueryData<UncleTeepediaLiveState>(utpKeys.player(sessionId), (current) =>
-          current ? { ...current, selectedOption: optionIndex } : current,
+        const response = await emitAck<{ result: { state?: UncleTeepediaLiveState } }>(
+          socketHandle.socket,
+          'player:answer',
+          payload,
         );
+        applyState(response.result?.state);
       } else {
-        await apiPost(`/uncleteepedia/attempts/${attempt?.id}/answers`, payload);
-        client.setQueryData<UncleTeepediaLiveState>(utpKeys.player(sessionId), (current) =>
-          current ? { ...current, selectedOption: optionIndex } : current,
+        const response = await apiPost<{ state?: UncleTeepediaLiveState }>(
+          `/uncleteepedia/attempts/${attempt.id}/answers`,
+          payload,
         );
-        await playerQuery.refetch();
+        applyState(response.data?.state);
+        if (!response.data?.state) await playerQuery.refetch();
       }
-      toast.info('Answer locked in.');
     } catch (error: any) {
       toast.error(error?.message ?? 'Answer was not accepted');
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const nextQuestion = async () => {
-    if (!attempt) return;
-    setBusy('next');
-    try {
-      if (practiceRef.current) {
-        const response = await apiPost<UncleTeepediaLiveState>(
-          `/uncleteepedia/attempts/${attempt.id}/next`,
-          {},
-        );
-        setPracticeState(response.data);
-      } else if (socketHandle?.socket?.connected) {
-        const response = await emitAck<{ result: UncleTeepediaLiveState }>(
-          socketHandle.socket,
-          'player:next',
-          { attemptId: attempt.id },
-        );
-        if (response.result) setPlayerStateCache(client, sessionId, response.result);
-      } else {
-        const response = await apiPost<UncleTeepediaLiveState>(
-          `/uncleteepedia/attempts/${attempt.id}/next`,
-          {},
-        );
-        setPlayerStateCache(client, sessionId, response.data);
-      }
-    } catch (error: any) {
-      toast.error(error?.message ?? 'Could not move to the next question');
+      if (!practiceRef.current) await playerQuery.refetch();
     } finally {
       setBusy(null);
     }
@@ -260,7 +248,7 @@ export const StudentUncleTeepediaPlayPage = () => {
     );
   }
 
-  if (selfPaced && !attempt) {
+  if (cursorMode && !attempt) {
     return (
       <div className="mx-auto max-w-2xl space-y-4">
         <Link to={ROUTES.studentUncleTeepedia} className="inline-flex items-center gap-2 text-xs font-bold text-brand-700">
@@ -302,7 +290,7 @@ export const StudentUncleTeepediaPlayPage = () => {
     );
   }
 
-  if (selfPaced && attempt && (attempt.status === 'SUBMITTED' || attempt.status === 'EXPIRED' || sessionEnded)) {
+  if (attempt && (attempt.status === 'SUBMITTED' || attempt.status === 'EXPIRED' || sessionEnded)) {
     return (
       <div className="mx-auto max-w-2xl space-y-4">
         <Card className="p-8 text-center">
@@ -340,7 +328,7 @@ export const StudentUncleTeepediaPlayPage = () => {
     );
   }
 
-  const progress = selfPaced && attempt
+  const progress = cursorMode && attempt
     ? `${Math.min((attempt.currentQuestionIndex ?? 0) + 1, attempt.totalQuestions ?? 0)} / ${attempt.totalQuestions ?? 0}`
     : null;
 
@@ -369,9 +357,6 @@ export const StudentUncleTeepediaPlayPage = () => {
             </h2>
           </div>
           <div className="flex items-center gap-2">
-            {revealed && round?.revealEndsAt && (
-              <Countdown endsAt={round.revealEndsAt} label="Reveal" size="sm" tone="light" />
-            )}
             <Countdown
               endsAt={deadline}
               pausedAt={state.session.status === 'PAUSED' ? state.session.pausedAt : null}
@@ -405,7 +390,7 @@ export const StudentUncleTeepediaPlayPage = () => {
             <EmptyState message="Waiting for the host to open the next question…" />
           )}
 
-          {question && onHotSeat && (
+          {question && onHotSeat && !cursorMode && (
             <>
               <p className="font-display text-2xl font-extrabold leading-snug text-ink sm:text-3xl">
                 {question.question}
@@ -414,8 +399,6 @@ export const StudentUncleTeepediaPlayPage = () => {
               <div className="grid gap-2 sm:grid-cols-2">
                 {question.options.map((option, index) => {
                   const isSelected = selected === index;
-                  const correct = revealed && question.correctOption === index;
-                  const wrongSelection = revealed && isSelected && question.correctOption !== index;
                   return (
                     <button
                       key={index}
@@ -423,52 +406,32 @@ export const StudentUncleTeepediaPlayPage = () => {
                       onClick={() => answer(index)}
                       disabled={!canAnswer || busy === `answer-${index}`}
                       className={`flex items-center gap-3 rounded border px-4 py-4 text-left text-sm transition ${
-                        correct
-                          ? 'border-emerald-400 bg-emerald-50 font-bold text-emerald-900'
-                          : wrongSelection
-                            ? 'border-rose-300 bg-rose-50 font-bold text-rose-900'
-                            : isSelected
-                              ? 'border-brand-500 bg-brand-50 font-bold text-brand-900'
-                              : 'border-line bg-white text-ink hover:border-brand-400 hover:bg-brand-50/40'
+                        isSelected
+                          ? 'border-brand-500 bg-brand-50 font-bold text-brand-900'
+                          : 'border-line bg-white text-ink hover:border-brand-400 hover:bg-brand-50/40'
                       } disabled:cursor-default`}
                     >
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-900 text-xs font-extrabold text-white">
                         {letters[index] ?? index + 1}
                       </span>
                       <span className="min-w-0 flex-1">{option}</span>
-                      {correct && <CheckCircle2 size={17} className="text-emerald-600" />}
-                      {wrongSelection && <XCircle size={17} className="text-rose-600" />}
-                      {isSelected && !revealed && <Lock size={15} className="text-brand-600" />}
+                      {isSelected && <Lock size={15} className="text-brand-600" />}
                     </button>
                   );
                 })}
               </div>
 
               <div className="rounded border border-line bg-cream px-4 py-3 text-sm text-muted">
-                {revealed ? (
-                  state.myAnswerCorrect == null ? (
-                    <span>No answer was recorded for this question.</span>
-                  ) : state.myAnswerCorrect ? (
-                    <span className="flex items-center gap-2 font-bold text-emerald-700">
-                      <CheckCircle2 size={16} /> Correct! The host has revealed the answer.
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2 font-bold text-rose-700">
-                      <XCircle size={16} /> Not this time. The correct answer is highlighted.
-                    </span>
-                  )
-                ) : selected !== null ? (
-                  <span className="flex items-center gap-2 font-bold text-brand-800">
-                    <Lock size={15} /> Answer locked in. The host controls the reveal.
-                  </span>
+                {selected !== null ? (
+                  <span>Answer recorded. Loading the next question…</span>
                 ) : (
-                  <span>Choose one option. Answers are hidden from other contestants and viewers.</span>
+                  <span>Choose one option. Answers stay hidden while the show is live.</span>
                 )}
               </div>
             </>
           )}
 
-          {selfPaced && question && (
+          {cursorMode && question && (
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[10px] font-bold uppercase tracking-[.22em] text-muted">
@@ -508,34 +471,26 @@ export const StudentUncleTeepediaPlayPage = () => {
               <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-line bg-cream px-4 py-3">
                 <p className="text-sm text-muted">
                   {selected !== null
-                    ? 'Answer saved. Move on when you are ready.'
-                    : 'You can change your mind until you move to the next question.'}
+                    ? 'Answer recorded. Loading the next question…'
+                    : mode === 'SHARED_LIVE'
+                      ? 'Tap an answer to move straight to your next question.'
+                      : 'Tap an answer to move straight to the next question.'}
                 </p>
-                <div className="flex gap-2">
-                  {selected !== null && (
-                    <button
-                      type="button"
-                      onClick={nextQuestion}
-                      disabled={busy === 'next'}
-                      className="inline-flex items-center gap-2 rounded bg-brand-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-60"
-                    >
-                      {busy === 'next' ? 'Moving…' : 'Next question'} <ChevronRight size={15} />
-                    </button>
-                  )}
+                {selfPaced && (
                   <button
                     type="button"
                     onClick={submit}
                     disabled={busy === 'submit'}
                     className="inline-flex items-center gap-2 rounded border border-line px-4 py-2.5 text-sm font-bold text-brand-800 hover:bg-white disabled:opacity-60"
                   >
-                    <Send size={14} /> Submit
+                    <Send size={14} /> Finish now
                   </button>
-                </div>
+                )}
               </div>
             </>
           )}
 
-          {!selfPaced && sessionEnded && (
+          {!cursorMode && sessionEnded && (
             <div className="rounded border border-line bg-cream px-4 py-6 text-center">
               <Trophy className="mx-auto text-amber-500" size={30} />
               <p className="mt-2 font-display text-2xl font-extrabold text-ink">Show ended</p>

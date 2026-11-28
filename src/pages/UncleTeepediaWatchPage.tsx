@@ -83,6 +83,7 @@ export const UncleTeepediaWatchPage = () => {
   const question = state?.question;
   const correctOption = revealed ? question?.correctOption ?? round?.correctOption ?? null : null;
   const isHotSeat = state?.competition.gameplayMode === 'HOT_SEAT';
+  const isSharedLive = state?.competition.gameplayMode === 'SHARED_LIVE';
   const activeParticipantId = state?.session.activeParticipantId;
 
   const follow = (participantId: string) => {
@@ -178,7 +179,11 @@ export const UncleTeepediaWatchPage = () => {
               <section className="overflow-hidden rounded border border-line bg-white">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-cream px-5 py-3">
                   <p className="text-xs font-bold uppercase tracking-widest text-brand-700">
-                    {round ? `Question ${round.roundNumber}` : 'Current question'}
+                    {isSharedLive && !question
+                      ? 'Independent rapid-fire'
+                      : round
+                        ? `Question ${round.roundNumber}`
+                        : 'Current question'}
                   </p>
                   <div className="flex items-center gap-2">
                     {revealed && round?.revealEndsAt && (
@@ -192,7 +197,13 @@ export const UncleTeepediaWatchPage = () => {
                   </div>
                 </div>
                 <div className="space-y-5 p-5 sm:p-7">
-                  {!question && <p className="text-sm text-muted">Waiting for the next question…</p>}
+                  {!question && (
+                    <p className="text-sm text-muted">
+                      {isSharedLive
+                        ? 'Every contestant is racing through their own questions. Follow a contestant to see their current question live.'
+                        : 'Waiting for the next question…'}
+                    </p>
+                  )}
                   {question && (
                     <>
                       <h2 className="font-display text-2xl font-extrabold leading-snug text-ink sm:text-4xl">
@@ -346,8 +357,17 @@ export const UncleTeepediaWatchPage = () => {
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-bold text-ink">{participant.name}</p>
                           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted">
-                            {onSeat ? 'On the hot seat' : participant.status.toLowerCase()}
+                            {onSeat
+                              ? 'On the hot seat'
+                              : isSharedLive
+                                ? `Question ${((participant as any).questionIndex ?? 0) + 1}`
+                                : participant.status.toLowerCase()}
                           </p>
+                          {isSharedLive && (participant as any).currentQuestion?.question && (
+                            <p className="mt-0.5 line-clamp-1 text-[11px] text-muted">
+                              {(participant as any).currentQuestion.question}
+                            </p>
+                          )}
                         </div>
                         <div className="text-right">
                           <p className="font-display text-lg font-extrabold text-brand-700">{participant.score}</p>

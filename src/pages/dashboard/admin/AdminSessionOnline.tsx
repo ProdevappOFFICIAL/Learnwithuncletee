@@ -144,7 +144,7 @@ export const AdminSessionOnline = () => {
         ) : (
           <>
             <TableWrap>
-              <table className={`w-full min-w-[860px] text-left text-sm transition-opacity ${sessions.isFetching ? 'opacity-60' : ''}`}>
+              <table className={`w-full min-w-[1050px] text-left text-sm transition-opacity ${sessions.isFetching ? 'opacity-60' : ''}`}>
                 <thead>
                   <tr>
                     <Th>Pupil</Th>

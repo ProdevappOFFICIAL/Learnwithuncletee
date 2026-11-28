@@ -427,13 +427,7 @@ const QuestionManager = ({ competition }: { competition: UncleTeepediaCompetitio
 };
 
 /** ── Host control room ────────────────────────────────────────────────────── */
-const HostController = ({
-  sessionId,
-  onRefreshCompetition,
-}: {
-  sessionId: string;
-  onRefreshCompetition: () => void;
-}) => {
+const HostController = ({ sessionId }: { sessionId: string }) => {
   const toast = useToast();
   const client = useQueryClient();
   const hostQuery = useUncleTeepediaHostState(sessionId);
@@ -510,7 +504,8 @@ const HostController = ({
         await apiPost(path, payload);
         await hostQuery.refetch();
       }
-      onRefreshCompetition();
+      // The socket snapshot is authoritative; no extra competition refetch on
+      // every command. Deployments counts remain cached until background sync.
     } catch (error: any) {
       toast.error(error?.message ?? 'Command failed');
       await hostQuery.refetch();
@@ -550,6 +545,7 @@ const HostController = ({
   const question = state.question;
   const revealDone = round?.status === 'REVEALED';
   const isSelfPaced = state.competition.gameplayMode === 'SELF_PACED';
+  const isSharedLive = state.competition.gameplayMode === 'SHARED_LIVE';
   const live = session.status === 'LIVE';
   const paused = session.status === 'PAUSED';
   const ended = session.status === 'ENDED';
@@ -612,7 +608,7 @@ const HostController = ({
               <Play size={15} /> Resume
             </button>
           )}
-          {!ended && !isSelfPaced && (
+          {!ended && !isSelfPaced && !isSharedLive && (
             <>
               <button
                 type="button"
@@ -661,7 +657,7 @@ const HostController = ({
         </Card>
       )}
 
-      {!ended && !isSelfPaced && (
+      {!ended && !isSelfPaced && !isSharedLive && (
         <Card>
           <CardHead
             title={`Round ${round?.roundNumber ?? 0}`}
@@ -726,9 +722,51 @@ const HostController = ({
           />
           <div className="p-5">
             <p className="text-sm text-muted">
-              This mode has no host-driven questions. Start the session to open official attempts,
-              then watch the progress table below.
+              This mode has no host-driven questions. Answers advance to the next question
+              automatically and the progress table below updates live.
             </p>
+          </div>
+        </Card>
+      )}
+
+      {isSharedLive && !ended && (
+        <Card>
+          <CardHead
+            title="Independent rapid-fire"
+            sub="Every contestant gets the next question immediately after answering. No shared next button."
+          />
+          <div className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3">
+            {(state.participants ?? []).map((participant: any) => (
+              <div key={participant.id} className="rounded border border-line p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-bold text-ink">{participant.name}</p>
+                  <Pill tone={participant.status === 'FINISHED' ? 'ink' : 'emerald'}>
+                    {participant.status === 'FINISHED'
+                      ? 'Finished'
+                      : participant.attemptStatus === 'IN_PROGRESS'
+                        ? 'Playing'
+                        : participant.status}
+                  </Pill>
+                </div>
+                <p className="mt-2 text-xs font-semibold uppercase tracking-widest text-muted">
+                  Question {(participant.questionIndex ?? 0) + 1} / {participant.totalQuestions ?? 0}
+                </p>
+                <p className="mt-1 line-clamp-2 min-h-[2.5rem] text-sm text-ink">
+                  {participant.currentQuestion?.question ?? 'All questions answered'}
+                </p>
+                <div className="mt-2 flex items-center justify-between text-sm">
+                  <span className="font-display text-xl font-extrabold text-brand-700">
+                    {participant.score}
+                  </span>
+                  <span className="text-xs text-muted">
+                    {participant.correctAnswers}/{participant.totalAnswers} correct
+                  </span>
+                </div>
+              </div>
+            ))}
+            {(state.participants ?? []).length === 0 && (
+              <EmptyState message="No pupils have joined yet." />
+            )}
           </div>
         </Card>
       )}
@@ -965,10 +1003,7 @@ export const AdminUncleTeepediaDetailPage = () => {
       </Card>
 
       {sessionId && (
-        <HostController
-          sessionId={sessionId}
-          onRefreshCompetition={() => void competition.refetch()}
-        />
+        <HostController sessionId={sessionId} />
       )}
 
       <QuestionManager competition={data} />

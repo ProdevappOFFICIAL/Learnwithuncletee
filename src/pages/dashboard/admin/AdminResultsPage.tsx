@@ -286,7 +286,7 @@ export const AdminResultsPage = () => {
           </div>
         ) : (
           <TableWrap>
-            <table className="w-full min-w-[780px] text-left text-sm">
+            <table className="w-full min-w-[920px] text-left text-sm">
               <thead>
                 <tr>
                   <Th>Pupil</Th>

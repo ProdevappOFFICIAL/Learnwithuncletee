@@ -510,14 +510,29 @@ export const useJoinCompetition = () => {
 };
 
 /** Used by host/player Socket.IO handlers to write straight into the cache. */
+const newerVersion = (
+  current: UncleTeepediaLiveState | undefined,
+  next: UncleTeepediaLiveState,
+) => {
+  const before = Number(current?.session?.version ?? 0);
+  const after = Number(next?.session?.version ?? 0);
+  return after >= before;
+};
+
 export const setHostStateCache = (
   client: QueryClient,
   sessionId: string,
   state: UncleTeepediaLiveState,
-) => client.setQueryData(utpKeys.host(sessionId), state);
+) =>
+  client.setQueryData<UncleTeepediaLiveState>(utpKeys.host(sessionId), (current) =>
+    current && !newerVersion(current, state) ? current : state,
+  );
 
 export const setPlayerStateCache = (
   client: QueryClient,
   sessionId: string,
   state: UncleTeepediaLiveState,
-) => client.setQueryData(utpKeys.player(sessionId), state);
+) =>
+  client.setQueryData<UncleTeepediaLiveState>(utpKeys.player(sessionId), (current) =>
+    current && !newerVersion(current, state) ? current : state,
+  );

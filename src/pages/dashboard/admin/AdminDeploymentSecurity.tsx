@@ -442,9 +442,9 @@ export const AdminDeploymentSecurity = () => {
           sub="One profile can protect many deployments of the same mode"
         />
         <div className="grid gap-4 p-5 text-sm leading-relaxed text-muted md:grid-cols-3">
-          <p><b className="text-ink">1 · Build a profile.</b> Pick switches for delivery behaviour, integrity detection, session limits and device restrictions.</p>
+          <p><b className="text-ink">1 · Build a profile.</b> Pick delivery rules, web-browser proctoring and desktop-browser lockdown.</p>
           <p><b className="text-ink">2 · Assign deployments.</b> Tick any online or offline deployments in the editor — or use the shield button on the Deployments page.</p>
-          <p><b className="text-ink">3 · Keep modes separate.</b> Online profiles only attach to web deployments; offline profiles only attach to desktop bundles.</p>
+          <p><b className="text-ink">3 · The exam picks the rules.</b> External browsers use the web rules; the Learning with Uncle T Browser uses the desktop lockdown rules. Offline bundles always use desktop rules.</p>
         </div>
       </Card>
 

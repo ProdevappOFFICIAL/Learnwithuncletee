@@ -30,6 +30,16 @@ export interface UncleTeepediaParticipantItem {
   totalAnswers: number;
   currentQuestionIndex?: number;
   answer?: { optionIndex: number; isCorrect?: boolean } | null;
+  attemptStatus?: string | null;
+  questionIndex?: number;
+  totalQuestions?: number;
+  currentQuestion?: {
+    id: string;
+    question: string;
+    options: string[];
+    correctOption?: number | null;
+    imageUrl?: string | null;
+  } | null;
 }
 
 export interface UncleTeepediaSessionItem {
