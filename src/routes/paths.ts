@@ -71,6 +71,7 @@ export const ROUTES = {
   adminWebsite: '/dashboard/admin/website',
   adminWebsitePages: '/dashboard/admin/website/pages',
   adminSettings: '/dashboard/admin/settings',
+  adminCustomization: '/dashboard/admin/customization',
   adminAuditLog: '/dashboard/admin/audit-log',
   adminResultGenerator: '/dashboard/admin/result-generator',
   adminResultsNotification: '/dashboard/admin/results-notification',

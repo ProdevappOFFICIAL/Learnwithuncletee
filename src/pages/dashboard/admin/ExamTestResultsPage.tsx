@@ -2,9 +2,10 @@ import { Fragment, useEffect, useState } from 'react';
 import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pagination, Pill, TableWrap, Td, Th } from '@/components/dashboard/DashboardUI';
 import { useResource } from '@/context/AuthContext';
 import { apiDelete, apiDownload, apiGet, apiPatch } from '@/lib/api';
-import { useAcademicSettings } from '@/lib/academic';
+import { useAcademicSettings, ACADEMIC_TERMS } from '@/lib/academic';
 import { usePagedList } from '@/lib/pagedQuery';
 import type { ClassItem } from '@/data/dashboard';
+import { sessionOptions } from '@/data/dashboard';
 import { ChevronDown, ChevronRight, Download } from 'lucide-react';
 
 interface TestResultRow {
@@ -40,8 +41,13 @@ export const ExamTestResultsPage = ({ origin }: { origin: 'ONLINE' | 'OFFLINE' }
   const [exporting, setExporting] = useState<'selected' | 'all' | null>(null);
   const classes = useResource<ClassItem[]>('/classes', { limit: 200 });
   const academic = useAcademicSettings();
-  const session = academic.data?.data.session ?? '';
-  const term = academic.data?.data.term ?? '';
+  const [session, setSession] = useState('');
+  const [term, setTerm] = useState('');
+  const sessionChoices = academic.data?.data.sessionOptions ?? sessionOptions();
+  useEffect(() => {
+    if (!session && academic.data?.data.session) setSession(academic.data.data.session);
+    if (!term && academic.data?.data.term) setTerm(academic.data.data.term);
+  }, [session, term, academic.data]);
 
   const results = usePagedList<TestResultRow>(
     ['test-results', query, classFilter, examType, mode, session, term],
@@ -191,9 +197,25 @@ export const ExamTestResultsPage = ({ origin }: { origin: 'ONLINE' | 'OFFLINE' }
             <option value="cbt2">CBT 2</option>
             <option value="exam">Examination</option>
           </select>
+          <select
+            value={session}
+            onChange={(e) => { setSession(e.target.value); results.resetPage(); }}
+            aria-label="Filter by session"
+            className="min-h-11 rounded border border-line bg-white px-3 text-sm font-semibold"
+          >
+            {sessionChoices.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
+          <select
+            value={term}
+            onChange={(e) => { setTerm(e.target.value); results.resetPage(); }}
+            aria-label="Filter by term"
+            className="min-h-11 rounded border border-line bg-white px-3 text-sm font-semibold"
+          >
+            {ACADEMIC_TERMS.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
           <button type="submit" className="min-h-11 rounded bg-brand-900 px-4 text-sm font-bold text-white hover:bg-brand-700">Search</button>
-          {(search || classFilter || examType) && (
-            <button type="button" onClick={() => { setSearch(''); setQuery(''); setClassFilter(''); setExamType(''); results.resetPage(); }} className="min-h-11 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">
+          {(search || classFilter || examType || session || term) && (
+            <button type="button" onClick={() => { setSearch(''); setQuery(''); setClassFilter(''); setExamType(''); setSession(academic.data?.data.session ?? ''); setTerm(academic.data?.data.term ?? ''); results.resetPage(); }} className="min-h-11 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">
               Reset
             </button>
           )}

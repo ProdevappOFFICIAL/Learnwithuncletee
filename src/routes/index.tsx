@@ -78,6 +78,8 @@ import { SubjectQuestionsPage } from '@/pages/dashboard/admin/SubjectQuestionsPa
 import { ExamTestResultsPage } from '@/pages/dashboard/admin/ExamTestResultsPage';
 import { WebsiteSectionPage } from '@/pages/dashboard/admin/AdminSectionPage';
 import { AdminSettingsPage } from '@/pages/dashboard/admin/AdminSettingsPage';
+import { AdminCustomizationPage } from '@/pages/dashboard/admin/AdminCustomizationPage';
+import { SitePreviewPage } from '@/pages/site/SitePreviewPage';
 import { AdminAuditLogPage } from '@/pages/dashboard/admin/AdminAuditLogPage';
 import { RouteError } from '@/components/ui/RouteError';
 import AdminResultGeneratorPage from '@/pages/dashboard/admin/AdminResultGeneratorPage';
@@ -97,6 +99,20 @@ const appRoutes = [
   { path: ROUTES.gallery, element: <GalleryPage /> },
   { path: ROUTES.contact, element: <ContactPage /> },
   { path: ROUTES.login, element: <LoginPage /> },
+  {
+    path: '/site-preview/:pageKey',
+    element: <RequireAuth />,
+    children: [
+      {
+        index: true,
+        element: (
+          <RequireRole allow={['ADMIN', 'OWNER', 'MEMBER']}>
+            <SitePreviewPage />
+          </RequireRole>
+        ),
+      },
+    ],
+  },
   {
     path: ROUTES.connectDesktop,
     element: <RequireAuth />,
@@ -212,6 +228,7 @@ const appRoutes = [
           { path: 'website/pages', element: <AdminWebsitePagesPage /> },
           { path: 'website/:section', element: <WebsiteSectionPage /> },
           { path: 'settings', element: <AdminSettingsPage /> },
+          { path: 'customization', element: <AdminCustomizationPage /> },
           { path: 'audit-log', element: <AdminAuditLogPage /> },
           { path: 'result-generator', element: <AdminResultGeneratorPage /> },
           { path: 'principal-comments', element: <AdminPrincipalCommentsPage /> },

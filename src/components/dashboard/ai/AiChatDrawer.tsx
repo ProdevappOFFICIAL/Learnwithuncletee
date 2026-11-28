@@ -31,7 +31,10 @@ export const AiChatDrawer = ({
   onClose: () => void;
 }) => {
   const { user, can } = useAuth();
-  const enabled = Boolean(user) && can('ai.use');
+  const enabled =
+    Boolean(user) &&
+    can('ai.use') &&
+    ['ADMIN', 'OWNER', 'MEMBER'].includes(String(user?.role ?? ''));
   const chat = useAiChat(user?.id, enabled);
   const [railOpen, setRailOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);

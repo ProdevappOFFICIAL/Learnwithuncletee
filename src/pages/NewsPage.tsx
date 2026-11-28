@@ -7,10 +7,10 @@ import { PageMetadata } from '@/components/ui/PageMetadata';
 import { apiGetPublic } from '@/lib/api';
 import { usePagedList } from '@/lib/pagedQuery';
 import type { NoticeData } from '@/data/dashboard';
+import { useSitePage } from '@/site/SiteContent';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-const filters = ['All', 'Announcement', 'Academic', 'Sports', 'Cultural', 'Events', 'News'] as const;
-type NewsFilter = (typeof filters)[number];
+const defaultFilters = ['All', 'Announcement', 'Academic', 'Sports', 'Cultural', 'Events', 'News'];
 
 const NewsCard = ({ article }: { article: NoticeData }) => (
   <Link to={`/news/${article.id}`} className="group block border-b border-line pb-6">
@@ -35,7 +35,9 @@ const NewsCard = ({ article }: { article: NoticeData }) => (
 );
 
 export const NewsPage = () => {
-  const [filter, setFilter] = useState<NewsFilter>('All');
+  const page = useSitePage<any>('news');
+  const filters: string[] = page.filters ?? defaultFilters;
+  const [filter, setFilter] = useState<string>('All');
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
 
@@ -54,7 +56,7 @@ export const NewsPage = () => {
   );
   const articles = news.rows;
 
-  const pickFilter = (f: NewsFilter) => {
+  const pickFilter = (f: string) => {
     setFilter(f);
     news.resetPage();
   };
@@ -104,7 +106,13 @@ export const NewsPage = () => {
           },
         ]}
       />
-      <PageHero eyebrow="From our community" title="News & Events" text="School updates, upcoming moments and stories from our learning community." image="https://images.unsplash.com/photo-1523580494863-6f3031224c94?auto=format&fit=crop&w=1800&q=85" />
+      <PageHero
+        eyebrow={page.hero?.eyebrow}
+        title={page.hero?.title}
+        text={page.hero?.text}
+        image={page.hero?.image}
+        paths={{ eyebrow: 'news.hero.eyebrow', title: 'news.hero.title', text: 'news.hero.text' }}
+      />
       <section className="py-14 sm:py-18">
         <Container>
           <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter news by category">
@@ -125,7 +133,7 @@ export const NewsPage = () => {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search announcements…"
+              placeholder={page.searchPlaceholder ?? 'Search announcements…'}
               aria-label="Search announcements"
               className="min-h-11 w-full max-w-sm rounded border border-line bg-white px-3 text-sm outline-none focus:border-brand-500"
             />
@@ -147,7 +155,7 @@ export const NewsPage = () => {
               <div className={`mt-9 grid gap-7 sm:grid-cols-2 lg:grid-cols-3 transition-opacity ${news.isFetching ? 'opacity-60' : ''}`}>
                 {articles.map((article) => <NewsCard key={article.id} article={article} />)}
               </div>
-              {articles.length === 0 && <p className="py-16 text-center text-muted">No updates in this category yet.</p>}
+              {articles.length === 0 && <p className="py-16 text-center text-muted">{page.emptyText ?? 'No updates in this category yet.'}</p>}
               {news.pageCount > 1 && (
                 <div className="mt-9 flex flex-wrap items-center justify-between gap-2 text-sm">
                   <p className="text-muted">{news.total} stor{news.total === 1 ? 'y' : 'ies'} · page {news.page} of {news.pageCount}</p>

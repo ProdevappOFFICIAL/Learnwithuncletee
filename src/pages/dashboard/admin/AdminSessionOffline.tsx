@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Card, CardHead, EmptyState, ErrorState, LoadingSkeleton,
@@ -7,6 +7,8 @@ import {
 import { apiDelete, apiGet } from '@/lib/api';
 import { usePagedList } from '@/lib/pagedQuery';
 import { useResource } from '@/context/AuthContext';
+import { useAcademicSettings, ACADEMIC_TERMS } from '@/lib/academic';
+import { sessionOptions } from '@/data/dashboard';
 import type { ClassItem } from '@/data/dashboard';
 import { Clock, CheckCircle2, XCircle, Eye, Wifi } from 'lucide-react';
 
@@ -23,6 +25,8 @@ interface SessionRow {
   user?: { id: string; user_name: string; user_email: string; class?: { name: string } | null };
   exam?: { id: string; exam_name: string; minutes: number };
   deployment?: { id: string; code: string } | null;
+  session?: string | null;
+  term?: string | null;
   createdAt: string;
 }
 
@@ -40,13 +44,23 @@ export const AdminSessionOffline = () => {
   const [classFilter, setClassFilter] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const classes = useResource<ClassItem[]>('/classes', { limit: 200 });
+  const academic = useAcademicSettings();
+  const [session, setSession] = useState('');
+  const [term, setTerm] = useState('');
+  const sessionChoices = academic.data?.data.sessionOptions ?? sessionOptions();
+  useEffect(() => {
+    if (!session && academic.data?.data.session) setSession(academic.data.data.session);
+    if (!term && academic.data?.data.term) setTerm(academic.data.data.term);
+  }, [session, term, academic.data]);
 
   const sessions = usePagedList<SessionRow>(
-    ['offline-sessions', query, classFilter],
+    ['offline-sessions', query, classFilter, session, term],
     (page, limit) =>
       apiGet<SessionRow[]>('/exam-sessions/offline', {
         searchTerm: query || undefined,
         classId: classFilter || undefined,
+        session: session || undefined,
+        term: term || undefined,
         page,
         limit,
       }),
@@ -94,9 +108,15 @@ export const AdminSessionOffline = () => {
             <option value="">All classes</option>
             {(classes.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+          <select value={session} onChange={(e) => { setSession(e.target.value); sessions.resetPage(); }} aria-label="Filter by session" className="min-h-11 rounded border border-line bg-white px-3 text-sm font-semibold">
+            {sessionChoices.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
+          <select value={term} onChange={(e) => { setTerm(e.target.value); sessions.resetPage(); }} aria-label="Filter by term" className="min-h-11 rounded border border-line bg-white px-3 text-sm font-semibold">
+            {ACADEMIC_TERMS.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
           <button type="submit" className="min-h-11 rounded bg-brand-900 px-4 text-sm font-bold text-white hover:bg-brand-700">Search</button>
-          {(search || classFilter) && (
-            <button type="button" onClick={() => { setSearch(''); setQuery(''); setClassFilter(''); sessions.resetPage(); }} className="min-h-11 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">Reset</button>
+          {(search || classFilter || session || term) && (
+            <button type="button" onClick={() => { setSearch(''); setQuery(''); setClassFilter(''); setSession(academic.data?.data.session ?? ''); setTerm(academic.data?.data.term ?? ''); sessions.resetPage(); }} className="min-h-11 rounded border border-line px-4 text-sm font-bold text-muted hover:text-ink">Reset</button>
           )}
         </form>
 
@@ -116,6 +136,7 @@ export const AdminSessionOffline = () => {
                   <tr>
                     <Th>Pupil</Th>
                     <Th>Exam</Th>
+                    <Th>Session / Term</Th>
                     <Th>Class</Th>
                     <Th>Deployment</Th>
                     <Th>Time Left</Th>
@@ -134,6 +155,7 @@ export const AdminSessionOffline = () => {
                         <span className="block text-xs text-muted">{r.user?.user_email ?? ''}</span>
                       </Td>
                       <Td>{r.exam?.exam_name ?? '—'}</Td>
+                      <Td className="text-muted text-xs">{r.session || '—'}{r.term ? ` · ${r.term}` : ''}</Td>
                       <Td className="text-muted">{r.user?.class?.name ?? '—'}</Td>
                       <Td>
                         {r.deployment

@@ -17,6 +17,7 @@ import {
   MessageSquare,
   MonitorPlay,
   Newspaper,
+  Palette,
   Presentation,
   Rocket,
   ScrollText,
@@ -412,6 +413,12 @@ export const adminNav: DashboardNavItem[] = [
         permission: "results.read",
       },
     ],
+  },
+  {
+    to: ROUTES.adminCustomization,
+    label: "Customization",
+    icon: Palette,
+    permission: "settings.write",
   },
   {
     label: "Settings",

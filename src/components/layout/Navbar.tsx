@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/routes/paths';
-import { primaryNavLinks, siteInfo } from '@/data/content';
 import { avatarOf, useAuth } from '@/context/AuthContext';
+import { useSiteGlobal, SiteImage, SiteText } from '@/site/SiteContent';
 import { LayoutDashboard, LogOut, Menu, X } from 'lucide-react';
 
 const homeForRole = (role: string) =>
@@ -34,6 +34,8 @@ export const Navbar = () => {
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const { user, logout } = useAuth();
+  const site = useSiteGlobal();
+  const navLinks = (site.nav ?? []) as Array<{ label: string; to: string }>;
   const navigate = useNavigate();
   const location = useLocation();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -121,28 +123,29 @@ export const Navbar = () => {
         <div className="mx-auto flex justify-between px-8 py-2">
           <i className="font-sans">...Lubricating the wheel of education...</i>
           <div className="flex gap-5">
-            {siteInfo.phoneContacts.map((contact) => (
+            {(site.phoneContacts ?? []).map((contact: any) => (
               <a key={contact.label} href={contact.href} className="hover:text-white">
-                {contact.label}: {contact.number}
+                <SiteText path={`global.phoneContacts.${(site.phoneContacts ?? []).indexOf(contact)}.label`} value={contact.label} />:{' '}
+                <SiteText path={`global.phoneContacts.${(site.phoneContacts ?? []).indexOf(contact)}.number`} value={contact.number} />
               </a>
             ))}
           </div>
         </div>
       </div>
       <nav className="mx-auto flex min-h-[76px] items-center justify-between gap-4 px-5 sm:px-8">
-        <Link to={ROUTES.home} className="flex shrink-0 items-center gap-2" aria-label="Learnwithuncletee home">
-          <img src="/logo.png" alt="Learnwithuncletee" className="h-12 w-12 rounded-full border border-line object-cover" />
+        <Link to={ROUTES.home} className="flex shrink-0 items-center gap-2" aria-label={`${site.siteName ?? 'School'} home`}>
+          <SiteImage path="global.logo" src={site.logo} alt={site.siteName ?? 'School logo'} loading="eager" className="h-12 w-12 rounded-full border border-line object-cover" />
           <span className="max-w-[145px] text-sm font-extrabold leading-tight text-ink sm:max-w-none sm:text-base">
-            Learnwithuncletee
+            <SiteText path="global.siteName" value={site.siteName} />
             <span className="mt-0.5 hidden text-[10px] font-semibold uppercase tracking-widest text-brand-600">School</span>
           </span>
         </Link>
 
         {/* Desktop links: dot sits centered under the active label */}
         <div className="hidden items-center gap-1 xl:flex">
-          {primaryNavLinks.map((l) => (
+          {navLinks.map((l, index) => (
             <NavLink
-              key={l.to}
+              key={`${l.to}-${index}`}
               to={l.to}
               className={({ isActive }) =>
                 `group relative rounded px-2.5 py-2 pb-3 text-xs font-semibold transition-colors ${
@@ -152,7 +155,7 @@ export const Navbar = () => {
             >
               {({ isActive }) => (
                 <>
-                  {l.label}
+                  <SiteText path={`global.nav.${index}.label`} value={l.label} />
                   <NavDot active={isActive} className="absolute bottom-0.5 left-1/2 -translate-x-1/2" />
                 </>
               )}
@@ -166,7 +169,9 @@ export const Navbar = () => {
           ) : (
             <Link to={ROUTES.login} className="rounded px-3 py-2 text-sm font-bold text-brand-700 hover:bg-brand-50">Portal Login</Link>
           )}
-          <Link to={ROUTES.admissions} className="rounded bg-brand-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-700">Apply Now</Link>
+          <Link to={ROUTES.admissions} className="rounded bg-brand-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-700">
+            <SiteText path="global.applyLabel" value={site.applyLabel ?? 'Apply Now'} />
+          </Link>
         </div>
 
         <div className="flex items-center gap-2 xl:hidden">
@@ -191,9 +196,9 @@ export const Navbar = () => {
       {open && (
         <div className="border-t border-line bg-white px-5 py-3 xl:hidden">
           <div className="mx-auto flex max-w-7xl flex-col gap-1 sm:grid sm:grid-cols-2">
-            {primaryNavLinks.map((l) => (
+            {navLinks.map((l, index) => (
               <NavLink
-                key={l.to}
+                key={`${l.to}-${index}`}
                 to={l.to}
                 onClick={() => setOpen(false)}
                 className={({ isActive }) =>
@@ -205,12 +210,14 @@ export const Navbar = () => {
                 {({ isActive }) => (
                   <>
                     <NavDot active={isActive} className="relative shrink-0" />
-                    {l.label}
+                    <SiteText path={`global.nav.${index}.label`} value={l.label} />
                   </>
                 )}
               </NavLink>
             ))}
-            <Link to={ROUTES.admissions} onClick={() => setOpen(false)} className="mt-2 rounded bg-brand-500 px-3 py-3 text-center text-sm font-bold text-white hover:bg-brand-700 sm:col-span-2">Apply Now</Link>
+            <Link to={ROUTES.admissions} onClick={() => setOpen(false)} className="mt-2 rounded bg-brand-500 px-3 py-3 text-center text-sm font-bold text-white hover:bg-brand-700 sm:col-span-2">
+              <SiteText path="global.applyLabel" value={site.applyLabel ?? 'Apply Now'} />
+            </Link>
             <Link to={ROUTES.login} onClick={() => setOpen(false)} className="rounded px-3 py-3 text-sm font-semibold text-brand-700 hover:bg-brand-50 sm:hidden">Portal Login</Link>
           </div>
         </div>

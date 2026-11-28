@@ -83,6 +83,10 @@ export const DashboardLayout = ({ role, nav }: Props) => {
   const effectiveRole: DashboardRole = isMember ? 'member' : role;
   const effectiveNav = isMember ? memberNav : nav;
   const meta = roleMeta[effectiveRole] || roleMeta[role];
+  // The AI operations assistant is for school leaders only. Teachers, pupils
+  // and parents keep focused read/write portals without the floating launcher.
+  const canUseAi =
+    can('ai.use') && ['ADMIN', 'OWNER', 'MEMBER'].includes(String(user?.role ?? ''));
 
   // Admin-configurable visibility: items carrying `permission` are hidden
   // when the signed-in user lacks it. Signed-out preview shows everything.
@@ -607,7 +611,7 @@ export const DashboardLayout = ({ role, nav }: Props) => {
                 <Search size={15} aria-hidden="true" />
                 <input placeholder="Search…" className="w-36 bg-transparent outline-none placeholder:text-muted/70 lg:w-44" />
               </label>
-              {can('ai.use') && (
+              {canUseAi && (
                 <button
                   type="button"
                   onClick={openAi}

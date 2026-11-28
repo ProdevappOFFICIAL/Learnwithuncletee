@@ -4,7 +4,7 @@ import { Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, Modal, PageHea
 import { useResource } from '@/context/AuthContext';
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 import { UploadButton } from '@/lib/uploadthing';
-import type { CourseAssignmentItem, StaffRow } from '@/data/dashboard';
+import type { CourseAssignmentItem, StaffRow, StatusAssignmentItem } from '@/data/dashboard';
 import { BookOpen, BadgeCheck, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '@/routes/paths';
@@ -87,6 +87,16 @@ export const AdminTeachersPage = () => {
     }
   }, [qc, query, safePage, pageCount]);
   const assignments = useResource<CourseAssignmentItem[]>('/course-assignments', { limit: 100 });
+  const leadership = useQuery({
+    queryKey: ['admin-teacher-leadership'],
+    queryFn: async () => (await apiGet<StatusAssignmentItem[]>('/statuses/assignments', { scope: 'TEACHER' })).data,
+    staleTime: 60_000,
+  });
+  const principalIds = new Set(
+    (leadership.data ?? [])
+      .filter((assignment) => /principal/i.test(assignment.status.name))
+      .map((assignment) => assignment.userId),
+  );
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<StaffRow | null>(null);
@@ -274,7 +284,10 @@ export const AdminTeachersPage = () => {
                       <Td><StaffPicture row={s} /></Td>
                       <Td><span className="font-bold">{s.user_name}</span><span className="block text-xs text-muted">{s.user_email}{s.teacher ? ` - ${s.teacher.staffCode}` : ''}</span></Td>
                       <Td>
-                        <Pill tone="ink">{s.role}</Pill>
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          <Pill tone="ink">{s.role}</Pill>
+                          {principalIds.has(s.id) && <Pill tone="violet">Principal</Pill>}
+                        </span>
                       </Td>
                       <Td className="text-muted">
                         {courses.length === 0 ? '-' : (

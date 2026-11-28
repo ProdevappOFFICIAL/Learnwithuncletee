@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Download, FileBarChart2, Printer } from 'lucide-react';
+import { BookOpenCheck, Download, Eye, FileBarChart2, Printer } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ROUTES } from '@/routes/paths';
 import {
   Card,
   CardHead,
@@ -28,6 +30,17 @@ interface ResultNotificationAvailability {
   visibleUntil: string;
 }
 
+interface AttemptRow {
+  id: string;
+  overallScore: number;
+  attempted_questions: number;
+  total_questions: number;
+  date: string;
+  exam?: { exam_name: string };
+  subjectScores?: Record<string, { correct: number; total: number }>;
+  subjectNames?: Record<string, string>;
+}
+
 export const StudentResultNotificationPage = () => {
   const { user } = useAuth();
   const academic = useAcademicSettings();
@@ -41,6 +54,8 @@ export const StudentResultNotificationPage = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<ResultNotificationAvailability | null>(null);
   const [availability, setAvailability] = useState<ResultNotificationAvailability | null>(null);
+  const [onlineAttempts, setOnlineAttempts] = useState<AttemptRow[]>([]);
+  const [offlineAttempts, setOfflineAttempts] = useState<AttemptRow[]>([]);
   const sheetRef = useRef<HTMLDivElement>(null);
 
   const currentSession = academic.data?.data.session ?? '';
@@ -79,6 +94,8 @@ export const StudentResultNotificationPage = () => {
     setAvailability(null);
     setCard(null);
     setFetchedPeriod(null);
+    setOnlineAttempts([]);
+    setOfflineAttempts([]);
     try {
       const availabilityResponse = await apiGet<ResultNotificationAvailability>(
         '/settings/result-notification/availability',
@@ -89,19 +106,28 @@ export const StudentResultNotificationPage = () => {
         setBlocked(availabilityResponse.data);
         return;
       }
-      const response = await apiGet<GeneratedReportCard | null>(
-        `/report-cards/student/${user.id}`,
-        { session: effectiveSession, term: effectiveTerm },
-      );
+      // Full result = the published report sheet plus both exam-attempt stores
+      // for the same session and term. The list endpoints force-scope pupils
+      // to their own rows on the server.
+      const [response, online, offline] = await Promise.all([
+        apiGet<GeneratedReportCard | null>(`/report-cards/student/${user.id}`, {
+          session: effectiveSession,
+          term: effectiveTerm,
+        }),
+        apiGet<AttemptRow[]>('/results', { session: effectiveSession, term: effectiveTerm, limit: 50 }).catch(() => ({ data: [] })),
+        apiGet<AttemptRow[]>('/offline-results', { session: effectiveSession, term: effectiveTerm, limit: 50 }).catch(() => ({ data: [] })),
+      ]);
       setCard(response.data);
+      setOnlineAttempts(online.data ?? []);
+      setOfflineAttempts(offline.data ?? []);
       setFetchedPeriod({ session: effectiveSession, term: effectiveTerm });
-      if (!response.data) {
+      if (!response.data && !(online.data ?? []).length && !(offline.data ?? []).length) {
         setNotice(
-          `No result notification has been published for ${effectiveSession} · ${effectiveTerm}.`,
+          `No result notification or exam attempts have been published for ${effectiveSession} · ${effectiveTerm}.`,
         );
       }
     } catch (err: any) {
-      setError(err?.message ?? 'Could not load your result notification.');
+      setError(err?.message ?? 'Could not load your full result.');
     } finally {
       setLoading(false);
     }
@@ -132,7 +158,7 @@ export const StudentResultNotificationPage = () => {
       <PageHeader
         eyebrow="Results"
         title="Result Notification"
-        text="Choose a session and term, then open the result notification sheet published for you. You can print it or download it as an image."
+        text="Choose a session and term, then get your full result: the published report card and every online/offline exam attempt for that term."
       />
 
       <Card>
@@ -187,7 +213,7 @@ export const StudentResultNotificationPage = () => {
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded bg-brand-500 px-5 text-sm font-bold text-white hover:bg-brand-700 disabled:opacity-50"
           >
             <FileBarChart2 size={15} aria-hidden="true" />
-            {loading ? 'Loading…' : 'Get results'}
+            {loading ? 'Loading…' : 'Get full result'}
           </button>
         </div>
         {error && (
@@ -293,6 +319,54 @@ export const StudentResultNotificationPage = () => {
           </div>
         </Card>
       ) : null}
+
+      {fetchedPeriod && !loading && !blocked && (onlineAttempts.length > 0 || offlineAttempts.length > 0) && (
+        <Card className="print:hidden">
+          <CardHead
+            title={`Exam attempts — ${fetchedPeriod.session} · ${fetchedPeriod.term}`}
+            sub={`${onlineAttempts.length + offlineAttempts.length} sitting(s) recorded for this term`}
+          />
+          <ul className="divide-y divide-line">
+            {[
+              ...onlineAttempts.map((row) => ({ ...row, origin: 'ONLINE' as const })),
+              ...offlineAttempts.map((row) => ({ ...row, origin: 'OFFLINE' as const })),
+            ]
+              .sort((a, b) => +new Date(b.date) - +new Date(a.date))
+              .map((row) => (
+                <li key={`${row.origin}:${row.id}`} className="px-5 py-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold">{row.exam?.exam_name ?? 'Exam'}</p>
+                      <p className="text-xs text-muted">
+                        {new Date(row.date).toLocaleString()} · attempted {row.attempted_questions}/{row.total_questions}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Pill tone={row.origin === 'OFFLINE' ? 'amber' : 'sky'}>{row.origin === 'OFFLINE' ? 'Offline' : 'Online'}</Pill>
+                      <Pill tone={row.overallScore >= 75 ? 'emerald' : row.overallScore < 40 ? 'rose' : 'sky'}>{Math.round(row.overallScore)}%</Pill>
+                      <Link
+                        to={ROUTES.studentResultDetail
+                          .replace(':origin', row.origin === 'OFFLINE' ? 'offline' : 'online')
+                          .replace(':id', row.id)}
+                        className="inline-flex min-h-9 items-center gap-1.5 rounded border border-line bg-white px-3 text-xs font-bold text-brand-700 hover:border-brand-500 hover:bg-brand-50"
+                      >
+                        <Eye size={13} aria-hidden="true" /> View
+                      </Link>
+                      <Link
+                        to={ROUTES.studentResultReport
+                          .replace(':origin', row.origin === 'OFFLINE' ? 'offline' : 'online')
+                          .replace(':id', row.id)}
+                        className="inline-flex min-h-9 items-center gap-1.5 rounded bg-brand-900 px-3 text-xs font-bold text-white hover:bg-brand-700"
+                      >
+                        <BookOpenCheck size={13} aria-hidden="true" /> Exam report
+                      </Link>
+                    </div>
+                  </div>
+                </li>
+              ))}
+          </ul>
+        </Card>
+      )}
     </div>
   );
 };

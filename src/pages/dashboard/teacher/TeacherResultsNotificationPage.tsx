@@ -637,7 +637,7 @@ export const TeacherResultsNotificationPage = () => {
               <ArrowLeft size={13} aria-hidden="true" /> All tasks
             </button>
           )}
-          <p className="text-[11px] font-bold uppercase tracking-widest text-brand-700">Reports</p>
+         
           <h1 className="mt-1 font-display text-2xl font-extrabold text-ink">
             {task === 'exam'
               ? 'Examination Scores'
