@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   Card,
   CardHead,
@@ -10,8 +11,13 @@ import {
   PageHeader,
   Pill,
 } from '@/components/dashboard/DashboardUI';
-import { useResource } from '@/context/AuthContext';
-import { apiDelete, apiPost } from '@/lib/api';
+import { apiGet } from '@/lib/api';
+import {
+  useCreateCompetition,
+  useDeleteCompetition,
+  usePrefetchCompetition,
+  useUncleTeepediaCompetitions,
+} from '@/hooks/useUncleTeepediaQueries';
 import { ROUTES } from '@/routes/paths';
 import type { ClassItem } from '@/data/dashboard';
 import {
@@ -48,16 +54,26 @@ const emptyForm = {
   buzzEnabled: false,
   rules: '',
   classIds: [] as string[],
+  autoAdvance: true,
+  autoAdvanceDelaySeconds: 2,
 };
 
 export const AdminUncleTeepediaPage = () => {
-  const list = useResource<UncleTeepediaCompetitionItem[]>('/uncleteepedia/competitions');
-  const classes = useResource<ClassItem[]>('/classes', { limit: 200 });
+  const list = useUncleTeepediaCompetitions();
+  const classes = useQuery({
+    queryKey: ['uncleteepedia', 'class-options'],
+    queryFn: async () => (await apiGet<ClassItem[]>('/classes', { limit: 200 })).data,
+    staleTime: 30 * 60_000,
+    gcTime: 60 * 60_000,
+  });
+  const createCompetition = useCreateCompetition();
+  const deleteCompetition = useDeleteCompetition();
+  const prefetchCompetition = usePrefetchCompetition();
   const navigate = useNavigate();
   const toast = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
-  const [busy, setBusy] = useState(false);
+  const busy = createCompetition.isPending;
 
   const competitions = useMemo(() => list.data ?? [], [list.data]);
   const stats = useMemo(
@@ -95,31 +111,31 @@ export const AdminUncleTeepediaPage = () => {
       toast.error('Give the competition a title first.');
       return;
     }
-    setBusy(true);
     try {
-      const response = await apiPost<UncleTeepediaCompetitionItem>('/uncleteepedia/competitions', {
+      const created = await createCompetition.mutateAsync({
         ...form,
         questionDurationSeconds: form.questionDurationSeconds || null,
         maxParticipants: form.maxParticipants || null,
         maxPracticeAttempts: form.maxPracticeAttempts || null,
+        settings: {
+          autoAdvance: form.autoAdvance,
+          autoAdvanceDelaySeconds: form.autoAdvanceDelaySeconds,
+        },
       });
       toast.success('Competition created. Add questions next.');
       setDialogOpen(false);
       setForm({ ...emptyForm });
-      navigate(`${ROUTES.adminUncleTeepedia}/${response.data.id}`);
+      navigate(`${ROUTES.adminUncleTeepedia}/${created.id}`);
     } catch (error: any) {
       toast.error(error?.message ?? 'Could not create competition');
-    } finally {
-      setBusy(false);
     }
   };
 
   const remove = async (competition: UncleTeepediaCompetitionItem) => {
     if (!window.confirm(`Delete "${competition.title}"? This cannot be undone.`)) return;
     try {
-      await apiDelete(`/uncleteepedia/competitions/${competition.id}`);
+      await deleteCompetition.mutateAsync(competition.id);
       toast.success('Competition deleted');
-      list.reload();
     } catch (error: any) {
       toast.error(error?.message ?? 'Could not delete competition');
     }
@@ -163,15 +179,20 @@ export const AdminUncleTeepediaPage = () => {
         ))}
       </div>
 
-      {list.loading && <LoadingSkeleton rows={4} />}
-      {list.error && <ErrorState message={list.error} onRetry={list.reload} />}
-      {!list.loading && !list.error && competitions.length === 0 && (
+      {list.isPending && !list.data && <LoadingSkeleton rows={4} />}
+      {list.error && <ErrorState message={list.error.message} onRetry={() => list.refetch()} />}
+      {!list.isPending && !list.error && competitions.length === 0 && (
         <EmptyState message="No competitions yet. Create one to get started." />
       )}
 
       <div className="grid gap-4 xl:grid-cols-2">
         {competitions.map((competition) => (
-          <Card key={competition.id} className="flex flex-col">
+          <div
+            key={competition.id}
+            onMouseEnter={() => prefetchCompetition(competition.id)}
+            className="flex"
+          >
+          <Card className="flex w-full flex-col">
             <CardHead
               title={competition.title}
               sub={`${formatLabel(competition.format)} · ${modeLabel(competition.gameplayMode)}`}
@@ -236,6 +257,7 @@ export const AdminUncleTeepediaPage = () => {
               </div>
             </div>
           </Card>
+          </div>
         ))}
       </div>
 
@@ -342,6 +364,37 @@ export const AdminUncleTeepediaPage = () => {
               />
             </label>
           </div>
+
+          {form.format === 'SIXTY_SECONDS' && (
+            <div className="grid gap-4 rounded border border-brand-200 bg-brand-50/60 p-4 sm:grid-cols-[1fr_180px]">
+              <label className="flex cursor-pointer items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.autoAdvance}
+                  onChange={(event) => set('autoAdvance', event.target.checked)}
+                  className="mt-0.5 accent-brand-600"
+                />
+                <span>
+                  <span className="font-bold text-ink">Auto-advance after answers</span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    Reveal the answer and move to the next question automatically. Hot Seat moves
+                    after the contestant answers; Shared Live waits until everyone has answered.
+                  </span>
+                </span>
+              </label>
+              <label className="block text-sm">
+                <span className="font-bold text-ink">Auto-advance delay (s)</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={form.autoAdvanceDelaySeconds}
+                  onChange={(event) => set('autoAdvanceDelaySeconds', Number(event.target.value))}
+                  className="mt-1 w-full rounded border border-line bg-white px-3 py-2.5"
+                />
+              </label>
+            </div>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-4">
             <label className="block text-sm">

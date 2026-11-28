@@ -121,6 +121,7 @@ export interface UncleTeepediaLiveState {
     questionDurationSeconds?: number | null;
     revealDurationSeconds?: number;
     buzzEnabled?: boolean;
+    autoAdvance?: boolean;
   };
   currentRound?: UncleTeepediaRound | null;
   question?: (UncleTeepediaQuestionItem & { correctOption?: number | null }) | null;

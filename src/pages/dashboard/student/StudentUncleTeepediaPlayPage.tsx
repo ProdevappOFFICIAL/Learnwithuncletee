@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, EmptyState, ErrorState, LoadingSkeleton, Pill } from '@/components/dashboard/DashboardUI';
-import { useResource } from '@/context/AuthContext';
 import { apiPost } from '@/lib/api';
+import {
+  setPlayerStateCache,
+  useUncleTeepediaPlayerState,
+  utpKeys,
+} from '@/hooks/useUncleTeepediaQueries';
 import { connectUncleTeepedia, emitAck, requestId } from '@/lib/uncleteepediaSocket';
 import { Countdown } from '@/components/uncleteepedia/Countdown';
 import { useToast } from '@/components/ui/Toast';
@@ -37,10 +42,8 @@ const ScoreChip = ({ participant }: { participant?: UncleTeepediaParticipantItem
 export const StudentUncleTeepediaPlayPage = () => {
   const { sessionId = '' } = useParams();
   const toast = useToast();
-  const initial = useResource<UncleTeepediaLiveState>(
-    sessionId ? `/uncleteepedia/sessions/${sessionId}/player-state` : null,
-  );
-  const [liveState, setLiveState] = useState<UncleTeepediaLiveState | null>(null);
+  const client = useQueryClient();
+  const playerQuery = useUncleTeepediaPlayerState(sessionId || null);
   const [practiceState, setPracticeState] = useState<UncleTeepediaLiveState | null>(null);
   const practiceRef = useRef(false);
   const [socketHandle, setSocketHandle] = useState<ReturnType<typeof connectUncleTeepedia> | null>(null);
@@ -48,12 +51,14 @@ export const StudentUncleTeepediaPlayPage = () => {
 
   useEffect(() => {
     if (!sessionId) return;
+    practiceRef.current = false;
+    setPracticeState(null);
     const handle = connectUncleTeepedia<UncleTeepediaLiveState>({
       sessionId,
       onState: (next) => {
         // A practice run is local to this contestant; live official broadcasts
         // must not overwrite the practice question feed.
-        if (!practiceRef.current) setLiveState(next);
+        if (!practiceRef.current) setPlayerStateCache(client, sessionId, next);
       },
       onError: (message) => toast.error(message),
     });
@@ -62,9 +67,9 @@ export const StudentUncleTeepediaPlayPage = () => {
       handle?.disconnect();
       setSocketHandle(null);
     };
-  }, [sessionId]);
+  }, [sessionId, client]);
 
-  const state = practiceState ?? liveState ?? initial.data;
+  const state = practiceState ?? playerQuery.data;
   const mode = state?.competition?.gameplayMode;
   const selfPaced = mode === 'SELF_PACED';
   const attempt = state?.attempt;
@@ -83,8 +88,7 @@ export const StudentUncleTeepediaPlayPage = () => {
   const refresh = async () => {
     practiceRef.current = false;
     setPracticeState(null);
-    await initial.reload();
-    setLiveState(null);
+    await playerQuery.refetch();
   };
 
   const startPractice = async () => {
@@ -113,7 +117,7 @@ export const StudentUncleTeepediaPlayPage = () => {
         `/uncleteepedia/sessions/${sessionId}/attempts`,
         {},
       );
-      setLiveState(response.data);
+      setPlayerStateCache(client, sessionId, response.data);
     } catch (error: any) {
       toast.error(error?.message ?? 'Could not start your attempt');
     } finally {
@@ -140,14 +144,15 @@ export const StudentUncleTeepediaPlayPage = () => {
         );
       } else if (socketHandle?.socket?.connected) {
         await emitAck(socketHandle.socket, 'player:answer', payload);
-        setLiveState((current) =>
+        client.setQueryData<UncleTeepediaLiveState>(utpKeys.player(sessionId), (current) =>
           current ? { ...current, selectedOption: optionIndex } : current,
         );
       } else {
         await apiPost(`/uncleteepedia/attempts/${attempt?.id}/answers`, payload);
-        setLiveState((current) =>
+        client.setQueryData<UncleTeepediaLiveState>(utpKeys.player(sessionId), (current) =>
           current ? { ...current, selectedOption: optionIndex } : current,
         );
+        await playerQuery.refetch();
       }
       toast.info('Answer locked in.');
     } catch (error: any) {
@@ -173,13 +178,13 @@ export const StudentUncleTeepediaPlayPage = () => {
           'player:next',
           { attemptId: attempt.id },
         );
-        if (response.result) setLiveState(response.result);
+        if (response.result) setPlayerStateCache(client, sessionId, response.result);
       } else {
         const response = await apiPost<UncleTeepediaLiveState>(
           `/uncleteepedia/attempts/${attempt.id}/next`,
           {},
         );
-        setLiveState(response.data);
+        setPlayerStateCache(client, sessionId, response.data);
       }
     } catch (error: any) {
       toast.error(error?.message ?? 'Could not move to the next question');
@@ -208,11 +213,11 @@ export const StudentUncleTeepediaPlayPage = () => {
     }
   };
 
-  if (initial.loading && !state) return <LoadingSkeleton rows={5} />;
-  if (initial.error && !state) {
+  if (playerQuery.isPending && !state) return <LoadingSkeleton rows={5} />;
+  if (playerQuery.error && !state) {
     return (
       <div className="space-y-4">
-        <ErrorState message={initial.error} onRetry={initial.reload} />
+        <ErrorState message={playerQuery.error.message} onRetry={() => playerQuery.refetch()} />
         <Link to={ROUTES.studentUncleTeepedia} className="text-sm font-bold text-brand-700 underline">
           Back to UncleTeepedia
         </Link>

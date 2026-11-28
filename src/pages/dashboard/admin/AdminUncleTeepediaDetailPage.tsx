@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Card,
   CardHead,
@@ -13,11 +14,22 @@ import {
   Td,
   Th,
 } from '@/components/dashboard/DashboardUI';
-import { useResource } from '@/context/AuthContext';
-import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api';
+import { apiGet, apiPost } from '@/lib/api';
 import { connectUncleTeepedia, emitAck, requestId } from '@/lib/uncleteepediaSocket';
 import { Countdown } from '@/components/uncleteepedia/Countdown';
 import { useToast } from '@/components/ui/Toast';
+import {
+  setHostStateCache,
+  useAddQuestions,
+  useCreateSession,
+  useDeleteQuestion,
+  useImportQuestions,
+  useReorderQuestions,
+  useUncleTeepediaCompetition,
+  useUncleTeepediaHostState,
+  useUpdateQuestion,
+  utpKeys,
+} from '@/hooks/useUncleTeepediaQueries';
 import {
   formatLabel,
   modeLabel,
@@ -75,21 +87,29 @@ const blankDraft = (): QuestionDraft => ({
 const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 /** ── Question manager ─────────────────────────────────────────────────────── */
-const QuestionManager = ({
-  competition,
-  reload,
-}: {
-  competition: UncleTeepediaCompetitionItem;
-  reload: () => void;
-}) => {
+const QuestionManager = ({ competition }: { competition: UncleTeepediaCompetitionItem }) => {
   const toast = useToast();
   const [draft, setDraft] = useState<QuestionDraft>(blankDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
   const questions = competition.questions ?? [];
-  const sources = useResource<SourceQuestion[]>('/questions', { limit: 200 });
+  const sources = useQuery({
+    queryKey: ['uncleteepedia', 'question-bank-options'],
+    queryFn: async () => (await apiGet<SourceQuestion[]>('/questions', { limit: 200 })).data,
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
+  });
+  const addQuestions = useAddQuestions(competition.id);
+  const importQuestions = useImportQuestions(competition.id);
+  const updateQuestion = useUpdateQuestion(competition.id);
+  const deleteQuestion = useDeleteQuestion(competition.id);
+  const reorderQuestions = useReorderQuestions(competition.id);
+  const busy =
+    addQuestions.isPending ||
+    importQuestions.isPending ||
+    updateQuestion.isPending ||
+    deleteQuestion.isPending;
 
   const reset = () => {
     setDraft(blankDraft());
@@ -106,37 +126,34 @@ const QuestionManager = ({
       toast.error('Choose one of the provided options as the correct answer.');
       return;
     }
-    setBusy(true);
     try {
       if (editingId) {
-        await apiPut(`/uncleteepedia/competitions/${competition.id}/questions/${editingId}`, {
-          question: draft.question,
-          options,
-          correctOption: draft.correctOption,
-          explanation: draft.explanation,
-          imageUrl: draft.imageUrl,
+        await updateQuestion.mutateAsync({
+          questionId: editingId,
+          body: {
+            question: draft.question,
+            options,
+            correctOption: draft.correctOption,
+            explanation: draft.explanation,
+            imageUrl: draft.imageUrl,
+          },
         });
         toast.success('Question updated');
       } else {
-        await apiPost(`/uncleteepedia/competitions/${competition.id}/questions`, {
-          questions: [
-            {
-              question: draft.question,
-              options,
-              correctOption: draft.correctOption,
-              explanation: draft.explanation,
-              imageUrl: draft.imageUrl,
-            },
-          ],
-        });
+        await addQuestions.mutateAsync([
+          {
+            question: draft.question,
+            options,
+            correctOption: draft.correctOption,
+            explanation: draft.explanation,
+            imageUrl: draft.imageUrl,
+          },
+        ]);
         toast.success('Question added');
       }
       reset();
-      reload();
     } catch (error: any) {
       toast.error(error?.message ?? 'Could not save question');
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -155,9 +172,8 @@ const QuestionManager = ({
   const remove = async (question: UncleTeepediaQuestionItem) => {
     if (!window.confirm('Delete this question?')) return;
     try {
-      await apiDelete(`/uncleteepedia/competitions/${competition.id}/questions/${question.id}`);
+      await deleteQuestion.mutateAsync(question.id);
       toast.success('Question deleted');
-      reload();
     } catch (error: any) {
       toast.error(error?.message ?? 'Could not delete question');
     }
@@ -169,10 +185,7 @@ const QuestionManager = ({
     if (target < 0 || target >= next.length) return;
     [next[index], next[target]] = [next[target], next[index]];
     try {
-      await apiPost(`/uncleteepedia/competitions/${competition.id}/questions/reorder`, {
-        questionIds: next.map((question) => question.id),
-      });
-      reload();
+      await reorderQuestions.mutateAsync(next.map((question) => question.id));
     } catch (error: any) {
       toast.error(error?.message ?? 'Could not reorder questions');
     }
@@ -180,19 +193,13 @@ const QuestionManager = ({
 
   const importSelected = async () => {
     if (!selectedSources.length) return;
-    setBusy(true);
     try {
-      await apiPost(`/uncleteepedia/competitions/${competition.id}/questions/import`, {
-        questionIds: selectedSources,
-      });
+      await importQuestions.mutateAsync(selectedSources);
       toast.success(`${selectedSources.length} question(s) imported`);
       setSelectedSources([]);
       setImportOpen(false);
-      reload();
     } catch (error: any) {
       toast.error(error?.message ?? 'Import failed');
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -362,8 +369,10 @@ const QuestionManager = ({
 
       <Modal open={importOpen} onClose={() => setImportOpen(false)} title="Import from question bank" size="xl">
         <div className="space-y-4">
-          {sources.loading && <LoadingSkeleton rows={3} />}
-          {sources.error && <ErrorState message={sources.error} onRetry={sources.reload} />}
+          {sources.isPending && <LoadingSkeleton rows={3} />}
+          {sources.error && (
+            <ErrorState message={sources.error.message} onRetry={() => sources.refetch()} />
+          )}
           <div className="max-h-[420px] space-y-2 overflow-y-auto">
             {(sources.data ?? []).map((source) => (
               <label
@@ -390,7 +399,7 @@ const QuestionManager = ({
                 </span>
               </label>
             ))}
-            {(sources.data ?? []).length === 0 && !sources.loading && (
+            {(sources.data ?? []).length === 0 && !sources.isPending && (
               <EmptyState message="The question bank is empty for this workspace." />
             )}
           </div>
@@ -426,17 +435,20 @@ const HostController = ({
   onRefreshCompetition: () => void;
 }) => {
   const toast = useToast();
-  const [state, setState] = useState<UncleTeepediaLiveState | null>(null);
+  const client = useQueryClient();
+  const hostQuery = useUncleTeepediaHostState(sessionId);
+  const state = hostQuery.data ?? null;
   const [socketHandle, setSocketHandle] = useState<ReturnType<typeof connectUncleTeepedia> | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    setState(null);
     setConnected(false);
     const handle = connectUncleTeepedia<UncleTeepediaLiveState>({
       sessionId,
-      onState: (next) => setState(next),
+      // Socket snapshots replace the REST cache directly, so there is no
+      // second loading phase after the control room opens.
+      onState: (next) => setHostStateCache(client, sessionId, next),
       onError: (message) => toast.error(message),
     });
     setSocketHandle(handle);
@@ -448,34 +460,60 @@ const HostController = ({
       setSocketHandle(null);
       setConnected(false);
     };
-  }, [sessionId]);
+  }, [sessionId, client]);
 
-  const reload = async () => {
-    try {
-      const response = await apiGet<UncleTeepediaLiveState>(`/uncleteepedia/sessions/${sessionId}/state`);
-      setState(response.data);
-    } catch (error: any) {
-      toast.error(error?.message ?? 'Could not load control room');
-    }
+  const patchHost = (updater: (current: UncleTeepediaLiveState) => UncleTeepediaLiveState) => {
+    client.setQueryData<UncleTeepediaLiveState>(utpKeys.host(sessionId), (current) =>
+      current ? updater(current) : current,
+    );
   };
-
-  useEffect(() => {
-    if (!state) void reload();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
 
   const command = async (event: string, path: string, payload: any = {}) => {
     setBusy(event);
+    const now = new Date().toISOString();
+    // Instant feedback for deterministic state changes. Question text still
+    // comes from the authoritative socket snapshot.
+    if (event === 'host:pause') {
+      patchHost((current) => ({
+        ...current,
+        session: { ...current.session, status: 'PAUSED', pausedAt: now },
+      }));
+    }
+    if (event === 'host:resume') {
+      patchHost((current) => ({
+        ...current,
+        session: { ...current.session, status: 'LIVE', pausedAt: null },
+      }));
+    }
+    if (event === 'host:end') {
+      patchHost((current) => ({
+        ...current,
+        session: { ...current.session, status: 'ENDED' },
+      }));
+    }
+    if (event === 'host:reveal') {
+      patchHost((current) => ({
+        ...current,
+        currentRound: current.currentRound
+          ? {
+              ...current.currentRound,
+              status: 'REVEALED',
+              correctOption: current.question?.correctOption ?? current.currentRound.correctOption,
+            }
+          : current.currentRound,
+      }));
+    }
     try {
       if (socketHandle?.socket?.connected) {
         await emitAck(socketHandle.socket, event, { ...payload, requestId: requestId() });
       } else {
         await apiPost(path, payload);
-        await reload();
+        await hostQuery.refetch();
       }
       onRefreshCompetition();
     } catch (error: any) {
       toast.error(error?.message ?? 'Command failed');
+      await hostQuery.refetch();
     } finally {
       setBusy(null);
     }
@@ -504,7 +542,8 @@ const HostController = ({
       { participantId },
     );
 
-  if (!state) return <LoadingSkeleton rows={4} />;
+  if (!state && hostQuery.isPending) return <LoadingSkeleton rows={4} />;
+  if (!state) return <ErrorState message="Control room state could not be loaded." onRetry={() => hostQuery.refetch()} />;
 
   const session = state.session;
   const round = state.currentRound;
@@ -533,6 +572,7 @@ const HostController = ({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Pill tone={statusTone(session.status)}>{session.status}</Pill>
+            {state.competition.autoAdvance && <Pill tone="sky">Auto-advance</Pill>}
             <Countdown
               endsAt={session.overallEndsAt}
               pausedAt={session.pausedAt}
@@ -794,12 +834,11 @@ const HostController = ({
 export const AdminUncleTeepediaDetailPage = () => {
   const { id = '' } = useParams();
   const toast = useToast();
-  const competition = useResource<UncleTeepediaCompetitionItem>(
-    id ? `/uncleteepedia/competitions/${id}` : null,
-  );
+  const competition = useUncleTeepediaCompetition(id);
+  const createSessionMutation = useCreateSession(id);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
   const [watchOpen, setWatchOpen] = useState(false);
+  const creating = createSessionMutation.isPending;
 
   const sessions = useMemo(() => competition.data?.sessions ?? [], [competition.data]);
   useEffect(() => {
@@ -822,24 +861,19 @@ export const AdminUncleTeepediaDetailPage = () => {
       toast.error('Add at least one question before opening a session.');
       return;
     }
-    setCreating(true);
     try {
-      const response = await apiPost<{ id: string }>(
-        `/uncleteepedia/competitions/${competition.data.id}/sessions`,
-        {},
-      );
+      const session = await createSessionMutation.mutateAsync();
       toast.success('Session created. Press Start live when the pupils are ready.');
-      await competition.reload();
-      setSessionId(response.data.id);
+      setSessionId(session.id);
     } catch (error: any) {
       toast.error(error?.message ?? 'Could not create session');
-    } finally {
-      setCreating(false);
     }
   };
 
-  if (competition.loading) return <LoadingSkeleton rows={5} />;
-  if (competition.error) return <ErrorState message={competition.error} onRetry={competition.reload} />;
+  if (competition.isPending && !competition.data) return <LoadingSkeleton rows={5} />;
+  if (competition.error) {
+    return <ErrorState message={competition.error.message} onRetry={() => competition.refetch()} />;
+  }
   if (!competition.data) return <EmptyState message="Competition not found." />;
   const data = competition.data;
   const watchUrl = sessionId ? `${window.location.origin}/uncleteepedia/watch/${sessionId}` : '';
@@ -931,10 +965,13 @@ export const AdminUncleTeepediaDetailPage = () => {
       </Card>
 
       {sessionId && (
-        <HostController sessionId={sessionId} onRefreshCompetition={competition.reload} />
+        <HostController
+          sessionId={sessionId}
+          onRefreshCompetition={() => void competition.refetch()}
+        />
       )}
 
-      <QuestionManager competition={data} reload={competition.reload} />
+      <QuestionManager competition={data} />
 
       <Card>
         <CardHead title="Competition settings" sub="Configuration is frozen in each session snapshot when it starts" />

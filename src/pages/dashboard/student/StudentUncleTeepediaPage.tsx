@@ -9,32 +9,20 @@ import {
   PageHeader,
   Pill,
 } from '@/components/dashboard/DashboardUI';
-import { useResource } from '@/context/AuthContext';
-import { apiPost } from '@/lib/api';
 import { useToast } from '@/components/ui/Toast';
-import { ROUTES } from '@/routes/paths';
 import {
-  formatLabel,
-  modeLabel,
-  statusTone,
-  type UncleTeepediaMineItem,
-} from '@/data/uncleteepedia';
+  useJoinCompetition,
+  usePrefetchPlayerState,
+  useUncleTeepediaMine,
+} from '@/hooks/useUncleTeepediaQueries';
+import { ROUTES } from '@/routes/paths';
+import { formatLabel, modeLabel, statusTone } from '@/data/uncleteepedia';
 import { ArrowRight, Gamepad2, Radio, Trophy, Users } from 'lucide-react';
 
-interface JoinResponse {
-  competition: {
-    id: string;
-    title: string;
-    format: string;
-    gameplayMode: string;
-    status: string;
-  };
-  participant: { id: string; status: string };
-  sessionId?: string | null;
-}
-
 export const StudentUncleTeepediaPage = () => {
-  const list = useResource<UncleTeepediaMineItem[]>('/uncleteepedia/mine');
+  const list = useUncleTeepediaMine();
+  const joinCompetition = useJoinCompetition();
+  const prefetchPlayerState = usePrefetchPlayerState();
   const navigate = useNavigate();
   const toast = useToast();
   const [code, setCode] = useState('');
@@ -47,12 +35,11 @@ export const StudentUncleTeepediaPage = () => {
     }
     setJoining(true);
     try {
-      const response = await apiPost<JoinResponse>('/uncleteepedia/join', { code: code.trim() });
-      toast.success(`Joined ${response.data.competition.title}`);
+      const joined = await joinCompetition.mutateAsync(code.trim());
+      toast.success(`Joined ${joined.competition.title}`);
       setCode('');
-      await list.reload();
-      if (response.data.sessionId) {
-        navigate(`${ROUTES.studentUncleTeepedia}/${response.data.sessionId}`);
+      if (joined.sessionId) {
+        navigate(`${ROUTES.studentUncleTeepedia}/${joined.sessionId}`);
       }
     } catch (error: any) {
       toast.error(error?.message ?? 'Could not join competition');
@@ -132,9 +119,9 @@ export const StudentUncleTeepediaPage = () => {
         </div>
       </Card>
 
-      {list.loading && <LoadingSkeleton rows={3} />}
-      {list.error && <ErrorState message={list.error} onRetry={list.reload} />}
-      {!list.loading && !list.error && competitions.length === 0 && (
+      {list.isPending && !list.data && <LoadingSkeleton rows={3} />}
+      {list.error && <ErrorState message={list.error.message} onRetry={() => list.refetch()} />}
+      {!list.isPending && !list.error && competitions.length === 0 && (
         <EmptyState message="You have not joined a competition yet. Enter a join code above." />
       )}
 
@@ -166,6 +153,7 @@ export const StudentUncleTeepediaPage = () => {
                   {canEnter ? (
                     <Link
                       to={`${ROUTES.studentUncleTeepedia}/${sessionId}`}
+                      onMouseEnter={() => sessionId && prefetchPlayerState(sessionId)}
                       className="inline-flex items-center gap-2 rounded bg-brand-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-brand-700"
                     >
                       <Gamepad2 size={15} />
