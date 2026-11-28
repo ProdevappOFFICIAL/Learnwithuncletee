@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { apiGet, apiGetPublic, apiPost } from '@/lib/api';
 import { ROUTES } from '@/routes/paths';
 import { siteInfo } from '@/data/content';
+import { ProctorPhotoGate } from '@/components/exam/ProctorPhotoGate';
 import { CheckCircle2, ChevronLeft } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -35,14 +36,44 @@ export interface LiveExam {
   };
 }
 
+interface ExamSecurityPolicy {
+  version: number;
+  environment: 'WEB' | 'DESKTOP';
+  photoRequired: boolean;
+  allowExternalBrowser: boolean;
+  shared?: Record<string, any>;
+  web?: Record<string, any> | null;
+  desktop?: Record<string, any> | null;
+}
+
+interface ExamPolicyResponse {
+  deployment: { id: string; code: string; examId: string; mode: string };
+  exam: { id: string; exam_name: string; minutes: number };
+  environment: 'WEB' | 'DESKTOP';
+  desktopVerified: boolean;
+  securityProfile: { id: string; name: string } | null;
+  policy: ExamSecurityPolicy;
+  desktopToken: string | null;
+}
+
+interface OnlineSessionStart {
+  id: string;
+  proctorPhotoStatus?: 'NOT_REQUIRED' | 'PENDING' | 'CAPTURED' | 'VERIFIED' | 'REJECTED';
+  proctorPhotoUrl?: string | null;
+  clientEnvironment?: 'WEB' | 'DESKTOP';
+}
+
 interface QuestionFeed {
   exam: { id: string; exam_name: string; minutes: number };
   questions: ExamQuestion[];
   subjects: Array<{ id: string; name: string }>;
   gate: { className: string; combinationName: string | null } | null;
+  deployment?: { id: string; code: string; securityProfileId: string | null };
+  environment?: 'WEB' | 'DESKTOP';
+  security?: ExamSecurityPolicy;
 }
 
-type Phase = 'loading' | 'unavailable' | 'login' | 'done';
+type Phase = 'loading' | 'unavailable' | 'login' | 'photo' | 'done';
 
 // Matches LoginPage's input style exactly
 const inputClass =
@@ -58,6 +89,10 @@ export const ExaminationPage = () => {
   const [exam, setExam] = useState<LiveExam['exam'] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [photoSessionId, setPhotoSessionId] = useState<string | null>(null);
+  const [photoExamName, setPhotoExamName] = useState('');
+  const [sittingUser, setSittingUser] = useState<{ id: string; user_name: string } | null>(null);
+  const [sittingPolicy, setSittingPolicy] = useState<ExamPolicyResponse | null>(null);
 
   // login form
   const [identity, setIdentity] = useState('');
@@ -100,6 +135,66 @@ export const ExaminationPage = () => {
    * feed → hand off to the exam room. Shared by the sign-in form and the
    * "continue as…" shortcut shown to an already-signed-in pupil.
    */
+  const loadQuestionsAndOpen = async (
+    me: { id: string; user_name: string },
+    policyData: ExamPolicyResponse,
+    startedSessionId?: string | null,
+  ) => {
+    if (!exam) return;
+    if (policyData.environment === 'WEB' && !policyData.policy.allowExternalBrowser) {
+      setError('This examination must be opened in the Learning with Uncle T Browser.');
+      setPhase('login');
+      return;
+    }
+
+    const feed = await apiGet<QuestionFeed>(`/exam-deployments/by-code/${code}/questions`);
+    if (feed.data.questions.length === 0) {
+      setError(
+        `Signed in as ${me.user_name}, but no questions are assigned to you in ${feed.data.exam.exam_name}` +
+        (feed.data.gate?.combinationName ? ` for combination ${feed.data.gate.combinationName}` : '') +
+        '. Check with your teacher.',
+      );
+      setPhase('login');
+      return;
+    }
+
+    // Questions are ready. Lock the desktop shell immediately before the room
+    // mounts, so a network failure cannot leave the pupil trapped in kiosk mode.
+    if (policyData.environment === 'DESKTOP') {
+      const bridge = (window as any).learnWithUncleTee;
+      if (!policyData.desktopToken || !bridge?.enterExamMode) {
+        setError(
+          'This examination needs the Learning with Uncle T Browser. Open it from the desktop app and try again.',
+        );
+        setPhase('login');
+        return;
+      }
+      try {
+        await bridge.enterExamMode({ token: policyData.desktopToken });
+      } catch {
+        setError('The desktop exam lock could not be applied. Restart the browser and try again.');
+        setPhase('login');
+        return;
+      }
+    }
+
+    sessionStorage.setItem(
+      `exam_session_${code}`,
+      JSON.stringify({
+        exam: feed.data.exam,
+        questions: feed.data.questions,
+        subjects: feed.data.subjects,
+        gate: feed.data.gate,
+        userId: me.id,
+        startedAt: Date.now(),
+        sessionId: startedSessionId,
+        environment: policyData.environment,
+        security: policyData.policy,
+      }),
+    );
+    window.location.href = ROUTES.examinationRoom.replace(':code', code);
+  };
+
   const beginSitting = async (me: { id: string; user_name: string }) => {
     if (!exam) return;
     // Submission lock: a locked online row means this pupil already
@@ -115,37 +210,55 @@ export const ExaminationPage = () => {
       );
       return;
     }
-    // Post-login: pull this pupil's filtered question feed (class → exam →
-    // combination → subject). 403 here means the exam isn't for their class.
-    const feed = await apiGet<QuestionFeed>(`/exam-deployments/by-code/${code}/questions`);
-    if (feed.data.questions.length === 0) {
-      setError(
-        `Signed in as ${me.user_name}, but no questions are assigned to you in ${feed.data.exam.exam_name}` +
-        (feed.data.gate?.combinationName ? ` for combination ${feed.data.gate.combinationName}` : '') +
-        '. Check with your teacher.',
-      );
+
+    const policyResponse = await apiGet<ExamPolicyResponse>(
+      `/exam-deployments/by-code/${code}/policy`,
+    );
+    const policyData = policyResponse.data;
+    setSittingUser(me);
+    setSittingPolicy(policyData);
+
+    if (policyData.environment === 'WEB' && !policyData.policy.allowExternalBrowser) {
+      setError('This examination must be opened in the Learning with Uncle T Browser.');
       return;
     }
-    // Store exam payload + userId in sessionStorage so ExamRoomPage can pick it up
+    if (policyData.environment === 'DESKTOP' && !policyData.desktopToken) {
+      setError('This examination needs the Learning with Uncle T Browser. Open it from the desktop app.');
+      return;
+    }
+
     const startedAt = new Date().toISOString();
-    sessionStorage.setItem(
-      `exam_session_${code}`,
-      JSON.stringify({ exam: feed.data.exam, questions: feed.data.questions, subjects: feed.data.subjects, gate: feed.data.gate, userId: me.id, startedAt: Date.now() }),
-    );
-
-    // ── Create the OnlineSession row in the backend (fire-and-forget) ──────────
-    // This ensures the admin sees every student who opens the exam, even those
-    // who abandon without submitting. Errors are swallowed so they never block
-    // the student from entering the exam room.
-    apiPost('/exam-sessions/online/start', {
+    const started = await apiPost<OnlineSessionStart>('/exam-sessions/online/start', {
       userId: me.id,
-      examId: feed.data.exam.id,
+      examId: exam.id,
+      deploymentId: policyData.deployment.id,
+      clientEnvironment: policyData.environment,
       startedAt,
-      timeLeft: (feed.data.exam.minutes || 60) * 60,
-    }).catch(() => { /* non-blocking — session row is best-effort */ });
+      timeLeft: (exam.minutes || 60) * 60,
+      securityProfileId: policyData.securityProfile?.id ?? null,
+      securitySnapshot: policyData.policy,
+      photoRequired: policyData.policy.photoRequired,
+    });
 
-    // Hard navigate so ExamRoomPage mounts fresh (prevents back-button to login mid-exam)
-    window.location.href = ROUTES.examinationRoom.replace(':code', code);
+    const photoReady = ['CAPTURED', 'VERIFIED'].includes(String(started.data.proctorPhotoStatus));
+    if (policyData.policy.photoRequired && !photoReady) {
+      setPhotoSessionId(started.data.id);
+      setPhotoExamName(exam.exam_name);
+      setPhase('photo');
+      return;
+    }
+
+    await loadQuestionsAndOpen(me, policyData, started.data.id);
+  };
+
+  const finishPhotoGate = async () => {
+    if (!sittingUser || !sittingPolicy) return;
+    try {
+      await loadQuestionsAndOpen(sittingUser, sittingPolicy, photoSessionId);
+    } catch (err: any) {
+      setError(err?.message ?? 'Could not open the examination.');
+      setPhase('login');
+    }
   };
 
   const doLogin = async (e: React.FormEvent) => {
@@ -177,6 +290,20 @@ export const ExaminationPage = () => {
   };
 
   // ─── Render ─────────────────────────────────────────────────────────────────
+
+  if (phase === 'photo' && photoSessionId) {
+    return (
+      <ProctorPhotoGate
+        sessionId={photoSessionId}
+        examName={photoExamName}
+        onComplete={finishPhotoGate}
+        onCancel={() => {
+          setPhotoSessionId(null);
+          setPhase('login');
+        }}
+      />
+    );
+  }
 
   return (
     <>

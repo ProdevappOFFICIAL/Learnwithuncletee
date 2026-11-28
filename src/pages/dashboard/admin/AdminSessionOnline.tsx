@@ -10,7 +10,7 @@ import { useResource } from '@/context/AuthContext';
 import { useAcademicSettings, ACADEMIC_TERMS } from '@/lib/academic';
 import { sessionOptions } from '@/data/dashboard';
 import type { ClassItem } from '@/data/dashboard';
-import { Clock, CheckCircle2, XCircle, Eye } from 'lucide-react';
+import { Camera, Clock, CheckCircle2, XCircle, Eye } from 'lucide-react';
 
 interface SessionRow {
   id: string;
@@ -29,6 +29,10 @@ interface SessionRow {
   deployment?: { id: string; code: string } | null;
   session?: string | null;
   term?: string | null;
+  clientEnvironment?: 'WEB' | 'DESKTOP';
+  proctorPhotoStatus?: string;
+  proctorPhotoUrl?: string | null;
+  proctorPhotoCapturedAt?: string | null;
   createdAt: string;
 }
 
@@ -144,6 +148,8 @@ export const AdminSessionOnline = () => {
                 <thead>
                   <tr>
                     <Th>Pupil</Th>
+                    <Th>Mode</Th>
+                    <Th>Photo</Th>
                     <Th>Exam</Th>
                     <Th>Session / Term</Th>
                     <Th>Class</Th>
@@ -162,6 +168,26 @@ export const AdminSessionOnline = () => {
                       <Td>
                         <span className="font-bold">{r.user?.user_name ?? '—'}</span>
                         <span className="block text-xs text-muted">{r.user?.user_email ?? ''}</span>
+                      </Td>
+                      <Td>
+                        <Pill tone={r.clientEnvironment === 'DESKTOP' ? 'violet' : 'sky'}>
+                          {r.clientEnvironment === 'DESKTOP' ? 'Desktop' : 'Web'}
+                        </Pill>
+                      </Td>
+                      <Td>
+                        {r.proctorPhotoUrl ? (
+                          <button
+                            type="button"
+                            onClick={() => window.open(r.proctorPhotoUrl as string, '_blank', 'noopener')}
+                            className="inline-flex items-center gap-1 rounded border border-line px-2 py-1 text-xs font-bold text-brand-700 hover:border-brand-500"
+                          >
+                            <Camera size={12} /> View
+                          </button>
+                        ) : (
+                          <span className="text-xs text-muted">
+                            {r.proctorPhotoStatus === 'PENDING' ? 'Pending' : '—'}
+                          </span>
+                        )}
                       </Td>
                       <Td>{r.exam?.exam_name ?? '—'}</Td>
                       <Td className="text-muted text-xs">{r.session || '—'}{r.term ? ` · ${r.term}` : ''}</Td>

@@ -294,7 +294,34 @@ const AttachmentDialog = ({ src, onClose }: { src: string; onClose: () => void }
 
 // ─── Session payload stored by ExaminationPage on login ───────────────────────
 
-interface ExamSession {
+interface ExamRoomPolicy {
+  environment?: 'WEB' | 'DESKTOP';
+  security?: {
+    version?: number;
+    environment?: 'WEB' | 'DESKTOP';
+    photoRequired?: boolean;
+    allowExternalBrowser?: boolean;
+    shared?: Record<string, any>;
+    web?: {
+      requireFullScreen?: boolean;
+      detectTabSwitch?: boolean;
+      tabSwitchPolicy?: 'WARN' | 'SUBMIT' | 'LOCK';
+      detectWindowBlur?: boolean;
+      detectCopyPaste?: boolean;
+      copyPastePolicy?: 'ALLOW' | 'BLOCK' | 'BLOCK_AND_WARN';
+      detectRightClick?: boolean;
+      detectDevTools?: boolean;
+      lockOnViolation?: boolean;
+      autoSubmitOnLeave?: boolean;
+      maxViolations?: number;
+      watermarkPaper?: boolean;
+    } | null;
+    desktop?: Record<string, any> | null;
+  } | null;
+  sessionId?: string;
+}
+
+interface ExamSession extends ExamRoomPolicy {
   exam: LiveExam['exam'];
   questions: ExamQuestion[];
   gate?: { className: string; combinationName: string | null } | null;
@@ -470,48 +497,98 @@ export const ExamRoomPage = () => {
     [flushProgress],
   );
 
-  // ── Anti-cheat: tab-switch / visibility / beforeunload ──────────────────────
+  // ── Policy-driven anti-cheat ─────────────────────────────────────────────────
+  const webPolicy = session?.security?.web ?? null;
+  const isDesktopExam =
+    session?.environment === 'DESKTOP' || session?.security?.environment === 'DESKTOP';
+  const MAX_VIOLATIONS = Math.max(1, Number(webPolicy?.maxViolations) || 3);
+  const violationPolicy = webPolicy?.tabSwitchPolicy ?? 'WARN';
+  const detectTabSwitch = webPolicy ? webPolicy.detectTabSwitch !== false : true;
+  const detectWindowBlur = webPolicy ? webPolicy.detectWindowBlur !== false : true;
+  const autoSubmitOnLeave = Boolean(webPolicy?.autoSubmitOnLeave);
   const violationsRef = useRef(0);
-  const MAX_VIOLATIONS = 3;
   const [warnCount, setWarnCount] = useState(0);
   const [warnOpen, setWarnOpen] = useState(false);
   const submitRef = useRef<(() => Promise<void>) | null>(null);
 
-  const handleViolation = useCallback(() => {
-    if (submitted) return;
-    violationsRef.current += 1;
-    const v = violationsRef.current;
-    setWarnCount(v);
-    setWarnOpen(true);
-    if (v >= MAX_VIOLATIONS) {
-      // Auto-submit on 3rd violation
-      submitRef.current?.();
-    }
-  }, [submitted]);
+  const handleViolation = useCallback(
+    (source: 'TAB_SWITCH' | 'WINDOW_BLUR' | 'COPY_PASTE' | 'RIGHT_CLICK' = 'TAB_SWITCH') => {
+      if (submitted) return;
+      if (source === 'TAB_SWITCH' && !detectTabSwitch) return;
+      if (source === 'WINDOW_BLUR' && !detectWindowBlur) return;
+      violationsRef.current += 1;
+      const v = violationsRef.current;
+      setWarnCount(v);
+      setWarnOpen(true);
+      const mustSubmit =
+        autoSubmitOnLeave ||
+        Boolean(webPolicy?.lockOnViolation) ||
+        (v >= MAX_VIOLATIONS && violationPolicy !== 'WARN');
+      if (mustSubmit) submitRef.current?.();
+    },
+    [
+      submitted,
+      detectTabSwitch,
+      detectWindowBlur,
+      autoSubmitOnLeave,
+      MAX_VIOLATIONS,
+      violationPolicy,
+      webPolicy?.lockOnViolation,
+    ],
+  );
 
   useEffect(() => {
-    // Relaxed exit guard: a plain reload resumes from saved progress (answers +
-    // current question persist, timer runs from startedAt), so only genuine
-    // tab-switching counts as a violation — no more reload block.
-    // Tab switch / window minimise
     const onVisibilityChange = () => {
-      if (document.hidden) handleViolation();
+      if (document.hidden) handleViolation('TAB_SWITCH');
     };
-
-    // Window blur (switch to another app)
     const onBlur = () => {
-      if (document.hidden) return; // already handled above
-      handleViolation();
+      if (document.hidden) return;
+      handleViolation('WINDOW_BLUR');
     };
-
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    window.addEventListener('blur', onBlur);
-
+    if (detectTabSwitch) document.addEventListener('visibilitychange', onVisibilityChange);
+    if (detectWindowBlur) window.addEventListener('blur', onBlur);
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('blur', onBlur);
     };
-  }, [handleViolation, submitted]);
+  }, [handleViolation, detectTabSwitch, detectWindowBlur, submitted]);
+
+  useEffect(() => {
+    if (!webPolicy?.requireFullScreen || isDesktopExam) return;
+    const target = document.documentElement;
+    if (!document.fullscreenElement) {
+      const request = target.requestFullscreen?.();
+      if (request) request.catch(() => {});
+    }
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement && !submitted) handleViolation();
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, [webPolicy?.requireFullScreen, isDesktopExam, handleViolation, submitted]);
+
+  useEffect(() => {
+    const block = (event: Event) => {
+      event.preventDefault();
+      if (webPolicy?.copyPastePolicy === 'BLOCK_AND_WARN') handleViolation('COPY_PASTE');
+    };
+    const blockContext = (event: Event) => {
+      event.preventDefault();
+      handleViolation('RIGHT_CLICK');
+    };
+    if (webPolicy?.detectCopyPaste && webPolicy.copyPastePolicy !== 'ALLOW') {
+      document.addEventListener('copy', block);
+      document.addEventListener('cut', block);
+      document.addEventListener('paste', block);
+    }
+    if (webPolicy?.detectRightClick) document.addEventListener('contextmenu', blockContext);
+    return () => {
+      document.removeEventListener('copy', block);
+      document.removeEventListener('cut', block);
+      document.removeEventListener('paste', block);
+      document.removeEventListener('contextmenu', blockContext);
+    };
+  }, [webPolicy?.detectCopyPaste, webPolicy?.copyPastePolicy, webPolicy?.detectRightClick, handleViolation]);
 
   // ── Stable shuffled options ─────────────────────────────────────────────────
   // The server pre-shuffles options per question (answers never reach the
@@ -582,14 +659,28 @@ export const ExamRoomPage = () => {
       const combinedAnswers: Record<string, any> = {};
       for (const [qId, idx] of Object.entries(picked)) combinedAnswers[qId] = idx;
       for (const [qId, text] of Object.entries(typed)) combinedAnswers[qId] = text;
-      apiPost('/exam-sessions/online/submit', {
-        userId,
-        examId: exam.id,
-        answers: combinedAnswers,
-        timeLeft: secondsLeft,
-        overallScore: res.data.overallScore,
-        questionAttempts,
-      }).catch(() => { /* non-blocking — result already saved */ });
+      let unlockToken: string | undefined;
+      try {
+        const finalised = await apiPost<{ unlockToken?: string }>('/exam-sessions/online/submit', {
+          userId,
+          examId: exam.id,
+          answers: combinedAnswers,
+          timeLeft: secondsLeft,
+          overallScore: res.data.overallScore,
+          questionAttempts,
+        });
+        unlockToken = finalised.data?.unlockToken;
+      } catch {
+        /* result is already saved; navigation will still exit desktop exam mode */
+      }
+      const desktopBridge = (window as any).learnWithUncleTee;
+      if (desktopBridge?.exitExamMode) {
+        try {
+          await desktopBridge.exitExamMode(unlockToken ? { token: unlockToken } : {});
+        } catch {
+          /* the shell also exits when navigation reaches the result page */
+        }
+      }
 
       setSubmitted(true);
       sessionStorage.removeItem(sessionKey);
@@ -605,7 +696,7 @@ export const ExamRoomPage = () => {
       setError(err?.message ?? 'Submit failed. Please try again.');
       setBusy(false);
     }
-  }, [exam, busy, userId, submitted, picked, typed, optionsByQ, sessionKey, progressKey, code, questions]);
+  }, [exam, busy, userId, submitted, picked, typed, optionsByQ, sessionKey, progressKey, code, questions, session, secondsLeft]);
 
   // Keep submitRef in sync so the anti-cheat handler can call it
   useEffect(() => { submitRef.current = submit; }, [submit]);

@@ -76,6 +76,26 @@ export interface DeploymentSecuritySettings {
   offlineSyncResults: boolean;
   offlineLockAfterSubmit: boolean;
   offlineRequireHostApproval: boolean;
+  // Browser policy
+  webAllowExternalBrowser: boolean;
+  // Desktop browser lockdown (official Electron shell)
+  desktopLockSingleTab: boolean;
+  desktopHideBrowserChrome: boolean;
+  desktopDisableBack: boolean;
+  desktopDisableForward: boolean;
+  desktopDisableReload: boolean;
+  desktopDisableAddressBar: boolean;
+  desktopDisableNewTabs: boolean;
+  desktopDisableCloseTab: boolean;
+  desktopDisableTabSwitch: boolean;
+  desktopDisableDevTools: boolean;
+  desktopDisableContextMenu: boolean;
+  desktopDisableDownloads: boolean;
+  desktopDisablePrint: boolean;
+  desktopBlockExternalNavigation: boolean;
+  desktopPreventWindowClose: boolean;
+  desktopDetectBlur: boolean;
+  desktopShowWatermark: boolean;
   // Limits
   maxQuestions: number;
   maxViolations: number;
@@ -95,6 +115,7 @@ export interface DeploymentSecuritySettings {
   blockedKeys: BlockedKey[];
   monitoredEvents: MonitoredEvent[];
   restrictions: DeviceRestriction[];
+  allowedOrigins: string[];
 }
 
 export type BooleanSecurityKey = {
@@ -150,6 +171,26 @@ export const DEFAULT_SECURITY_SETTINGS: DeploymentSecuritySettings = {
   offlineSyncResults: true,
   offlineLockAfterSubmit: true,
   offlineRequireHostApproval: false,
+  // Browser policy
+  webAllowExternalBrowser: true,
+  // Desktop browser lockdown
+  desktopLockSingleTab: true,
+  desktopHideBrowserChrome: true,
+  desktopDisableBack: true,
+  desktopDisableForward: true,
+  desktopDisableReload: true,
+  desktopDisableAddressBar: true,
+  desktopDisableNewTabs: true,
+  desktopDisableCloseTab: true,
+  desktopDisableTabSwitch: true,
+  desktopDisableDevTools: true,
+  desktopDisableContextMenu: true,
+  desktopDisableDownloads: true,
+  desktopDisablePrint: true,
+  desktopBlockExternalNavigation: true,
+  desktopPreventWindowClose: true,
+  desktopDetectBlur: true,
+  desktopShowWatermark: false,
   // Limits
   maxQuestions: 0,
   maxViolations: 3,
@@ -169,6 +210,7 @@ export const DEFAULT_SECURITY_SETTINGS: DeploymentSecuritySettings = {
   blockedKeys: ['F12', 'Ctrl+Shift+I'],
   monitoredEvents: ['TAB_SWITCH', 'WINDOW_BLUR', 'FULLSCREEN_EXIT'],
   restrictions: ['NO_REFRESH', 'NO_BACK'],
+  allowedOrigins: [],
 };
 
 /** Fresh defaults — arrays are copied so edits never mutate the shared object. */
@@ -177,6 +219,7 @@ export const cloneDefaultSecuritySettings = (): DeploymentSecuritySettings => ({
   blockedKeys: [...DEFAULT_SECURITY_SETTINGS.blockedKeys],
   monitoredEvents: [...DEFAULT_SECURITY_SETTINGS.monitoredEvents],
   restrictions: [...DEFAULT_SECURITY_SETTINGS.restrictions],
+  allowedOrigins: [...DEFAULT_SECURITY_SETTINGS.allowedOrigins],
 });
 
 /** Merge an API payload over defaults, tolerating partial/legacy profiles. */
@@ -191,6 +234,7 @@ export const mergeSecuritySettings = (
     blockedKeys: Array.isArray(value.blockedKeys) ? [...value.blockedKeys] : base.blockedKeys,
     monitoredEvents: Array.isArray(value.monitoredEvents) ? [...value.monitoredEvents] : base.monitoredEvents,
     restrictions: Array.isArray(value.restrictions) ? [...value.restrictions] : base.restrictions,
+    allowedOrigins: Array.isArray(value.allowedOrigins) ? [...value.allowedOrigins] : base.allowedOrigins,
   };
 };
 
@@ -242,9 +286,31 @@ export const SECURITY_SWITCH_GROUPS: SecuritySwitchGroup[] = [
       { key: 'lockOnViolation', label: 'Lock on violation' },
       { key: 'autoSubmitOnLeave', label: 'Auto-submit when pupil leaves' },
       { key: 'requireProctorApproval', label: 'Require proctor approval', hint: 'A staff member must release each pupil.' },
-      { key: 'requirePhotoCapture', label: 'Require photo capture', hint: 'Take a webcam snapshot at sign-in.' },
+      { key: 'requirePhotoCapture', label: 'Require photo capture (web)', hint: 'Take a webcam snapshot before releasing questions in an external browser.' },
+      { key: 'webAllowExternalBrowser', label: 'Allow external browsers', hint: 'If off, the exam only opens inside the Learning with Uncle T Browser.' },
     ],
   },
+];
+
+/** Lockdown switches applied only by the official desktop browser shell. */
+export const SECURITY_DESKTOP_SWITCHES: SecuritySwitchDef[] = [
+  { key: 'desktopLockSingleTab', label: 'Lock to one exam tab' },
+  { key: 'desktopHideBrowserChrome', label: 'Hide tabs, toolbar and address bar' },
+  { key: 'desktopDisableBack', label: 'Disable back navigation', hint: 'Blocks the button, Alt+Left and history navigation.' },
+  { key: 'desktopDisableForward', label: 'Disable forward navigation', hint: 'Blocks the button and Alt+Right.' },
+  { key: 'desktopDisableReload', label: 'Disable reload', hint: 'Blocks Ctrl+R, F5 and the reload button.' },
+  { key: 'desktopDisableAddressBar', label: 'Disable address bar' },
+  { key: 'desktopDisableNewTabs', label: 'Disable new tabs and windows' },
+  { key: 'desktopDisableCloseTab', label: 'Disable closing the exam tab' },
+  { key: 'desktopDisableTabSwitch', label: 'Disable tab switching' },
+  { key: 'desktopDisableDevTools', label: 'Disable developer tools' },
+  { key: 'desktopDisableContextMenu', label: 'Disable right-click menu' },
+  { key: 'desktopDisableDownloads', label: 'Disable downloads' },
+  { key: 'desktopDisablePrint', label: 'Disable printing' },
+  { key: 'desktopBlockExternalNavigation', label: 'Block navigation outside the allowlist' },
+  { key: 'desktopPreventWindowClose', label: 'Prevent closing the exam window' },
+  { key: 'desktopDetectBlur', label: 'Detect window blur' },
+  { key: 'desktopShowWatermark', label: 'Show pupil watermark' },
 ];
 
 export const SECURITY_OFFLINE_SWITCHES: SecuritySwitchDef[] = [

@@ -25,7 +25,8 @@ export type UploadEndpoint =
   | 'assignmentUploader'
   | 'lessonMaterialUploader'
   | 'galleryUploader'
-  | 'formResponseUploader';
+  | 'formResponseUploader'
+  | 'proctorPhotoUploader';
 
 interface UploadButtonProps {
   endpoint: UploadEndpoint;

@@ -16,6 +16,7 @@ import { apiDelete, apiPatch, apiPost } from '@/lib/api';
 import type { ExamDeploymentItem } from '@/data/dashboard';
 import {
   SECURITY_CHECK_GROUPS,
+  SECURITY_DESKTOP_SWITCHES,
   SECURITY_NUMBERS,
   SECURITY_OFFLINE_RADIO,
   SECURITY_OFFLINE_SWITCHES,
@@ -47,12 +48,12 @@ import {
 const MODE_META: Record<DeploymentSecurityMode, { label: string; blurb: string; icon: typeof Cloud }> = {
   ONLINE: {
     label: 'Online',
-    blurb: 'Applied to web exam deployments at /examination/:code.',
+    blurb: 'Applied to online deployments: the web rules cover normal browsers and the desktop rules cover the Learning with Uncle T Browser.',
     icon: Cloud,
   },
   OFFLINE: {
     label: 'Offline',
-    blurb: 'Applied to bundles downloaded by the desktop host app.',
+    blurb: 'Applied to bundles downloaded by the desktop host app; the desktop browser rules are used.',
     icon: CloudOff,
   },
 };
@@ -554,9 +555,56 @@ export const AdminDeploymentSecurity = () => {
             ))}
           </section>
 
+          <section className="space-y-3 rounded border border-brand-200 bg-brand-50/50 p-4">
+            <SectionHeading
+              title="Desktop browser lockdown"
+              text="Used only when this exam is opened inside the Learning with Uncle T Browser. The native shell enforces these rules."
+            />
+            <div className="grid gap-2 sm:grid-cols-2">
+              {SECURITY_DESKTOP_SWITCHES.map((option) => (
+                <SwitchRow
+                  key={option.key}
+                  label={option.label}
+                  hint={option.hint}
+                  checked={settings[option.key]}
+                  onChange={(next) => setBool(option.key, next)}
+                />
+              ))}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <RadioGroup
+                label={SECURITY_OFFLINE_RADIO.label}
+                value={settings[SECURITY_OFFLINE_RADIO.key]}
+                options={SECURITY_OFFLINE_RADIO.options}
+                onChange={(value) => setPolicy(SECURITY_OFFLINE_RADIO.key, value)}
+              />
+              <label className="block border border-line bg-white p-3 text-sm font-semibold">
+                Allowed origins
+                <span className="mt-0.5 block text-xs font-normal leading-relaxed text-muted">
+                  One origin per line. Leave empty to allow the school website and localhost.
+                </span>
+                <textarea
+                  rows={5}
+                  value={settings.allowedOrigins.join('\n')}
+                  onChange={(event) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      allowedOrigins: event.target.value
+                        .split(/[\n,]+/)
+                        .map((value) => value.trim())
+                        .filter((value) => /^https?:\/\//i.test(value)),
+                    }))
+                  }
+                  placeholder={'https://learnwithuncletee.org\nhttps://www.learnwithuncletee.org'}
+                  className="mt-2 w-full rounded border border-line bg-white px-3 py-2 font-mono text-xs outline-none focus:border-brand-500"
+                />
+              </label>
+            </div>
+          </section>
+
           {activeMode === 'OFFLINE' && (
             <section className="space-y-2">
-              <SectionHeading title="Desktop host behaviour" text="Only applied when the offline bundle runs in the desktop host app." />
+              <SectionHeading title="Offline host behaviour" text="Only applied when the offline bundle runs in the desktop host app." />
               <div className="grid gap-2 sm:grid-cols-2">
                 {SECURITY_OFFLINE_SWITCHES.map((option) => (
                   <SwitchRow
@@ -567,14 +615,6 @@ export const AdminDeploymentSecurity = () => {
                     onChange={(next) => setBool(option.key, next)}
                   />
                 ))}
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <RadioGroup
-                  label={SECURITY_OFFLINE_RADIO.label}
-                  value={settings[SECURITY_OFFLINE_RADIO.key]}
-                  options={SECURITY_OFFLINE_RADIO.options}
-                  onChange={(value) => setPolicy(SECURITY_OFFLINE_RADIO.key, value)}
-                />
               </div>
             </section>
           )}

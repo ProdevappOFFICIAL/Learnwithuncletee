@@ -5,7 +5,7 @@ import { apiDelete, apiPost } from '@/lib/api';
 import { UploadButton } from '@/lib/uploadthing';
 import { TERM_OPTIONS, sessionOptions, type GradeData, type ResultDocData, type StudentRow } from '@/data/dashboard';
 import type { ClassItem } from '@/data/dashboard';
-import { Download, FileText, Trash2 } from 'lucide-react';
+import { Camera, Download, FileText, Trash2 } from 'lucide-react';
 
 interface ClassRow extends GradeData {
   studentName: string;
@@ -20,6 +20,9 @@ interface ExamAttemptRow {
   date: string;
   user?: { user_name: string; user_email: string; class?: { name: string } | null };
   exam?: { exam_name: string };
+  proctorPhotoUrl?: string | null;
+  proctorPhotoCapturedAt?: string | null;
+  onlineSessionId?: string | null;
 }
 
 //const SUBJECTS = ['Mathematics', 'English Language', 'Basic Science', 'Social Studies', 'ICT', 'Civic Education'];
@@ -290,6 +293,7 @@ export const AdminResultsPage = () => {
                   <Th>Exam</Th>
                   <Th>Class</Th>
                   <Th>Mode</Th>
+                  <Th>Identity</Th>
                   <Th>Score</Th>
                   <Th>Date</Th>
                 </tr>
@@ -307,6 +311,19 @@ export const AdminResultsPage = () => {
                       <Pill tone={row.origin === 'OFFLINE' ? 'amber' : 'sky'}>
                         {row.origin === 'OFFLINE' ? 'Offline' : 'Online'}
                       </Pill>
+                    </Td>
+                    <Td>
+                      {row.proctorPhotoUrl ? (
+                        <button
+                          type="button"
+                          onClick={() => window.open(row.proctorPhotoUrl as string, '_blank', 'noopener')}
+                          className="inline-flex items-center gap-1 rounded border border-line px-2 py-1 text-xs font-bold text-brand-700 hover:border-brand-500"
+                        >
+                          <Camera size={12} /> View
+                        </button>
+                      ) : (
+                        <span className="text-xs text-muted">—</span>
+                      )}
                     </Td>
                     <Td>
                       <Pill

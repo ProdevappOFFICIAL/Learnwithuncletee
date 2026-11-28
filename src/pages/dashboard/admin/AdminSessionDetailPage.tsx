@@ -1,10 +1,11 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { apiGet } from '@/lib/api';
+import { apiDelete, apiGet } from '@/lib/api';
 import {
-  Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, PageHeader, Pill,
+  Card, CardHead, EmptyState, ErrorState, LoadingSkeleton, Modal, PageHeader, Pill,
 } from '@/components/dashboard/DashboardUI';
-import { ArrowLeft, CheckCircle2, XCircle, Clock, User, BookOpen, Minus } from 'lucide-react';
+import { ArrowLeft, Camera, CheckCircle2, Trash2, XCircle, Clock, User, BookOpen, Minus } from 'lucide-react';
 
 interface QuestionDetail {
   questionId: string;
@@ -36,6 +37,11 @@ interface SessionDetail {
   user?: { id: string; user_name: string; user_email: string; class?: { name: string } | null };
   exam?: { id: string; exam_name: string; minutes: number };
   deployment?: { id: string; code: string } | null;
+  clientEnvironment?: 'WEB' | 'DESKTOP';
+  proctorPhotoUrl?: string | null;
+  proctorPhotoCapturedAt?: string | null;
+  proctorPhotoSource?: string | null;
+  proctorPhotoStatus?: string;
   questionDetail: QuestionDetail[];
 }
 
@@ -58,6 +64,8 @@ const stripHtml = (html: string) => {
 export const AdminSessionDetailPage = () => {
   const { mode, id } = useParams<{ mode: string; id: string }>();
   const navigate = useNavigate();
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const [deletingPhoto, setDeletingPhoto] = useState(false);
 
   const endpoint = mode === 'online'
     ? `/exam-sessions/online/${id}`
@@ -70,6 +78,20 @@ export const AdminSessionDetailPage = () => {
   });
 
   const session: SessionDetail | undefined = (res as any)?.data ?? res;
+
+  const deletePhoto = async () => {
+    if (!session || !confirm('Delete this proctoring photo? This cannot be undone.')) return;
+    setDeletingPhoto(true);
+    try {
+      await apiDelete(`/exam-sessions/online/${session.id}/photo`);
+      await refetch();
+      setPhotoOpen(false);
+    } catch (error: any) {
+      alert(error?.message ?? 'Could not delete the photo.');
+    } finally {
+      setDeletingPhoto(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -161,6 +183,99 @@ export const AdminSessionDetailPage = () => {
               </p>
             </div>
           </div>
+
+          <Card>
+            <CardHead
+              title="Identity photo"
+              sub="Admins only · captured before the exam questions were released"
+            />
+            <div className="flex flex-wrap items-center gap-5 p-5">
+              {session.proctorPhotoUrl ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setPhotoOpen(true)}
+                    className="overflow-hidden rounded border border-line"
+                    aria-label="View proctoring photo"
+                  >
+                    <img
+                      src={session.proctorPhotoUrl}
+                      alt="Pupil identity snapshot"
+                      className="h-28 w-36 object-cover"
+                    />
+                  </button>
+                  <div className="min-w-0 flex-1 text-sm">
+                    <p className="font-bold text-ink">
+                      {session.user?.user_name ?? 'Pupil'} ·{' '}
+                      <span className="font-normal text-muted">
+                        {session.clientEnvironment === 'DESKTOP' ? 'Desktop browser' : 'Web browser'}
+                      </span>
+                    </p>
+                    <p className="mt-1 text-xs text-muted">
+                      Captured:{' '}
+                      {session.proctorPhotoCapturedAt
+                        ? new Date(session.proctorPhotoCapturedAt).toLocaleString()
+                        : 'Time not recorded'}
+                      {session.proctorPhotoSource ? ` · ${session.proctorPhotoSource}` : ''}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPhotoOpen(true)}
+                        className="inline-flex items-center gap-1.5 rounded bg-brand-900 px-3 py-2 text-xs font-bold text-white hover:bg-brand-700"
+                      >
+                        <Camera size={13} /> View image
+                      </button>
+                      <button
+                        type="button"
+                        onClick={deletePhoto}
+                        disabled={deletingPhoto}
+                        className="inline-flex items-center gap-1.5 rounded border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                      >
+                        <Trash2 size={13} /> {deletingPhoto ? 'Deleting…' : 'Delete image'}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-3 text-sm text-muted">
+                  <Camera size={22} className="text-muted" />
+                  <span>
+                    {session.proctorPhotoStatus === 'PENDING'
+                      ? 'The pupil has not captured a photo yet.'
+                      : 'No proctoring photo was captured for this sitting.'}
+                  </span>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          <Modal
+            open={photoOpen && Boolean(session.proctorPhotoUrl)}
+            onClose={() => setPhotoOpen(false)}
+            title={`Identity photo — ${session.user?.user_name ?? 'Pupil'}`}
+            size="lg"
+          >
+            {session.proctorPhotoUrl && (
+              <div className="space-y-3">
+                <img
+                  src={session.proctorPhotoUrl}
+                  alt="Pupil identity snapshot"
+                  className="max-h-[65vh] w-full rounded border border-line object-contain"
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={deletePhoto}
+                    disabled={deletingPhoto}
+                    className="inline-flex items-center gap-1.5 rounded border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                  >
+                    <Trash2 size={13} /> Delete image
+                  </button>
+                </div>
+              </div>
+            )}
+          </Modal>
 
           {/* ── Question Breakdown ── */}
           <Card>
